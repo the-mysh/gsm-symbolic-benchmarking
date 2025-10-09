@@ -1,0 +1,11 @@
+name: gsm
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - notebook
+  - huggingface_hub
+  - datasets
+  - pip
+  - pip:
+      - langchain-huggingface==0.2.0
