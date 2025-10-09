@@ -8,4 +8,6 @@ dependencies:
   - datasets
   - pip
   - pip:
-      - langchain-huggingface==0.2.0
+      - langchain-huggingface
+      - langchain
+      - ipywidgets
