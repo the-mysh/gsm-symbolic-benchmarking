@@ -111,7 +111,3 @@ venv.bak/
 .mypy_cache/
 data_explorer/.appconfig.INI
 *.de
-
-
-# custom
-/token.txt
