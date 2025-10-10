@@ -6,32 +6,33 @@ by Claude Sonnet
 
 import os
 import re
-import json
 import numpy as np
 import pandas as pd
-from pathlib import Path
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 from tqdm.auto import tqdm
-
-# HuggingFace imports
+import logging
 from datasets import load_dataset
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    pipeline
-)
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
+
+from gsm_benchmarker.utils.logging_setup import install_colored_logger
+
+
+logger = logging.getLogger(__name__)
+
 
 # Optional: For API-based models
 try:
     import openai
 except ImportError:
+    logger.warning("Could not import openai")
     openai = None
 
 try:
     import anthropic
 except ImportError:
+    logger.warning("Could not import anthropic")
     anthropic = None
 
 
@@ -53,19 +54,21 @@ class BenchmarkConfig:
 class GSMSymbolicDataset:
     """Handler for GSM-Symbolic dataset from HuggingFace"""
 
-    def __init__(self, split: str = "p1"):
+    DSET_NAME = "apple/GSM-Symbolic"
+
+    def __init__(self, variant: str = "main"):
         """
         Load GSM-Symbolic dataset
 
         Args:
-            split: Dataset variant - 'p1' (default), 'p2', 'm1', 'noop', etc.
+            variant: Dataset variant - 'main' (default) / 'p1' / 'p2'.
         """
-        print(f"Loading GSM-Symbolic dataset (split: {split})...")
+        logger.info(f"Loading GSM-Symbolic dataset (variant: {variant})...")
 
         # Load from HuggingFace
-        self.dataset = load_dataset("apple/GSM-Symbolic", split=split)
+        self.dataset = load_dataset(self.DSET_NAME, variant, split="test")
 
-        print(f"Loaded {len(self.dataset)} examples")
+        logger.info(f"Loaded {len(self.dataset)} examples")
 
     def get_instances_by_id(self, original_id: int) -> List[Dict]:
         """Get all instances of a specific question template"""
@@ -76,7 +79,8 @@ class GSMSymbolicDataset:
 
     def get_unique_templates(self) -> List[int]:
         """Get list of unique template IDs"""
-        return sorted(set(ex['original_id'] for ex in self.dataset))
+
+        return list(set(self.dataset['original_id']))
 
     def create_evaluation_sets(self, num_instances: int = 50) -> List[List[Dict]]:
         """
@@ -84,12 +88,15 @@ class GSMSymbolicDataset:
         Each set contains 100 examples (one per template)
 
         Returns:
-            List of 50 datasets, each with 100 examples
+            List of <num_instances> sets, each with 100 examples
         """
+
+        logger.info(f"Creating {num_instances} sets")
+
         templates = self.get_unique_templates()
         eval_sets = []
 
-        for instance_idx in range(num_instances):
+        for instance_idx in tqdm(range(num_instances), desc="set", position=0):
             eval_set = []
             for template_id in templates:
                 # Get all instances for this template
@@ -149,7 +156,7 @@ class HuggingFaceModelEvaluator:
         self.config = config
         self.extractor = AnswerExtractor()
 
-        print(f"Loading model: {model_name}")
+        logger.info(f"Loading model: {model_name}")
 
         # Load tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(
@@ -179,7 +186,7 @@ class HuggingFaceModelEvaluator:
             **model_kwargs
         )
 
-        print(f"Model loaded on {config.device}")
+        logger.info(f"Model loaded on {config.device}")
 
     def create_prompt(self, question: str, answer: str = None) -> str:
         """Create 8-shot CoT prompt following paper's format"""
@@ -397,9 +404,9 @@ def run_full_benchmark():
     # Evaluate each model
     for model_type, model_list in models_config.items():
         for model_name in model_list:
-            print(f"\n{'=' * 60}")
-            print(f"Evaluating: {model_name}")
-            print(f"{'=' * 60}\n")
+            logger.info(f"\n{'=' * 60}")
+            logger.info(f"Evaluating: {model_name}")
+            logger.info(f"{'=' * 60}\n")
 
             model_results = {'Model': model_name}
 
@@ -414,7 +421,7 @@ def run_full_benchmark():
                 if variant_split is None:
                     continue  # Skip if not implemented
 
-                print(f"\nVariant: {variant_name}")
+                logger.info(f"\nVariant: {variant_name}")
 
                 # Load dataset
                 dataset_loader = GSMSymbolicDataset(split=variant_split)
@@ -425,14 +432,14 @@ def run_full_benchmark():
                 for i, eval_set in enumerate(eval_sets):
                     result = evaluator.evaluate_dataset(eval_set)
                     accuracies.append(result['accuracy'])
-                    print(f"  Instance {i + 1}/50: {result['accuracy']:.1f}%")
+                    logger.info(f"  Instance {i + 1}/50: {result['accuracy']:.1f}%")
 
                 # Compute statistics
                 mean_acc = np.mean(accuracies)
                 std_acc = np.std(accuracies)
 
                 model_results[variant_name] = f"{mean_acc:.1f} ({std_acc:.2f})"
-                print(f"\n  Mean: {mean_acc:.1f}%, Std: {std_acc:.2f}%")
+                logger.info(f"\n  Mean: {mean_acc:.1f}%, Std: {std_acc:.2f}%")
 
             results_table.append(model_results)
 
@@ -447,16 +454,18 @@ def run_full_benchmark():
     os.makedirs('results', exist_ok=True)
     df.to_csv(output_path, index=False)
 
-    print(f"\n{'=' * 60}")
-    print("FINAL RESULTS")
-    print(f"{'=' * 60}\n")
-    print(df.to_string(index=False))
-    print(f"\nResults saved to: {output_path}")
+    logger.info(f"\n{'=' * 60}")
+    logger.info("FINAL RESULTS")
+    logger.info(f"{'=' * 60}\n")
+    logger.info(df.to_string(index=False))
+    logger.info(f"\nResults saved to: {output_path}")
 
     return df
 
 
 if __name__ == "__main__":
+    install_colored_logger(level=logging.DEBUG)
+    
     # Example: Quick test on a single model and variant
     print("GSM-Symbolic Benchmark - HuggingFace Implementation")
     print("=" * 60)
@@ -466,7 +475,7 @@ if __name__ == "__main__":
 
     # Load dataset
     print("\n1. Loading dataset...")
-    dataset_loader = GSMSymbolicDataset(split='p1')
+    dataset_loader = GSMSymbolicDataset()
     eval_sets = dataset_loader.create_evaluation_sets(num_instances=5)  # Just 5 for testing
 
     # Test with a small model (adjust as needed)

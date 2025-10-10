@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gsm_benchmarker"
+version = "0.0.1"
+authors = [
+  { name="Dominika Dlugosz", email="dominika.a.m.dlugosz@gmail.com" }
+]
+description = "Reproducing and extending GSM-Symbolic benchmark"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "coloredlogs",
+    "tqdm",
+    # todo
+]
+
+
+[project.urls]
+"Homepage" = "https://github.com/the-mysh/gsm-symbolic-benchmarking"

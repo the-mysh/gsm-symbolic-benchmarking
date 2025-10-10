@@ -6,6 +6,8 @@ dependencies:
   - notebook
   - huggingface_hub
   - datasets
+  - coloredlogs
+  - tqdm
   - pip
   - pip:
       - langchain-huggingface
