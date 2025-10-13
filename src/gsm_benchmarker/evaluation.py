@@ -2,8 +2,9 @@ import re
 from typing import List, Dict, Optional
 from tqdm.auto import tqdm
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import torch
+
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 
@@ -67,23 +68,31 @@ class HuggingFaceModelEvaluator:
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Load model with quantization for efficiency
-        model_kwargs = {
-            "device_map": "auto",
-            "trust_remote_code": config.trust_remote_code,
-        }
-
-        if config.use_4bit and config.device == "cuda":
-            from transformers import BitsAndBytesConfig
-            model_kwargs["quantization_config"] = BitsAndBytesConfig(
+        # TRY THIS FIRST: More aggressive quantization
+        if torch.cuda.is_available():
+            logger.debug("Use CUDA")
+            bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,  # Extra compression
+                bnb_4bit_quant_type="nf4"
             )
 
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            **model_kwargs
-        )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                quantization_config=bnb_config,
+                device_map="auto",
+                low_cpu_mem_usage=True,
+                max_memory={0: "7GB", "cpu": "12GB"}  # Adjust based on your hardware
+            )
+        else:
+            # CPU only - don't use device_map
+            logger.debug("No CUDA - use CPU only")
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float32,
+                low_cpu_mem_usage=True
+            )
 
         logger.info(f"Model loaded on {config.device}")
 

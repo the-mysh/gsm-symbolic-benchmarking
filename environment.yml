@@ -10,6 +10,8 @@ dependencies:
   - tqdm
   - pip
   - pip:
+      - accelerate
       - langchain-huggingface
       - langchain
       - ipywidgets
+      - bitsandbytes

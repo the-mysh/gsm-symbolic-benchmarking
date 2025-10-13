@@ -1,6 +1,6 @@
 from tqdm.auto import tqdm
 import logging
-from datasets import load_dataset, arrow_dataset
+from datasets import load_dataset, Dataset
 
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,7 @@ class GSMSymbolicDataset:
 
         logger.info(f"Loaded {len(self.dataset)} examples")
 
-    def get_subdataset_for_original_id(self, original_id: int) -> arrow_dataset:
+    def get_subdataset_for_original_id(self, original_id: int) -> Dataset:
         """Get all instances of a specific question template"""
 
         return self.dataset.filter(

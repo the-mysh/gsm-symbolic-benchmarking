@@ -22,9 +22,10 @@ def run_full_benchmark():
     models_config = {
         # HuggingFace models
         'hf': [
-            "meta-llama/Llama-3-8b-instruct",
-            "google/gemma-2-9b-it",
-            "microsoft/Phi-3-mini-128k-instruct",
+            "meta-llama/Llama-3.1-8B",
+            # "meta-llama/Llama-3-8b-instruct",
+            # "google/gemma-2-9b-it",
+            # "microsoft/Phi-3-mini-128k-instruct",
             # Add more models as needed
         ],
         # API-based models (if available)
