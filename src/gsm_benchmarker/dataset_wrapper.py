@@ -1,6 +1,6 @@
 from tqdm.auto import tqdm
 import logging
-from datasets import load_dataset
+from datasets import load_dataset, arrow_dataset
 
 
 logger = logging.getLogger(__name__)
@@ -25,12 +25,13 @@ class GSMSymbolicDataset:
 
         logger.info(f"Loaded {len(self.dataset)} examples")
 
-    def get_instances_by_id(self, original_id: int) -> list[dict]:
+    def get_subdataset_for_original_id(self, original_id: int) -> arrow_dataset:
         """Get all instances of a specific question template"""
-        return [
-            ex for ex in self.dataset
-            if ex['original_id'] == original_id
-        ]
+
+        return self.dataset.filter(
+            lambda x: x == original_id,
+            input_columns=["original_id"]
+        )
 
     def get_unique_templates(self) -> list[int]:
         """Get list of unique template IDs"""
@@ -55,14 +56,14 @@ class GSMSymbolicDataset:
             eval_set = []
             for template_id in templates:
                 # Get all instances for this template
-                instances = self.get_instances_by_id(template_id)
+                sub_dset = self.get_subdataset_for_original_id(template_id)
 
                 # Take the instance_idx-th example (if exists)
-                if instance_idx < len(instances):
-                    eval_set.append(instances[instance_idx])
+                if instance_idx < len(sub_dset):
+                    eval_set.append(sub_dset[instance_idx])
                 else:
                     # Fallback to first instance if not enough variants
-                    eval_set.append(instances[0])
+                    eval_set.append(sub_dset[0])
 
             eval_sets.append(eval_set)
 
