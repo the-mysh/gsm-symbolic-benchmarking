@@ -1,0 +1,32 @@
+name: gsm-cpu
+
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+
+  # PyTorch CPU-only
+  - pytorch::pytorch=2.1.0
+  - pytorch::cpuonly
+
+  # HuggingFace
+  - transformers=4.36.0
+  - datasets=2.16.0
+  - accelerate=0.25.0
+
+  # Core packages
+  - numpy=1.24.3
+  - pandas=2.1.4
+  - tqdm=4.66.1
+  - psutil=5.9.6
+
+  # Jupyter
+  - notebook
+
+  # Pip packages
+  - pip:
+    - sentencepiece==0.1.99
+    - protobuf==4.25.1
