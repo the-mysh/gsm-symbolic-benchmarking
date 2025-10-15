@@ -10,15 +10,15 @@ _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 @dataclass()
 class SingleShot:
     question: str
-    answer: str
-    numerical_result: str
+    solution: str
+    result: str
 
     def format(self, fmt_string: str) -> str:
         try:
-            s = fmt_string.format(question=self.question, answer=self.answer, numerical_result=self.numerical_result)
+            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result)
         except KeyError:
             raise ValueError(
-                f"The SingleShot format string should have fields: 'question', 'answer', and 'numerical_result'. "
+                f"The SingleShot format string should have fields: 'question', 'solution', and 'result'. "
                 f"Got:\n{fmt_string}")
         return s
 
@@ -54,7 +54,7 @@ class GSM8hotManager:
 if __name__ == '__main__':
     m = GSM8hotManager()
 
-    f = "Question:\n{question}\n\nAnswer:\n{answer}\nThe final result is: {numerical_result}"
+    f = "Question:\n{question}\n\nAnswer:\n{solution}\nThe final result is: {result}"
     print()
     print(m.format(f, n_shots=3, separator="\n\n\n"))
 

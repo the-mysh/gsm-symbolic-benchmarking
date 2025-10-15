@@ -49,7 +49,7 @@ class HuggingFaceModelEvaluator:
     """Evaluate models using HuggingFace transformers"""
 
     QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
-    SHOT_FORMAT = QUESTION_FORMAT + " {answer} The final answer is {numerical_result}."
+    SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
 
     def __init__(self, model_name: str, config: BenchmarkConfig):
         self.model_name = model_name
