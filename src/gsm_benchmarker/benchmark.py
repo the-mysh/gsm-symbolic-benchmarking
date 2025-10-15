@@ -74,7 +74,7 @@ def run_full_benchmark():
 
                 # Load dataset
                 dataset_loader = GSMSymbolicDataset(variant_split)
-                eval_sets = dataset_loader.create_evaluation_sets(num_sets=50)
+                eval_sets = dataset_loader.create_evaluation_sets(n_sets=50)
 
                 # Evaluate on all 50 instances
                 accuracies = []
