@@ -2,16 +2,12 @@ import re
 from typing import List, Dict, Optional
 from tqdm.auto import tqdm
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
-import torch
-
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-
+from gsm_benchmarker.model_wrapper import HFModelWrapper
 
 
 logger = logging.getLogger(__name__)
-
 
 
 class AnswerExtractor:
@@ -53,48 +49,9 @@ class HuggingFaceModelEvaluator:
 
     def __init__(self, model_name: str, config: BenchmarkConfig):
         self.model_name = model_name
-        self.config = config
         self.extractor = AnswerExtractor()
 
-        logger.info(f"Loading model: {model_name}")
-
-        # Load tokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=config.trust_remote_code
-        )
-
-        # Set padding token if not set
-        if self.tokenizer.pad_token is None:
-            self.tokenizer.pad_token = self.tokenizer.eos_token
-
-        # TRY THIS FIRST: More aggressive quantization
-        if torch.cuda.is_available():
-            logger.debug("Use CUDA")
-            bnb_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16,
-                bnb_4bit_use_double_quant=True,  # Extra compression
-                bnb_4bit_quant_type="nf4"
-            )
-
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                quantization_config=bnb_config,
-                device_map="auto",
-                low_cpu_mem_usage=True,
-                max_memory={0: "7GB", "cpu": "12GB"}  # Adjust based on your hardware
-            )
-        else:
-            # CPU only - don't use device_map
-            logger.debug("No CUDA - use CPU only")
-            self.model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype=torch.float32,
-                low_cpu_mem_usage=True
-            )
-
-        logger.info(f"Model loaded on {config.device}")
+        self.model_wrapper = HFModelWrapper(model_name, config=config)
 
     def create_prompt(self, question: str, answer: str = None) -> str:
         """Create 8-shot CoT prompt following paper's format"""
@@ -109,33 +66,6 @@ class HuggingFaceModelEvaluator:
         prompt += f"Q: {question}\nA: Let's think step by step."
 
         return prompt
-
-    def generate(self, prompt: str) -> str:
-        """Generate response from model"""
-        inputs = self.tokenizer(
-            prompt,
-            return_tensors="pt",
-            truncation=True,
-            max_length=2048
-        ).to(self.model.device)
-
-        with torch.no_grad():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=self.config.max_new_tokens,
-                temperature=self.config.temperature if self.config.temperature > 0 else 1.0,
-                do_sample=self.config.temperature > 0,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-            )
-
-        # Decode only the generated part (not the prompt)
-        generated_text = self.tokenizer.decode(
-            outputs[0][inputs['input_ids'].shape[1]:],
-            skip_special_tokens=True
-        )
-
-        return generated_text
 
     def evaluate_dataset(self, dataset: List[Dict]) -> Dict:
         """
@@ -158,7 +88,7 @@ class HuggingFaceModelEvaluator:
 
             # Generate prediction
             prompt = self.create_prompt(question)
-            response = self.generate(prompt)
+            response = self.model_wrapper.ask(prompt)
             predicted_answer = self.extractor.extract_answer(response)
 
             is_correct = (
