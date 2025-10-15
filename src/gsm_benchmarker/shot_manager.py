@@ -3,6 +3,7 @@ import json
 from dataclasses import dataclass
 from typing import Iterator
 
+
 _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 
 
@@ -10,6 +11,15 @@ _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 class SingleShot:
     question: str
     answer: str
+
+    def format(self, fmt_string: str) -> str:
+        try:
+            s = fmt_string.format(question=self.question, answer=self.answer)
+        except KeyError:
+            raise ValueError(
+                f"The SingleShot format string should have fields: 'question' and 'answer'. Got:\n{fmt_string}")
+        return s
+
 
 
 class GSM8hotManager:
@@ -29,24 +39,21 @@ class GSM8hotManager:
     def __getitem__(self, item) -> SingleShot:
         return self._shots[item]
 
-
     @staticmethod
     def _load_data() -> tuple[SingleShot, ...]:
         data_bytes = (_RESOURCES_PATH / "standard-8-shots.json").read_bytes()
         data_dict = json.loads(data_bytes)
         return tuple(SingleShot(**s) for s in data_dict["samples"])
 
+    def format(self, fmt_string: str, n_shots: int | None = None, separator: str = "\n\n"):
+        return separator.join(s.format(fmt_string) for s in self._shots[:n_shots])
+
 
 if __name__ == '__main__':
     m = GSM8hotManager()
-    print()
-    for i, ex in enumerate(m):
-        if i == 3:
-            break
-        print(f"Question {i}: {ex.question}")
-        print(f"Answer {i}: {ex.answer}")
-        print()
 
-    print("...")
+    f = "Question:\n{question}\n\nAnswer:\n{answer}"
+    print()
+    print(m.format(f, n_shots=3, separator="\n\n\n"))
 
 
