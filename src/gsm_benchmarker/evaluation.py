@@ -2,6 +2,8 @@ import re
 from typing import List, Dict, Optional
 from tqdm.auto import tqdm
 import logging
+import pandas as pd
+import numpy as np
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.model_wrapper import HFModelWrapper
@@ -65,7 +67,7 @@ class HuggingFaceModelEvaluator:
 
         return None
 
-    def evaluate_dataset(self, dataset: List[Dict]) -> Dict:
+    def evaluate_dataset(self, dataset: List[Dict]) -> pd.DataFrame:
         """
         Evaluate model on a dataset
 
@@ -76,42 +78,33 @@ class HuggingFaceModelEvaluator:
             Dictionary with accuracy and detailed results
         """
 
-        correct = 0
-        total = len(dataset)
-        results = []
+        results_table = pd.DataFrame(
+            0,
+            index=np.arange(len(dataset)),
+            columns=["id", "question", "true_answer", "predicted_answer", "correct", "response"]
+        )
 
-        for example in tqdm(dataset, desc="Evaluating"):
+        for i, example in tqdm(enumerate(dataset), desc="Evaluating"):
             question = example['question']
+            results_table.loc[i, ["id", "question"]] = [example["id"], question]
+
             # Extract ground truth answer
             true_answer = self.extract_answer(example['answer'])
+            results_table.loc[i, "true_answer"] = true_answer
+            if true_answer is None:
+                logger.warning(f"Could not extract numerical answer from: {example['answer']}")
+                continue
 
             # Generate prediction
             prompt = self.create_prompt(question)
             response = self.model_wrapper.ask(prompt)
             predicted_answer = self.extract_answer(response)
 
-            is_correct = (
+            correct = (
                     predicted_answer is not None and
-                    true_answer is not None and
                     abs(predicted_answer - true_answer) < 1e-5
             )
 
-            if is_correct:
-                correct += 1
+            results_table.loc[i, ["predicted_answer", "correct", "response"]] = [predicted_answer, correct, response]
 
-            results.append({
-                'question': question,
-                'true_answer': true_answer,
-                'predicted_answer': predicted_answer,
-                'correct': is_correct,
-                'response': response
-            })
-
-        accuracy = (correct / total * 100) if total > 0 else 0
-
-        return {
-            'accuracy': accuracy,
-            'correct': correct,
-            'total': total,
-            'results': results
-        }
+        return results_table
