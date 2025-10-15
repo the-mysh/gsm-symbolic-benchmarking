@@ -68,7 +68,7 @@ class HFModelWrapper:
         logger.debug("Loading model for CPU only")
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
-            torch_dtype=torch.float32,
+            dtype=torch.float32,
             low_cpu_mem_usage=True
         )
 
