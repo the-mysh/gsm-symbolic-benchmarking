@@ -6,7 +6,7 @@ import torch
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.evaluation import HuggingFaceModelEvaluator
+from gsm_benchmarker.hf_model_evaluator import HuggingFaceModelEvaluator
 
 
 logger = logging.getLogger(__name__)

@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.model_wrapper import HFModelWrapper
+from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.shot_manager import GSM8hotManager
 
 
