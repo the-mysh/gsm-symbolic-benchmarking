@@ -21,9 +21,19 @@ class GSMSymbolicDataset:
         logger.info(f"Loading GSM-Symbolic dataset (variant: {variant})...")
 
         # Load from HuggingFace
-        self.dataset = load_dataset(self.DSET_NAME, variant, split="test")
+        self._variant = variant
+        self._split = 'test'  # only one available
+        self.dataset = load_dataset(self.DSET_NAME, self._variant, split=self._split)
 
         logger.info(f"Loaded {len(self.dataset)} examples")
+
+    @property
+    def dset_variant(self) -> str:
+        return self._variant
+
+    @property
+    def dset_split(self) -> str:
+        return self._split
 
     def get_subdataset_for_original_id(self, original_id: int) -> Dataset:
         """Get all instances of a specific question template"""
