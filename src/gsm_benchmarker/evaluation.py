@@ -1,9 +1,12 @@
+import os
 import re
 import traceback
 from tqdm.auto import tqdm
 import logging
 import numpy as np
 import pandas as pd
+from pathlib import Path
+from datetime import datetime
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.model_wrapper import HFModelWrapper
@@ -108,18 +111,63 @@ class HuggingFaceModelEvaluator:
 
         return pd.DataFrame(results)
 
-    def evaluate_multiple_datasets(self, datasets: list[list[dict]]) -> pd.DataFrame:
+    def evaluate_multiple_datasets(self, datasets: list[list[dict]], intermediate_storage_path: Path | str | None
+                                   ) -> pd.DataFrame:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
+
+        if intermediate_storage_path is None:
+            logger.info("No intermediate storage path provided; intermediate results will not be stored")
+        else:
+            intermediate_storage_path = self._establish_storage_dir(intermediate_storage_path)  # adds a subfolder
+            logger.info(f"Intermediate results will be stored at: {intermediate_storage_path}")
 
         all_results = []
         n = len(datasets)
 
         for i, dataset in tqdm(enumerate(datasets), desc="Dataset"):
             try:
-                all_results.append(self.evaluate_dataset(dataset))
+                result = self.evaluate_dataset(dataset)
+                self._store_intermediate_result(result, intermediate_storage_path, i)
+                all_results.append(result)
             except Exception as exc:
                 logger.error(f"Exception occurred when evaluating dataset {i+1}/{n}: {exc}. "
                              f"Results for this dataset will be skipped.")
                 logger.error(f"Full stack:\n{traceback.format_exc()}")
 
         return pd.concat(all_results, keys=np.arange(n))
+
+    @staticmethod
+    def _establish_storage_dir(storage_path: Path | str) -> Path:
+        if isinstance(storage_path, str):
+            storage_path = Path(storage_path)
+
+        if not isinstance(storage_path, Path):
+            raise TypeError(f"Expected a str or a Path object; got {type(storage_path)}: {storage_path}")
+
+        if storage_path.is_file():
+            raise RuntimeError(f'Expected a path to a directory; got a file path instead: {storage_path}')
+
+        if not storage_path.exists():
+            if not storage_path.parent.exists():
+                logger.warning(f"Storage root does not exist and will be created")
+            logger.info(f"Creating storage directories at {storage_path}")
+            os.makedirs(storage_path)
+
+        results_folder = datetime.now().strftime("%Y%m%d_%H%M%S")
+        full_storage_path = storage_path/results_folder
+        logger.debug(f"Creating folder for results from current execution: {full_storage_path}")
+        os.makedirs(full_storage_path)
+
+        return full_storage_path
+
+    @staticmethod
+    def _store_intermediate_result(result: pd.DataFrame, dir_path: Path | None, result_index: int) -> None:
+        if dir_path is None:
+            return
+
+        fname = dir_path / f"intermediate_{result_index}.parquet"
+        if fname.exists():
+            # just in case
+            logger.warning(f"Intermediate results file {fname} already exists; it will be overwritten")
+        result.to_parquet(fname, index=False)
+        logger.debug(f"Stored intermediate results at: {fname}")
