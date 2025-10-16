@@ -1,5 +1,4 @@
 import re
-from typing import List, Dict, Optional
 from tqdm.auto import tqdm
 import logging
 import pandas as pd
@@ -36,7 +35,7 @@ class HuggingFaceModelEvaluator:
         return prompt
 
     @staticmethod
-    def extract_answer(text: str) -> Optional[float]:
+    def extract_answer(text: str) -> float | None:
         """
         Extract numerical answer from text.
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
@@ -66,12 +65,12 @@ class HuggingFaceModelEvaluator:
 
         return None
 
-    def evaluate_dataset(self, dataset: List[Dict]) -> pd.DataFrame:
+    def evaluate_dataset(self, dataset: list[dict]) -> pd.DataFrame:
         """
         Evaluate model on a dataset
 
         Args:
-            dataset: List of examples with 'question' and 'answer' fields
+            dataset: list of examples with 'question' and 'answer' fields
 
         Returns:
             Dictionary with accuracy and detailed results
