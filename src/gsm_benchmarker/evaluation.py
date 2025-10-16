@@ -1,6 +1,7 @@
 import os
 import re
 import traceback
+from shutil import rmtree
 from tqdm.auto import tqdm
 import logging
 import numpy as np
@@ -111,7 +112,8 @@ class HuggingFaceModelEvaluator:
 
         return pd.DataFrame(results)
 
-    def evaluate_multiple_datasets(self, datasets: list[list[dict]], intermediate_storage_path: Path | str | None
+    def evaluate_multiple_datasets(self, datasets: list[list[dict]], intermediate_storage_path: Path | str | None,
+                                   remove_intermediate_results: bool = True
                                    ) -> pd.DataFrame:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
 
@@ -134,7 +136,12 @@ class HuggingFaceModelEvaluator:
                              f"Results for this dataset will be skipped.")
                 logger.error(f"Full stack:\n{traceback.format_exc()}")
 
-        return pd.concat(all_results, keys=np.arange(n))
+        full_result = pd.concat(all_results, keys=np.arange(n))
+
+        if remove_intermediate_results:
+            self._remove_intermediate_results(intermediate_storage_path)
+
+        return full_result
 
     @staticmethod
     def _establish_storage_dir(storage_path: Path | str) -> Path:
@@ -159,6 +166,15 @@ class HuggingFaceModelEvaluator:
         os.makedirs(full_storage_path)
 
         return full_storage_path
+
+    @staticmethod
+    def _remove_intermediate_results(storage_path: Path | None):
+        if storage_path is not None:
+            try:
+                logger.info("Removing intermediate results")
+                rmtree(storage_path)
+            except Exception as exc:
+                logger.error(f"Failed to remove intermediate results: {exc}")
 
     @staticmethod
     def _store_intermediate_result(result: pd.DataFrame, dir_path: Path | None, result_index: int) -> None:
