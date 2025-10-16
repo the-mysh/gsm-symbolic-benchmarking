@@ -3,6 +3,7 @@ import logging
 import os
 import pandas as pd
 import torch
+from pathlib import Path
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -10,6 +11,63 @@ from gsm_benchmarker.hf_model_evaluator import HuggingFaceModelEvaluator
 
 
 logger = logging.getLogger(__name__)
+
+
+class BenchmarkRunner:
+    def __init__(self, models: list[str], dset_variants: list[str], storage_path: Path | str,
+                 config: BenchmarkConfig | None = None):
+
+        self._models = models
+        self._dset_variants = dset_variants
+        self._config = config if config is not None else BenchmarkConfig()
+        self._storage_path = storage_path  # TODO: sanity checks
+
+        self._results = {}
+
+    def run(self, n_sets: int | None = None, n_per_set: int | None = None):
+        # TODO: refactor
+
+        for variant in self._dset_variants:
+            if variant not in self._results:
+                self._results[variant] = {}
+
+        intermediate_storage_path = self._storage_path/'intermediate'
+        final_storage_path = self._storage_path/'results'
+
+        for im, model in enumerate(self._models):
+            logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model} {10*'='}")
+            model_evaluator = HuggingFaceModelEvaluator(model, self._config)
+
+            for iv, variant in enumerate(self._dset_variants):
+                logger.info(f"Evaluating {model} on dataset variant {iv+1}/{len(self._dset_variants)}: {variant}")
+
+                # Load dataset
+                dataset_wrapper = GSMSymbolicDataset(variant=variant)
+                eval_sets = dataset_wrapper.create_evaluation_sets(n_sets=n_sets, n_per_set=n_per_set)
+
+                res = model_evaluator.evaluate_multiple_datasets(
+                    eval_sets,
+                    intermediate_storage_path=intermediate_storage_path / f"{model_evaluator.path_friendly_model_name}"
+                )
+
+                logger.debug("Storing results")
+                self._results[variant][model] = res
+
+                res_path = final_storage_path / f"results/{dataset_wrapper.DSET_NAME}_{dataset_wrapper.dset_variant}"
+                os.makedirs(res_path, exist_ok=True)
+                fname = res_path / f"{model_evaluator.path_friendly_model_name}.parquet"
+                res.to_parquet(fname)
+                logger.debug(f"Model x variant results stored to: {fname}")
+
+                logger.info(f"Evaluation of model {model} on variant {variant} completed")
+
+            logger.info(f"Evaluation of model {model} on all dataset variants completed")
+            logger.debug("Deleting model from memory")
+            del model_evaluator.model_wrapper
+            torch.cuda.empty_cache()
+
+        logger.info("EVALUATION COMPLETE")
+        return self._results
 
 
 def run_full_benchmark():

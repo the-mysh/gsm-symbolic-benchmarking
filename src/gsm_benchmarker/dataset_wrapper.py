@@ -10,6 +10,7 @@ class GSMSymbolicDataset:
     """Handler for GSM-Symbolic dataset from HuggingFace"""
 
     DSET_NAME = "apple/GSM-Symbolic"
+    MAX_SETS = 50
 
     def __init__(self, variant: str = "main"):
         """
@@ -48,7 +49,7 @@ class GSMSymbolicDataset:
 
         return list(set(self.dataset['original_id']))
 
-    def create_evaluation_sets(self, n_sets: int = 50, n_per_set: int = None) -> list[list[dict]]:
+    def create_evaluation_sets(self, n_sets: int | None = None, n_per_set: int = None) -> list[list[dict]]:
         """
         Create evaluation sets (matching paper's methodology)
         Each set contains up to 100 examples (one per template)
@@ -58,6 +59,9 @@ class GSMSymbolicDataset:
         """
 
         templates = self.get_unique_templates()[:n_per_set]
+
+        if n_sets is None:
+            n_sets = self.MAX_SETS
 
         logger.info(f"Creating {n_sets} sets with {len(templates)} examples each")
 
