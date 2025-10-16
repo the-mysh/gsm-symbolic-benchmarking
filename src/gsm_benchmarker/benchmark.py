@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class BenchmarkRunner:
-    def __init__(self, models: list[str], dset_variants: list[str], storage_path: Path | str,
+    def __init__(self, models: list[str], dset_variants: list[GSMSymbolicDataset.Variant], storage_path: Path | str,
                  config: BenchmarkConfig | None = None):
 
         self._models = models
@@ -53,7 +53,7 @@ class BenchmarkRunner:
                 logger.debug("Storing results")
                 self._results[variant][model] = res
 
-                res_path = final_storage_path / f"results/{dataset_wrapper.DSET_NAME}_{dataset_wrapper.dset_variant}"
+                res_path = final_storage_path / f"results/{dataset_wrapper.DSET_NAME}_{dataset_wrapper.variant_name}"
                 os.makedirs(res_path, exist_ok=True)
                 fname = res_path / f"{model_evaluator.path_friendly_model_name}.parquet"
                 res.to_parquet(fname)

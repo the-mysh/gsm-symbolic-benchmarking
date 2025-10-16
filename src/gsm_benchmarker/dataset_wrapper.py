@@ -1,7 +1,11 @@
 from tqdm.auto import tqdm
 import logging
 from datasets import load_dataset, Dataset
+from enum import Enum, auto
+from typing import TypeVar
 
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -12,29 +16,42 @@ class GSMSymbolicDataset:
     DSET_NAME = "apple/GSM-Symbolic"
     MAX_SETS = 50
 
-    def __init__(self, variant: str = "main"):
+    class Variant(Enum):
+        main = auto()
+        p1 = auto()
+        p2 = auto()
+
+    class Split(Enum):
+        test = auto()
+
+    def __init__(self, variant: Variant, split: Split = Split.test):
         """
         Load GSM-Symbolic dataset
 
         Args:
             variant: Dataset variant - 'main' (default) / 'p1' / 'p2'.
         """
+
+        self._variant = self._check_type(variant, self.Variant)
+        self._split = self._check_type(split, self.Split)
+
         logger.info(f"Loading GSM-Symbolic dataset (variant: {variant})...")
-
-        # Load from HuggingFace
-        self._variant = variant
-        self._split = 'test'  # only one available
-        self.dataset = load_dataset(self.DSET_NAME, self._variant, split=self._split)
-
+        self.dataset = load_dataset(self.DSET_NAME, self._variant.name, split=self._split.name)
         logger.info(f"Loaded {len(self.dataset)} examples")
 
-    @property
-    def dset_variant(self) -> str:
-        return self._variant
+    @staticmethod
+    def _check_type(value: T, expected_type: type[T]) -> T:
+        if not isinstance(value, expected_type):
+            raise TypeError(f"Expected a {expected_type}, got {type(value)}: {value}")
+        return value
 
     @property
-    def dset_split(self) -> str:
-        return self._split
+    def variant_name(self) -> str:
+        return self._variant.name
+
+    @property
+    def split_name(self) -> str:
+        return self._split.name
 
     def get_subdataset_for_original_id(self, original_id: int) -> Dataset:
         """Get all instances of a specific question template"""
