@@ -1,6 +1,8 @@
 import re
+import traceback
 from tqdm.auto import tqdm
 import logging
+import numpy as np
 import pandas as pd
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -79,7 +81,7 @@ class HuggingFaceModelEvaluator:
         results = []
         prompt_template = self.create_prompt(question="{}")
 
-        for example in tqdm(dataset, desc="Evaluating"):
+        for example in tqdm(dataset, desc="Example"):
             question = example['question']
 
             # Extract ground truth answer
@@ -105,3 +107,19 @@ class HuggingFaceModelEvaluator:
             })
 
         return pd.DataFrame(results)
+
+    def evaluate_multiple_datasets(self, datasets: list[list[dict]]) -> pd.DataFrame:
+        """Evaluate model on a set of datasets. Return results in a combined dataframe."""
+
+        all_results = []
+        n = len(datasets)
+
+        for i, dataset in tqdm(enumerate(datasets), desc="Dataset"):
+            try:
+                all_results.append(self.evaluate_dataset(dataset))
+            except Exception as exc:
+                logger.error(f"Exception occurred when evaluating dataset {i+1}/{n}: {exc}. "
+                             f"Results for this dataset will be skipped.")
+                logger.error(f"Full stack:\n{traceback.format_exc()}")
+
+        return pd.concat(all_results, keys=np.arange(n))
