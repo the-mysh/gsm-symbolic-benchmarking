@@ -27,6 +27,20 @@ class HuggingFaceModelEvaluator:
         self.original_shots = GSM8hotManager()
         self.model_wrapper = HFModelWrapper(model_name, config=config)
 
+    @property
+    def model_name(self) -> str:
+        return self.model_wrapper.model_name
+
+    @property
+    def path_friendly_model_name(self) -> str:
+        m = self.model_name
+        repl = '_'
+
+        for char in ('/', '\\', '.'):
+            m = m.replace(char, repl)
+
+        return m
+
     def create_prompt(self, question: str) -> str:
         """Create 8-shot CoT prompt following paper's format"""
 
