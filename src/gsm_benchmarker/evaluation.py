@@ -78,33 +78,31 @@ class HuggingFaceModelEvaluator:
             Dictionary with accuracy and detailed results
         """
 
-        results_table = pd.DataFrame(
-            0,
-            index=np.arange(len(dataset)),
-            columns=["id", "question", "true_answer", "predicted_answer", "correct", "response"]
-        )
+        results = []
 
-        for i, example in tqdm(enumerate(dataset), desc="Evaluating"):
+        for example in tqdm(dataset, desc="Evaluating"):
             question = example['question']
-            results_table.loc[i, ["id", "question"]] = [example["id"], question]
 
             # Extract ground truth answer
             true_answer = self.extract_answer(example['answer'])
-            results_table.loc[i, "true_answer"] = true_answer
+
             if true_answer is None:
                 logger.warning(f"Could not extract numerical answer from: {example['answer']}")
-                continue
+                response, predicted_answer, correct = None, None, None
+            else:
+                # Generate prediction
+                prompt = self.create_prompt(question)
+                response = self.model_wrapper.ask(prompt)
+                predicted_answer = self.extract_answer(response)
+                correct = predicted_answer is not None and abs(predicted_answer - true_answer) < 1e-5
 
-            # Generate prediction
-            prompt = self.create_prompt(question)
-            response = self.model_wrapper.ask(prompt)
-            predicted_answer = self.extract_answer(response)
+            results.append({
+                'id': example['id'],
+                'question': question,
+                'true_answer': true_answer,
+                'predicted_answer': predicted_answer,
+                'correct': correct,
+                'response': response
+            })
 
-            correct = (
-                    predicted_answer is not None and
-                    abs(predicted_answer - true_answer) < 1e-5
-            )
-
-            results_table.loc[i, ["predicted_answer", "correct", "response"]] = [predicted_answer, correct, response]
-
-        return results_table
+        return pd.DataFrame(results)
