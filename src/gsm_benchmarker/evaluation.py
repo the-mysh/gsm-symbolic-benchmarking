@@ -140,7 +140,7 @@ class HuggingFaceModelEvaluator:
         all_results = []
         n = len(datasets)
 
-        for i, dataset in tqdm(enumerate(datasets), desc="Dataset"):
+        for i, dataset in tqdm(enumerate(datasets), desc="Dataset", total=n):
             try:
                 result = self.evaluate_dataset(dataset)
                 self._store_intermediate_result(result, intermediate_storage_path, i)
