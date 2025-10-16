@@ -12,6 +12,7 @@ from datetime import datetime
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.shot_manager import GSM8hotManager
+from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
 
 
 logger = logging.getLogger(__name__)
@@ -159,20 +160,7 @@ class HuggingFaceModelEvaluator:
 
     @staticmethod
     def _establish_storage_dir(storage_path: Path | str) -> Path:
-        if isinstance(storage_path, str):
-            storage_path = Path(storage_path)
-
-        if not isinstance(storage_path, Path):
-            raise TypeError(f"Expected a str or a Path object; got {type(storage_path)}: {storage_path}")
-
-        if storage_path.is_file():
-            raise RuntimeError(f'Expected a path to a directory; got a file path instead: {storage_path}')
-
-        if not storage_path.exists():
-            if not storage_path.parent.exists():
-                logger.warning(f"Storage root does not exist and will be created")
-            logger.info(f"Creating storage directories at {storage_path}")
-            os.makedirs(storage_path)
+        storage_path = confirm_or_create_folder(storage_path)
 
         results_folder = datetime.now().strftime("%Y%m%d_%H%M%S")
         full_storage_path = storage_path/results_folder

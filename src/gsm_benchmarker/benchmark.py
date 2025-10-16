@@ -8,6 +8,7 @@ from pathlib import Path
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.hf_model_evaluator import HuggingFaceModelEvaluator
+from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
 
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,7 @@ class BenchmarkRunner:
         self._models = models
         self._dset_variants = dset_variants
         self._config = config if config is not None else BenchmarkConfig()
-        self._storage_path = storage_path  # TODO: sanity checks
+        self._storage_path = confirm_or_create_folder(storage_path)
 
         self._results = {}
 
