@@ -69,9 +69,9 @@ class BenchmarkRunner:
                 self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
 
                 logger.info(f"Evaluation of model {model} on variant {variant} completed")
-                self._delete_model(model_evaluator)
 
             logger.info(f"Evaluation of model {model} on all dataset variants completed")
+            self._delete_model(model_evaluator)
 
         logger.info("EVALUATION COMPLETE")
         return self._results
