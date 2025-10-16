@@ -11,12 +11,17 @@ logger = logging.getLogger(__name__)
 class HFModelWrapper:
     def __init__(self, model_name: str, config: BenchmarkConfig):
         self.config = config
+        self._model_name = model_name
 
         logger.info(f"Setting up model {model_name}")
 
         self.tokeniser = self.load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
         self.model = self.load_model(model_name)
         logger.info("Model loaded")
+
+    @property
+    def model_name(self) -> str:
+        return self._model_name
 
     @staticmethod
     def load_tokeniser(model_name: str, trust_remote_code: bool = False):
