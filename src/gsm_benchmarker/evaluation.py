@@ -3,7 +3,6 @@ from typing import List, Dict, Optional
 from tqdm.auto import tqdm
 import logging
 import pandas as pd
-import numpy as np
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.model_wrapper import HFModelWrapper
@@ -79,6 +78,7 @@ class HuggingFaceModelEvaluator:
         """
 
         results = []
+        prompt_template = self.create_prompt(question="{}")
 
         for example in tqdm(dataset, desc="Evaluating"):
             question = example['question']
@@ -91,7 +91,7 @@ class HuggingFaceModelEvaluator:
                 response, predicted_answer, correct = None, None, None
             else:
                 # Generate prediction
-                prompt = self.create_prompt(question)
+                prompt = prompt_template.format(question)
                 response = self.model_wrapper.ask(prompt)
                 predicted_answer = self.extract_answer(response)
                 correct = predicted_answer is not None and abs(predicted_answer - true_answer) < 1e-5
