@@ -61,8 +61,10 @@ class APIModelWrapper(BaseModelWrapper):
         if openai is None:
             raise ImportError("openai package not installed")
 
+        client = openai.OpenAI()
+
         def ask_openai(prompt: str) -> str:
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model=model_name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=config.temperature,
