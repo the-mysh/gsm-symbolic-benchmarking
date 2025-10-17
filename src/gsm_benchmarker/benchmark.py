@@ -126,7 +126,7 @@ class BenchmarkRunner:
                     # Evaluate model
                     res = model_evaluator.evaluate_multiple_datasets(
                         eval_sets,
-                        intermediate_storage_path=self.intermediate_storage_path / f"{model_evaluator.path_friendly_model_name}",
+                        intermediate_storage_path=self.intermediate_storage_path,
                         remove_intermediate_results=remove_intermediate_results
                     )
 

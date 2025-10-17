@@ -169,11 +169,10 @@ class ModelEvaluator:
 
         return full_result
 
-    @staticmethod
-    def _establish_storage_dir(storage_path: Path | str) -> Path:
+    def _establish_storage_dir(self, storage_path: Path | str) -> Path:
         storage_path = confirm_or_create_folder(storage_path)
 
-        results_folder = datetime.now().strftime("%Y%m%d_%H%M%S")
+        results_folder = f"{self.path_friendly_model_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}"
         full_storage_path = storage_path/results_folder
         logger.debug(f"Creating folder for results from current execution: {full_storage_path}")
         os.makedirs(full_storage_path)
