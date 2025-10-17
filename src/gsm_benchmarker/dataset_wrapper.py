@@ -103,9 +103,9 @@ class GSMSymbolicDataset:
                 if instance_idx < len(sub_dset):
                     eval_set.append(sub_dset[instance_idx])
                 else:
-                    # Fallback to first instance if not enough variants
-                    eval_set.append(sub_dset[0])
+                    logger.warning(f"Not enough examples for template id {template_id}")
 
-            eval_sets.append(eval_set)
+            if eval_set:
+                eval_sets.append(eval_set)
 
         return eval_sets
