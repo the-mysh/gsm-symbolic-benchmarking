@@ -102,12 +102,12 @@ class APIModelWrapper(BaseModelWrapper):
         )
 
         def ask_google_genai(prompt: str) -> str:
-            message = client.models.generate_content(
+            response = client.models.generate_content(
                 model=model_name,
                 contents=prompt,
                 config=generation_config
             )
-            return message.content[0].text
+            return response.text
 
         return ask_google_genai
 
