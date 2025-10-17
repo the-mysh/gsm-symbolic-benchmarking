@@ -8,6 +8,7 @@ from dataclasses import dataclass
 import traceback
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
+from gsm_benchmarker.api_model_wrapper import APIType
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.model_evaluator import ModelEvaluator
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
@@ -32,8 +33,13 @@ class EvaluationFailure:
 
 
 class BenchmarkRunner:
-    def __init__(self, models: list[str], dset_variants: list[GSMSymbolicDataset.Variant], storage_path: Path | str,
-                 config: BenchmarkConfig | None = None):
+    def __init__(
+            self,
+            models: list[str | tuple[str, None | APIType]],
+            dset_variants: list[GSMSymbolicDataset.Variant],
+            storage_path: Path | str,
+            config: BenchmarkConfig | None = None
+    ):
 
         self._models = models
         self._dset_variants = dset_variants
@@ -70,19 +76,38 @@ class BenchmarkRunner:
             if variant not in self._results:
                 self._results[variant] = {}
 
-    def _load_model(self, model: str) -> ModelEvaluator | None:
+    def _load_model(self, model: str, api_type: APIType | None = None) -> ModelEvaluator | None:
         try:
-            model_evaluator = ModelEvaluator(model, self._config)
+            model_evaluator = ModelEvaluator(model, self._config, api_type=api_type)
         except Exception as exc:
             self._handle_model_loading_exception(model, exc)
             return None
 
         return model_evaluator
 
+    @staticmethod
+    def _get_model_and_api_type(model_spec: str | tuple[str, APIType | None]) -> tuple[str, APIType | None]:
+        if isinstance(model_spec, str):
+            return model_spec, None
+
+        if not isinstance(model_spec, (tuple, list)):
+            raise TypeError(f"Expected a model name string or a tuple containing model name and API type; "
+                            f"got {type(model_spec)}: {model_spec}")
+
+        if len(model_spec) != 2:
+            raise ValueError(f"Expected a tuple of 2 elements; got {len(model_spec)} - {model_spec}")
+
+        model, api_type = model_spec
+        if not isinstance(model, str):
+            raise TypeError(f"Model name should be a str; got {type(model)}: {model}")
+
+        return model, api_type  # api_type check later
+
     def run(self, n_sets: int | None = None, n_per_set: int | None = None):
         self._pre_populate_results()
 
-        for im, model in enumerate(self._models):
+        for im, model_spec in enumerate(self._models):
+            model, api_type = self._get_model_and_api_type(model_spec)
             logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model} {10*'='}")
 
             model_evaluator = self._load_model(model)
