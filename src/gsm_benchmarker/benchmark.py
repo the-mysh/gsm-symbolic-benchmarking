@@ -17,6 +17,13 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class ModelLoadingFailure:
+    model: str
+    exception: Exception
+    exception_traceback: str
+
+
+@dataclass
 class EvaluationFailure:
     model: str
     variant: str
@@ -34,7 +41,7 @@ class BenchmarkRunner:
         self._storage_path = confirm_or_create_folder(storage_path)
 
         self._results: dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]] = {}
-        self._failed_evaluations: list[EvaluationFailure] = []
+        self._failures: list[EvaluationFailure | ModelLoadingFailure] = []
 
     @cached_property
     def intermediate_storage_path(self):
@@ -54,7 +61,7 @@ class BenchmarkRunner:
 
     @property
     def failed_evaluations(self) -> list[EvaluationFailure]:
-        return self._failed_evaluations
+        return self._failures
 
     def _pre_populate_results(self):
         # results structure: variants as outer layer, models as inner
@@ -63,12 +70,24 @@ class BenchmarkRunner:
             if variant not in self._results:
                 self._results[variant] = {}
 
+    def _load_model(self, model: str) -> HuggingFaceModelEvaluator | None:
+        try:
+            model_evaluator = HuggingFaceModelEvaluator(model, self._config)
+        except Exception as exc:
+            self._handle_model_loading_exception(model, exc)
+            return None
+
+        return model_evaluator
+
     def run(self, n_sets: int | None = None, n_per_set: int | None = None):
         self._pre_populate_results()
 
         for im, model in enumerate(self._models):
             logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model} {10*'='}")
-            model_evaluator = HuggingFaceModelEvaluator(model, self._config)
+
+            model_evaluator = self._load_model(model)
+            if not model_evaluator:
+                continue  # failed to load; already handled
 
             for iv, variant in enumerate(self._dset_variants):
                 try:
@@ -103,13 +122,21 @@ class BenchmarkRunner:
         t = traceback.format_exc()
         logger.error(f"Evaluation of model {model} on dataset variant {variant.name} failed with an exception: {exc}. "
                      f"Full traceback:\n{t}")
-        self._failed_evaluations.append(EvaluationFailure(
+        self._failures.append(EvaluationFailure(
             model=model,
             variant=variant.name,
             exception=exc,
             exception_traceback=t
         ))
 
+    def _handle_model_loading_exception(self, model: str, exc: Exception):
+        t = traceback.format_exc()
+        logger.error(f"Loading model {model} failed with an exception: {exc}. Full traceback:\n{t}")
+        self._failures.append(ModelLoadingFailure(
+            model=model,
+            exception=exc,
+            exception_traceback=t
+        ))
 
     @staticmethod
     def _delete_model(model_evaluator):
@@ -144,9 +171,15 @@ class BenchmarkRunner:
         return pd.DataFrame(summaries)
 
     def summarise_failures(self) -> str:
-        if not self._failed_evaluations:
-            return "No evaluation failures recorded"
+        if not self._failures:
+            return "No evaluation/model loading failures recorded"
 
-        ss = "\n\n".join(f"On model {ef.model}, variant {ef.variant}: {ef.exception}" for ef in self._failed_evaluations)
+        def make_msg(f: ModelLoadingFailure | EvaluationFailure):
+            if isinstance(f, ModelLoadingFailure):
+                return f"On model {f.model} - failed to load: {f.exception}"
+            else:
+                return f"On model {f.model}, variant {f.variant} - failed to evaluate: {f.exception}"
 
-        return f"Recorded {len(self._failed_evaluations)} failed evaluations:\n\n{ss}"
+        ss = "\n\n".join(make_msg(ef) for ef in self._failures)
+
+        return f"Recorded {len(self._failures)} failures:\n\n{ss}"
