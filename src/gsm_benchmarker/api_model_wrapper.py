@@ -16,6 +16,13 @@ except ImportError:
     logger.warning("anthropic package not installed; Anthropic models will not be available")
     anthropic = None
 
+try:
+    from google import genai
+    from google.genai import types
+except ImportError:
+    logger.warning("google-genai package not installed; Gemini family models will not be available")
+    anthropic = None
+
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 
@@ -23,6 +30,7 @@ from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 class APIType(Enum):
     openai = auto()
     anthropic = auto()
+    google_genai = auto()
 
 
 class APIModelWrapper(BaseModelWrapper):
@@ -41,6 +49,9 @@ class APIModelWrapper(BaseModelWrapper):
 
             case APIType.anthropic:
                 return self._setup_anthropic(model_name, config)
+            
+            case APIType.google_genai:
+                return self._setup_google_genai(model_name, config)
 
             case _:
                 raise ValueError(f"API type not recognised: {api_type}; expected {' / '.join(APIType.__members__)}")
@@ -75,6 +86,28 @@ class APIModelWrapper(BaseModelWrapper):
             )
             return message.content[0].text
         return ask_anthropic
+
+    @staticmethod
+    def _setup_google_genai(model_name: str, config: BenchmarkConfig) -> Callable[[str], str]:
+        if genai is None:
+            raise ImportError("google-genai package not installed")
+
+        client = genai.Client()
+
+        generation_config = types.GenerateContentConfig(
+            temperature=config.temperature,
+            max_output_tokens=config.max_new_tokens
+        )
+
+        def ask_google_genai(prompt: str) -> str:
+            message = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+                config=generation_config
+            )
+            return message.content[0].text
+
+        return ask_google_genai
 
 
     def ask(self, prompt: str) -> str:

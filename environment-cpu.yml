@@ -27,3 +27,4 @@ dependencies:
       - torch
       - openai
       - anthropic
+      - google-genai
