@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.shot_manager import GSM8hotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly
 from gsm_benchmarker.api_model_wrapper import APIModelWrapper, APIType
@@ -91,8 +92,7 @@ class ModelEvaluator:
 
         return None
 
-
-    def evaluate_dataset(self, dataset: list[dict]) -> pd.DataFrame:
+    def evaluate_dataset(self, dataset: list[GSMSymbolicDataset.Sample]) -> pd.DataFrame:
         """
         Evaluate model on a dataset
 
@@ -107,24 +107,22 @@ class ModelEvaluator:
         prompt_template = self.create_prompt(question="{}")
 
         for example in tqdm(dataset, desc="Example"):
-            question = example['question']
-
             # Extract ground truth answer
-            true_answer = self.extract_answer(example['answer'])
+            true_answer = self.extract_answer(example.answer)
 
             if true_answer is None:
-                logger.warning(f"Could not extract numerical answer from: {example['answer']}")
+                logger.warning(f"Could not extract numerical answer from: {example.answer}")
                 response, predicted_answer, correct = None, None, None
             else:
                 # Generate prediction
-                prompt = prompt_template.format(question)
+                prompt = prompt_template.format(example.question)
                 response = self.model_wrapper.ask(prompt)
                 predicted_answer = self.extract_answer(response)
                 correct = predicted_answer is not None and abs(predicted_answer - true_answer) < 1e-5
 
             results.append({
-                'id': example['id'],
-                'question': question,
+                'id': example.id,
+                'question': example.question,
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
                 'correct': correct,
@@ -133,9 +131,12 @@ class ModelEvaluator:
 
         return pd.DataFrame(results)
 
-    def evaluate_multiple_datasets(self, datasets: list[list[dict]], intermediate_storage_path: Path | str | None,
-                                   remove_intermediate_results: bool = True
-                                   ) -> pd.DataFrame | None:
+    def evaluate_multiple_datasets(
+            self,
+            datasets: list[list[GSMSymbolicDataset.Sample]],
+            intermediate_storage_path: Path | str | None,
+            remove_intermediate_results: bool = True
+        ) -> pd.DataFrame | None:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
 
         if intermediate_storage_path is None:

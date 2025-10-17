@@ -2,7 +2,7 @@ from tqdm.auto import tqdm
 import logging
 from datasets import load_dataset, Dataset
 from enum import Enum, auto
-from typing import TypeVar
+from typing import TypeVar, NamedTuple
 
 from gsm_benchmarker.utils.path_ops import make_name_path_friendly
 
@@ -24,6 +24,11 @@ class GSMSymbolicDataset:
 
     class Split(Enum):
         test = auto()
+
+    class Sample(NamedTuple):
+        id: int
+        question: str
+        answer: str
 
     def __init__(self, variant: Variant, split: Split = Split.test):
         """
@@ -75,7 +80,7 @@ class GSMSymbolicDataset:
 
         return list(set(self.dataset['original_id']))
 
-    def create_evaluation_sets(self, n_sets: int | None = None, n_per_set: int = None) -> list[list[dict]]:
+    def create_evaluation_sets(self, n_sets: int | None = None, n_per_set: int = None) -> list[list[Sample]]:
         """
         Create evaluation sets (matching paper's methodology)
         Each set contains up to 100 examples (one per template)
@@ -101,7 +106,8 @@ class GSMSymbolicDataset:
 
                 # Take the instance_idx-th example (if exists)
                 if instance_idx < len(sub_dset):
-                    eval_set.append(sub_dset[instance_idx])
+                    s = sub_dset[instance_idx]
+                    eval_set.append(self.Sample(s['id'], s['question'], s['answer']))
                 else:
                     logger.warning(f"Not enough examples for template id {template_id}")
 
