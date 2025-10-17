@@ -15,7 +15,7 @@ class HFModelWrapper(BaseModelWrapper):
 
         logger.info(f"Setting up model {model_name}")
         self.tokeniser = self._load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
-        self.model = self._load_model(model_name, trust_remote_code=self.config.trust_remote_code)
+        self.model = self._load_model(model_name, config=self.config)
         logger.info("Model loaded")
 
     @staticmethod
@@ -33,18 +33,18 @@ class HFModelWrapper(BaseModelWrapper):
         return tokeniser
 
     @staticmethod
-    def _load_model(model_name, trust_remote_code: bool = False):
+    def _load_model(model_name, config: BenchmarkConfig):
         if torch.cuda.is_available():
             logger.info("CUDA available")
-            model = HFModelWrapper._load_model_cuda(model_name, trust_remote_code=trust_remote_code)
+            model = HFModelWrapper._load_model_cuda(model_name, config=config)
         else:
             logger.info("CUDA not available - using only CPU")
-            model = HFModelWrapper._load_model_cpu(model_name, trust_remote_code=trust_remote_code)
+            model = HFModelWrapper._load_model_cpu(model_name, config=config)
 
         return model
 
     @staticmethod
-    def _load_model_cuda(model_name, trust_remote_code: bool = False):
+    def _load_model_cuda(model_name, config: BenchmarkConfig):
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
@@ -58,20 +58,20 @@ class HFModelWrapper(BaseModelWrapper):
             quantization_config=bnb_config,
             device_map="auto",
             low_cpu_mem_usage=True,
-            max_memory={0: "7GB", "cpu": "12GB"},  # Adjust based on your hardware,
-            trust_remote_code=trust_remote_code
+            max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
+            trust_remote_code=config.trust_remote_code
         )
 
         return model
 
     @staticmethod
-    def _load_model_cpu(model_name, trust_remote_code: bool = False):
+    def _load_model_cpu(model_name, config: BenchmarkConfig):
         logger.debug("Loading model for CPU only")
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             dtype=torch.float32,
             low_cpu_mem_usage=True,
-            trust_remote_code=trust_remote_code
+            trust_remote_code=config.trust_remote_code
         )
 
         return model
