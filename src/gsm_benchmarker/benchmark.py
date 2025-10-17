@@ -9,7 +9,7 @@ import traceback
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.hf_model_evaluator import HuggingFaceModelEvaluator
+from gsm_benchmarker.model_evaluator import ModelEvaluator
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
 
 
@@ -70,9 +70,9 @@ class BenchmarkRunner:
             if variant not in self._results:
                 self._results[variant] = {}
 
-    def _load_model(self, model: str) -> HuggingFaceModelEvaluator | None:
+    def _load_model(self, model: str) -> ModelEvaluator | None:
         try:
-            model_evaluator = HuggingFaceModelEvaluator(model, self._config)
+            model_evaluator = ModelEvaluator(model, self._config)
         except Exception as exc:
             self._handle_model_loading_exception(model, exc)
             return None

@@ -10,23 +10,34 @@ from pathlib import Path
 from datetime import datetime
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.shot_manager import GSM8hotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
+from gsm_benchmarker.api_model_wrapper import APIModelWrapper
+from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
+from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 
 
 logger = logging.getLogger(__name__)
 
 
-class HuggingFaceModelEvaluator:
+class ModelEvaluator:
     """Evaluate models using HuggingFace transformers"""
 
     QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
     SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
 
-    def __init__(self, model_name: str, config: BenchmarkConfig):
+    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: str | None = None):
         self.original_shots = GSM8hotManager()
-        self.model_wrapper = HFModelWrapper(model_name, config=config)
+        self.model_wrapper = self._make_model_wrapper(model_name, config, api_type=api_type)
+
+    @staticmethod
+    def _make_model_wrapper(model_name: str, config: BenchmarkConfig, api_type: str | None = None) -> BaseModelWrapper:
+        if api_type is None:
+            logger.debug("Initialising a HuggingFace model")
+            return HFModelWrapper(model_name, config=config)
+        else:
+            logger.debug("Initialising an API-based model")
+            return APIModelWrapper(model_name, config=config, api_type=api_type)
 
     @property
     def model_name(self) -> str:
@@ -85,6 +96,7 @@ class HuggingFaceModelEvaluator:
             return float(numbers[-1])
 
         return None
+
 
     def evaluate_dataset(self, dataset: list[dict]) -> pd.DataFrame:
         """
@@ -189,3 +201,4 @@ class HuggingFaceModelEvaluator:
             logger.warning(f"Intermediate results file {fname} already exists; it will be overwritten")
         result.to_parquet(fname, index=False)
         logger.debug(f"Stored intermediate results at: {fname}")
+
