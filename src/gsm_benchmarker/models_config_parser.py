@@ -20,7 +20,7 @@ class SingleModelConfig:
 
     @classmethod
     def from_json_dict(cls, d: dict):
-        api_type_name = d.pop('api-type')
+        api_type_name = d.pop('api_type')
         if api_type_name is None:
             api_type = None
         else:
