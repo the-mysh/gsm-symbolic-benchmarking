@@ -12,7 +12,7 @@ from datetime import datetime
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.shot_manager import GSM8hotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
-from gsm_benchmarker.api_model_wrapper import APIModelWrapper
+from gsm_benchmarker.api_model_wrapper import APIModelWrapper, APIType
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 
@@ -26,12 +26,12 @@ class ModelEvaluator:
     QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
     SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
 
-    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: str | None = None):
+    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType | None = None):
         self.original_shots = GSM8hotManager()
         self.model_wrapper = self._make_model_wrapper(model_name, config, api_type=api_type)
 
     @staticmethod
-    def _make_model_wrapper(model_name: str, config: BenchmarkConfig, api_type: str | None = None) -> BaseModelWrapper:
+    def _make_model_wrapper(model_name: str, config: BenchmarkConfig, api_type: APIType | None = None) -> BaseModelWrapper:
         if api_type is None:
             logger.debug("Initialising a HuggingFace model")
             return HFModelWrapper(model_name, config=config)

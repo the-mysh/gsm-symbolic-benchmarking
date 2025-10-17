@@ -1,5 +1,6 @@
 import logging
 from typing import Callable
+from enum import Enum, auto
 
 logger = logging.getLogger(__name__)
 
@@ -19,22 +20,30 @@ from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 
 
+class APIType(Enum):
+    openai = auto()
+    anthropic = auto()
+
+
 class APIModelWrapper(BaseModelWrapper):
-    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: str):
+    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType):
         super().__init__(model_name, config)
 
         self._client_interface = self._setup_client(self._model_name, api_type, self.config)
 
-    def _setup_client(self, model_name: str, api_type: str, config: BenchmarkConfig) -> Callable[[str], str]:
+    def _setup_client(self, model_name: str, api_type: APIType, config: BenchmarkConfig) -> Callable[[str], str]:
+        if not isinstance(api_type, APIType):
+            raise TypeError(f"Expected an APIType enum member; got {type(api_type)}: {api_type}")
+
         match api_type:
-            case "openai":
+            case APIType.openai:
                 return self._setup_openai(model_name, config)
 
-            case "anthropic":
+            case APIType.anthropic:
                 return self._setup_anthropic(model_name, config)
 
             case _:
-                raise ValueError(f"API type not recognised: {api_type}; expected 'openai' or 'anthropic'")
+                raise ValueError(f"API type not recognised: {api_type}; expected {' / '.join(APIType.__members__)}")
 
     @staticmethod
     def _setup_openai(model_name: str, config: BenchmarkConfig) -> Callable[[str], str]:
