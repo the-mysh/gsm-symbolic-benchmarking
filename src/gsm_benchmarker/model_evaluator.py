@@ -141,7 +141,7 @@ class ModelEvaluator:
 
     def evaluate_multiple_datasets(self, datasets: list[list[dict]], intermediate_storage_path: Path | str | None,
                                    remove_intermediate_results: bool = True
-                                   ) -> pd.DataFrame:
+                                   ) -> pd.DataFrame | None:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
 
         if intermediate_storage_path is None:
@@ -163,7 +163,11 @@ class ModelEvaluator:
                              f"Results for this dataset will be skipped.")
                 logger.error(f"Full stack:\n{traceback.format_exc()}")
 
-        full_result = pd.concat(all_results, keys=np.arange(n))
+        if all_results:
+            full_result = pd.concat(all_results, keys=np.arange(n))
+        else:
+            logger.warning("All evaluations failed, no results to return")
+            full_result = None
 
         if remove_intermediate_results:
             self._remove_intermediate_results(intermediate_storage_path)

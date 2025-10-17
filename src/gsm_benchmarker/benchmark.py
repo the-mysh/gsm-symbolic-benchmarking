@@ -130,7 +130,9 @@ class BenchmarkRunner:
 
                     # Store results
                     self._results[variant][model] = res
-                    self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
+
+                    if res is not None:
+                        self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
 
                     logger.info(f"Evaluation of model {model} on variant {variant} completed")
                 except Exception as exc:
