@@ -3,28 +3,23 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 import torch
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 
 
 logger = logging.getLogger(__name__)
 
 
-class HFModelWrapper:
+class HFModelWrapper(BaseModelWrapper):
     def __init__(self, model_name: str, config: BenchmarkConfig):
-        self.config = config
-        self._model_name = model_name
+        super().__init__(model_name, config)
 
         logger.info(f"Setting up model {model_name}")
-
-        self.tokeniser = self.load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
-        self.model = self.load_model(model_name, trust_remote_code=self.config.trust_remote_code)
+        self.tokeniser = self._load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
+        self.model = self._load_model(model_name, trust_remote_code=self.config.trust_remote_code)
         logger.info("Model loaded")
 
-    @property
-    def model_name(self) -> str:
-        return self._model_name
-
     @staticmethod
-    def load_tokeniser(model_name: str, trust_remote_code: bool = False):
+    def _load_tokeniser(model_name: str, trust_remote_code: bool = False):
         logger.debug("Loading tokeniser")
         tokeniser = AutoTokenizer.from_pretrained(
             model_name,
@@ -38,18 +33,18 @@ class HFModelWrapper:
         return tokeniser
 
     @staticmethod
-    def load_model(model_name, trust_remote_code: bool = False):
+    def _load_model(model_name, trust_remote_code: bool = False):
         if torch.cuda.is_available():
             logger.info("CUDA available")
-            model = HFModelWrapper.load_model_cuda(model_name, trust_remote_code=trust_remote_code)
+            model = HFModelWrapper._load_model_cuda(model_name, trust_remote_code=trust_remote_code)
         else:
             logger.info("CUDA not available - using only CPU")
-            model = HFModelWrapper.load_model_cpu(model_name, trust_remote_code=trust_remote_code)
+            model = HFModelWrapper._load_model_cpu(model_name, trust_remote_code=trust_remote_code)
 
         return model
 
     @staticmethod
-    def load_model_cuda(model_name, trust_remote_code: bool = False):
+    def _load_model_cuda(model_name, trust_remote_code: bool = False):
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
@@ -70,7 +65,7 @@ class HFModelWrapper:
         return model
 
     @staticmethod
-    def load_model_cpu(model_name, trust_remote_code: bool = False):
+    def _load_model_cpu(model_name, trust_remote_code: bool = False):
         logger.debug("Loading model for CPU only")
         model = AutoModelForCausalLM.from_pretrained(
             model_name,

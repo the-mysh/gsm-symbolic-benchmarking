@@ -25,3 +25,5 @@ dependencies:
   - pip
   - pip:
       - torch
+      - openai
+      - anthropic
