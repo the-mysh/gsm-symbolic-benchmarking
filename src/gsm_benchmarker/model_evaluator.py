@@ -12,7 +12,7 @@ from datetime import datetime
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.shot_manager import GSM8hotManager
-from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly
+from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly, remove_intermediate_results_folder
 from gsm_benchmarker.api_model_wrapper import APIModelWrapper, APIType
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
@@ -164,8 +164,8 @@ class ModelEvaluator:
             logger.warning("All evaluations failed, no results to return")
             full_result = None
 
-        if remove_intermediate_results:
-            self._remove_intermediate_results(intermediate_storage_path)
+        if remove_intermediate_results and intermediate_storage_path is not None:
+            remove_intermediate_results_folder(intermediate_storage_path)
 
         return full_result
 
@@ -179,15 +179,6 @@ class ModelEvaluator:
         os.makedirs(full_storage_path)
 
         return full_storage_path
-
-    @staticmethod
-    def _remove_intermediate_results(storage_path: Path | None):
-        if storage_path is not None:
-            try:
-                logger.info("Removing intermediate results")
-                rmtree(storage_path)
-            except Exception as exc:
-                logger.error(f"Failed to remove intermediate results: {exc}")
 
     @staticmethod
     def _store_intermediate_result(result: pd.DataFrame, dir_path: Path | None, result_index: int) -> None:

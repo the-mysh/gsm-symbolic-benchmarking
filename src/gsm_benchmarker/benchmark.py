@@ -11,7 +11,7 @@ from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.api_model_wrapper import APIType
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.model_evaluator import ModelEvaluator
-from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
+from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, remove_intermediate_results_folder
 
 
 logger = logging.getLogger(__name__)
@@ -103,7 +103,8 @@ class BenchmarkRunner:
 
         return model, api_type  # api_type check later
 
-    def run(self, n_sets: int | None = None, n_per_set: int | None = None):
+    def run(self, n_sets: int | None = None, n_per_set: int | None = None,
+            remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
         self._pre_populate_results()
 
         for im, model_spec in enumerate(self._models):
@@ -125,7 +126,8 @@ class BenchmarkRunner:
                     # Evaluate model
                     res = model_evaluator.evaluate_multiple_datasets(
                         eval_sets,
-                        intermediate_storage_path=self.intermediate_storage_path / f"{model_evaluator.path_friendly_model_name}"
+                        intermediate_storage_path=self.intermediate_storage_path / f"{model_evaluator.path_friendly_model_name}",
+                        remove_intermediate_results=remove_intermediate_results
                     )
 
                     # Store results
@@ -142,6 +144,10 @@ class BenchmarkRunner:
             self._delete_model(model_evaluator)
 
         logger.info("EVALUATION COMPLETE")
+
+        if remove_intermediate_results:
+            remove_intermediate_results_folder(self.intermediate_storage_path)
+
         logger.info(self.summarise_failures())
         return self._results
 

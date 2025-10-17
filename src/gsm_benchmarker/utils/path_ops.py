@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import logging
+from shutil import rmtree
 
 
 logger = logging.getLogger(__name__)
@@ -33,3 +34,10 @@ def make_name_path_friendly(name: str) -> str:
 
     return name
 
+
+def remove_intermediate_results_folder(storage_path: Path) -> None:
+    try:
+        logger.info("Removing intermediate results")
+        rmtree(storage_path)
+    except Exception as exc:
+        logger.error(f"Failed to remove intermediate results: {exc}")
