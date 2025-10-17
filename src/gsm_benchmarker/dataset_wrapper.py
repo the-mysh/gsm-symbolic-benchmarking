@@ -21,6 +21,7 @@ class GSMSymbolicDataset:
         main = auto()
         p1 = auto()
         p2 = auto()
+        GSM8K = auto()
 
     class Split(Enum):
         test = auto()
@@ -41,8 +42,13 @@ class GSMSymbolicDataset:
         self._variant = self._check_type(variant, self.Variant)
         self._split = self._check_type(split, self.Split)
 
-        logger.info(f"Loading GSM-Symbolic dataset (variant: {variant})...")
-        self.dataset = load_dataset(self.DSET_NAME, self._variant.name, split=self._split.name)
+        if self._variant is self.Variant.GSM8K:
+            variant = self.Variant.main
+            logger.info(f"Loading GSM-Symbolic dataset in variant 'main'; original questions will be extracted from it")
+        else:
+            logger.info(f"Loading GSM-Symbolic dataset (variant: {variant.name})...")
+
+        self.dataset = load_dataset(self.DSET_NAME, variant.name, split=self._split.name)
         logger.info(f"Loaded {len(self.dataset)} examples")
 
     @staticmethod
@@ -91,10 +97,17 @@ class GSMSymbolicDataset:
 
         templates = self.get_unique_templates()[:n_per_set]
 
-        if n_sets is None:
-            n_sets = self.MAX_SETS
+        if self._variant is self.Variant.GSM8K:
+            if n_sets is not None and n_sets > 1:
+                logger.warning(f"For variant {self._variant.GSM8K}, only one evaluation set can be created")
+                n_sets = 1
+            sample_creator = lambda s: self.Sample(s['id'], s['original_question'], s['original_answer'])
+        else:
+            if n_sets is None:
+                n_sets = self.MAX_SETS
+            sample_creator = lambda s: self.Sample(s['id'], s['question'], s['answer'])
 
-        logger.info(f"Creating {n_sets} sets with {len(templates)} examples each")
+        logger.info(f"Creating {n_sets} set(s) with {len(templates)} example(s) each")
 
         eval_sets = []
 
@@ -106,8 +119,7 @@ class GSMSymbolicDataset:
 
                 # Take the instance_idx-th example (if exists)
                 if instance_idx < len(sub_dset):
-                    s = sub_dset[instance_idx]
-                    eval_set.append(self.Sample(s['id'], s['question'], s['answer']))
+                    eval_set.append(sample_creator(sub_dset[instance_idx]))
                 else:
                     logger.warning(f"Not enough examples for template id {template_id}")
 
