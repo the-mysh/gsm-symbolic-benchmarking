@@ -16,7 +16,7 @@ class HFModelWrapper:
         logger.info(f"Setting up model {model_name}")
 
         self.tokeniser = self.load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
-        self.model = self.load_model(model_name)
+        self.model = self.load_model(model_name, trust_remote_code=self.config.trust_remote_code)
         logger.info("Model loaded")
 
     @property
@@ -38,18 +38,18 @@ class HFModelWrapper:
         return tokeniser
 
     @staticmethod
-    def load_model(model_name):
+    def load_model(model_name, trust_remote_code: bool = False):
         if torch.cuda.is_available():
             logger.info("CUDA available")
-            model = HFModelWrapper.load_model_cuda(model_name)
+            model = HFModelWrapper.load_model_cuda(model_name, trust_remote_code=trust_remote_code)
         else:
             logger.info("CUDA not available - using only CPU")
-            model = HFModelWrapper.load_model_cpu(model_name)
+            model = HFModelWrapper.load_model_cpu(model_name, trust_remote_code=trust_remote_code)
 
         return model
 
     @staticmethod
-    def load_model_cuda(model_name):
+    def load_model_cuda(model_name, trust_remote_code: bool = False):
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
@@ -63,18 +63,20 @@ class HFModelWrapper:
             quantization_config=bnb_config,
             device_map="auto",
             low_cpu_mem_usage=True,
-            max_memory={0: "7GB", "cpu": "12GB"}  # Adjust based on your hardware
+            max_memory={0: "7GB", "cpu": "12GB"},  # Adjust based on your hardware,
+            trust_remote_code=trust_remote_code
         )
 
         return model
 
     @staticmethod
-    def load_model_cpu(model_name):
+    def load_model_cpu(model_name, trust_remote_code: bool = False):
         logger.debug("Loading model for CPU only")
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             dtype=torch.float32,
-            low_cpu_mem_usage=True
+            low_cpu_mem_usage=True,
+            trust_remote_code=trust_remote_code
         )
 
         return model
