@@ -110,7 +110,7 @@ class BenchmarkRunner:
             model, api_type = self._get_model_and_api_type(model_spec)
             logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model} {10*'='}")
 
-            model_evaluator = self._load_model(model)
+            model_evaluator = self._load_model(model, api_type=api_type)
             if not model_evaluator:
                 continue  # failed to load; already handled
 
