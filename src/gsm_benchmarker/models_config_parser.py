@@ -1,6 +1,5 @@
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from importlib.resources import files
 
 
@@ -57,4 +56,4 @@ class ModelsConfig:
     def _load_data() -> tuple[SingleModelConfig, ...]:
         data_bytes = (_RESOURCES_PATH / "original-models-config.json").read_bytes()
         data_dict = json.loads(data_bytes)
-        return tuple(s for s in data_dict["models"])
+        return tuple(SingleModelConfig.from_json_dict(s) for s in data_dict["models"])
