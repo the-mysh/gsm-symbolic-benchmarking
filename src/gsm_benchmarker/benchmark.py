@@ -4,6 +4,8 @@ import pandas as pd
 import torch
 from pathlib import Path
 from functools import cached_property
+from dataclasses import dataclass
+import traceback
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -12,6 +14,14 @@ from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class EvaluationFailure:
+    model: str
+    variant: str
+    exception: Exception
+    exception_traceback: str
 
 
 class BenchmarkRunner:
@@ -23,7 +33,8 @@ class BenchmarkRunner:
         self._config = config if config is not None else BenchmarkConfig()
         self._storage_path = confirm_or_create_folder(storage_path)
 
-        self._results = {}
+        self._results: dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]] = {}
+        self._failed_evaluations: list[EvaluationFailure] = []
 
     @cached_property
     def intermediate_storage_path(self):
@@ -36,6 +47,14 @@ class BenchmarkRunner:
         p = self._storage_path / 'final'
         confirm_or_create_folder(p)
         return p
+
+    @property
+    def results(self) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
+        return self._results
+
+    @property
+    def failed_evaluations(self) -> list[EvaluationFailure]:
+        return self._failed_evaluations
 
     def _pre_populate_results(self):
         # results structure: variants as outer layer, models as inner
@@ -52,29 +71,45 @@ class BenchmarkRunner:
             model_evaluator = HuggingFaceModelEvaluator(model, self._config)
 
             for iv, variant in enumerate(self._dset_variants):
-                logger.info(f"Evaluating {model} on dataset variant {iv+1}/{len(self._dset_variants)}: {variant}")
+                try:
+                    logger.info(f"Evaluating {model} on dataset variant {iv+1}/{len(self._dset_variants)}: {variant}")
 
-                # Load dataset
-                dataset_wrapper = GSMSymbolicDataset(variant=variant)
-                eval_sets = dataset_wrapper.create_evaluation_sets(n_sets=n_sets, n_per_set=n_per_set)
+                    # Load dataset
+                    dataset_wrapper = GSMSymbolicDataset(variant=variant)
+                    eval_sets = dataset_wrapper.create_evaluation_sets(n_sets=n_sets, n_per_set=n_per_set)
 
-                # Evaluate model
-                res = model_evaluator.evaluate_multiple_datasets(
-                    eval_sets,
-                    intermediate_storage_path=self.intermediate_storage_path / f"{model_evaluator.path_friendly_model_name}"
-                )
+                    # Evaluate model
+                    res = model_evaluator.evaluate_multiple_datasets(
+                        eval_sets,
+                        intermediate_storage_path=self.intermediate_storage_path / f"{model_evaluator.path_friendly_model_name}"
+                    )
 
-                # Store results
-                self._results[variant][model] = res
-                self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
+                    # Store results
+                    self._results[variant][model] = res
+                    self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
 
-                logger.info(f"Evaluation of model {model} on variant {variant} completed")
+                    logger.info(f"Evaluation of model {model} on variant {variant} completed")
+                except Exception as exc:
+                    self._handle_evaluation_exception(model, variant, exc)
 
             logger.info(f"Evaluation of model {model} on all dataset variants completed")
             self._delete_model(model_evaluator)
 
         logger.info("EVALUATION COMPLETE")
+        logger.info(self.summarise_failures())
         return self._results
+
+    def _handle_evaluation_exception(self, model: str, variant: GSMSymbolicDataset.Variant, exc: Exception):
+        t = traceback.format_exc()
+        logger.error(f"Evaluation of model {model} on dataset variant {variant.name} failed with an exception: {exc}. "
+                     f"Full traceback:\n{t}")
+        self._failed_evaluations.append(EvaluationFailure(
+            model=model,
+            variant=variant.name,
+            exception=exc,
+            exception_traceback=t
+        ))
+
 
     @staticmethod
     def _delete_model(model_evaluator):
@@ -107,3 +142,11 @@ class BenchmarkRunner:
                 )
 
         return pd.DataFrame(summaries)
+
+    def summarise_failures(self) -> str:
+        if not self._failed_evaluations:
+            return "No evaluation failures recorded"
+
+        ss = "\n\n".join(f"On model {ef.model}, variant {ef.variant}: {ef.exception}" for ef in self._failed_evaluations)
+
+        return f"Recorded {len(self._failed_evaluations)} failed evaluations:\n\n{ss}"
