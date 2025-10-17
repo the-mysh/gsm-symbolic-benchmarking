@@ -25,3 +25,11 @@ def confirm_or_create_folder(folder_path: Path | str) -> Path:
     return folder_path
 
 
+def make_name_path_friendly(name: str) -> str:
+    repl = '_'
+
+    for char in ('/', '\\', '.'):
+        name = name.replace(char, repl)
+
+    return name
+

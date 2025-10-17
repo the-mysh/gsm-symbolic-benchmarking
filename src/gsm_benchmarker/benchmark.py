@@ -174,7 +174,7 @@ class BenchmarkRunner:
     def _store_model_x_variant_result(self, dataset_wrapper, model_evaluator, res):
         logger.debug("Storing results")
 
-        res_path = self.final_storage_path / f"results/{dataset_wrapper.DSET_NAME}_{dataset_wrapper.variant_name}"
+        res_path = self.final_storage_path / dataset_wrapper.path_friendly_name
         confirm_or_create_folder(res_path)
 
         fname = res_path / f"{model_evaluator.path_friendly_model_name}.parquet"

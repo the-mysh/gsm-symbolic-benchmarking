@@ -4,6 +4,7 @@ from datasets import load_dataset, Dataset
 from enum import Enum, auto
 from typing import TypeVar
 
+from gsm_benchmarker.utils.path_ops import make_name_path_friendly
 
 T = TypeVar("T")
 
@@ -52,6 +53,14 @@ class GSMSymbolicDataset:
     @property
     def split_name(self) -> str:
         return self._split.name
+
+    @property
+    def path_friendly_dset_name(self) -> str:
+        return make_name_path_friendly(self.DSET_NAME)
+
+    @property
+    def path_friendly_name(self) -> str:
+        return make_name_path_friendly(f"{self.DSET_NAME}_{self._variant.name}_{self._split.name}")
 
     def get_subdataset_for_original_id(self, original_id: int) -> Dataset:
         """Get all instances of a specific question template"""

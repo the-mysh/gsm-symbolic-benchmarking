@@ -11,7 +11,7 @@ from datetime import datetime
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.shot_manager import GSM8hotManager
-from gsm_benchmarker.utils.path_ops import confirm_or_create_folder
+from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly
 from gsm_benchmarker.api_model_wrapper import APIModelWrapper, APIType
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
@@ -45,13 +45,7 @@ class ModelEvaluator:
 
     @property
     def path_friendly_model_name(self) -> str:
-        m = self.model_name
-        repl = '_'
-
-        for char in ('/', '\\', '.'):
-            m = m.replace(char, repl)
-
-        return m
+        return make_name_path_friendly(self.model_name)
 
     def create_prompt(self, question: str) -> str:
         """Create 8-shot CoT prompt following paper's format"""
