@@ -28,6 +28,7 @@ class GSMSymbolicDataset:
 
     class Sample(NamedTuple):
         id: int
+        original_id: int
         question: str
         answer: str
 
@@ -101,11 +102,11 @@ class GSMSymbolicDataset:
             if n_sets is not None and n_sets > 1:
                 logger.warning(f"For variant {self._variant.GSM8K}, only one evaluation set can be created")
                 n_sets = 1
-            sample_creator = lambda s: self.Sample(s['id'], s['original_question'], s['original_answer'])
+            sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['original_question'], s['original_answer'])
         else:
             if n_sets is None:
                 n_sets = self.MAX_SETS
-            sample_creator = lambda s: self.Sample(s['id'], s['question'], s['answer'])
+            sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['question'], s['answer'])
 
         logger.info(f"Creating {n_sets} set(s) with {len(templates)} example(s) each")
 

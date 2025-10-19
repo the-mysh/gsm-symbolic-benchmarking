@@ -1,7 +1,6 @@
 import os
 import re
 import traceback
-from shutil import rmtree
 from tqdm.auto import tqdm
 import logging
 import numpy as np
@@ -122,6 +121,7 @@ class ModelEvaluator:
 
             results.append({
                 'id': example.id,
+                'original_id': example.original_id,
                 'question': example.question,
                 'true_answer': true_answer,
                 'predicted_answer': predicted_answer,
