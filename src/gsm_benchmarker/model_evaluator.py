@@ -27,10 +27,22 @@ class ModelEvaluator:
     SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
 
     ANSWER_PATTERNS = (
-        re.compile(r'####\s*(-?\d+(?:\.\d+)?)'),  # GSM8K standard format: #### NUMBER
-        re.compile(r'[Tt]he (?:final )?answer is\s*\$?\s*(-?\d+(?:\.\d+)?)'),  # GSM-Symbolic format
-        re.compile(r'[Aa]nswer:\s*\$?\s*(-?\d+(?:\.\d+)?)'),
-        re.compile(r'=\s*(-?\d+(?:\.\d+)?)\s*(?:\n|$)'),
+        (
+            "GSM8K standard format: '#### <number>",
+            re.compile(r'####\s*(-?\d+(?:\.\d+)?)')
+        ),
+        (
+            "GSM-Symbolic format: 'The final answer is <number>'",
+            re.compile(r'[Tt]he (?:final )?answer is\s*\$?\s*(-?\d+(?:\.\d+)?)')
+        ),
+        (
+            "'Answer:' format",
+            re.compile(r'[Aa]nswer:\s*\$?\s*(-?\d+(?:\.\d+)?)')
+        ),
+        (
+            "'= <number> format'",
+            re.compile(r'=\s*(-?\d+(?:\.\d+)?)\s*(?:\n|$)')
+        ),
     )
 
     STOP_TOKENS = (
@@ -88,15 +100,21 @@ class ModelEvaluator:
 
         text = cls.trim_response(text)
 
-        for pattern in cls.ANSWER_PATTERNS:
+        for pattern_name, pattern in cls.ANSWER_PATTERNS:
             match = pattern.search(text)
             if match:
+                logger.debug(f"Matched answer pattern: {pattern_name}")
                 return float(match.group(1))
+
+        logger.debug("No predefined answer pattern matched")
 
         # Last resort if none of the patterns work: find last number in text
         numbers = re.findall(r'-?\d+(?:\.\d+)?', text)
         if numbers:
+            logger.debug("Extracting answer as the last number in text")
             return float(numbers[-1])
+
+        logger.warning("Could not extract answer from text")
 
         return None
 

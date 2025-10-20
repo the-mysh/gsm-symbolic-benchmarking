@@ -1,20 +1,41 @@
+import logging
 import pytest
 
 from gsm_benchmarker.model_evaluator import ModelEvaluator
 
 
-@pytest.mark.parametrize(("resp", "value"), (
-    ("The final answer is 42.", 42),
-    ("The answer is 38", 38),
-    ("Answer: 3.1", 3.1),
-    ("answer:    22", 22),
-    ("#### -1", -1),
-    ("###### 3", 3),
-    ("A: 31", 31),
-    ("=2.5", 2.5),
-    ("=      -23.8", -23.8),
-    ("value=3.2\n", 3.2)
+@pytest.mark.parametrize(("resp", "value", "pattern"), (
+    ("The final answer is 42.", 42, "GSM-Symbolic format"),
+    ("The answer is 38", 38, "GSM-Symbolic format"),
+    ("Answer: 3.1", 3.1, "'Answer:' format"),
+    ("answer:    22", 22, "'Answer:' format"),
+    ("#### -1", -1, "GSM8K standard format"),
+    ("###### 3", 3, "GSM8K standard format"),
+    ("A: 31", 31, ""),
+    ("=2.5", 2.5, "'= <number> format'"),
+    ("=      -23.8", -23.8, "'= <number> format'"),
+    ("value=3.2\n", 3.2, "'= <number> format'")
 ))
-def test_extract_answer(resp, value):
-    extracted_value = ModelEvaluator.extract_answer(resp)
+def test_extract_answer_from_pattern(resp, value, pattern, caplog):
+
+    with caplog.at_level(logging.DEBUG):
+        extracted_value = ModelEvaluator.extract_answer(resp)
+
     assert extracted_value == pytest.approx(value, abs=1e-5)
+    assert "No predefined answer pattern" not in caplog.text
+    assert pattern in caplog.text
+
+
+@pytest.mark.parametrize(("resp", "value"), (
+    ("A: 31", 31),
+    ("was 5, subtracted 1, left 4", 4)
+))
+def test_extract_answer_from_pattern(resp, value, caplog):
+
+    with caplog.at_level(logging.DEBUG):
+        extracted_value = ModelEvaluator.extract_answer(resp)
+
+    assert extracted_value == pytest.approx(value, abs=1e-5)
+    assert "No predefined answer pattern" in caplog.text
+    assert "Extracting answer as the last number" in caplog.text
+
