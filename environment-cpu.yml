@@ -22,6 +22,8 @@ dependencies:
   - notebook
   - ipywidgets
 
+  - pytest
+
   - pip
   - pip:
       - torch
