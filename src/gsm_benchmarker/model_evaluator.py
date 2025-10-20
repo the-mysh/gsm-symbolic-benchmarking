@@ -31,7 +31,18 @@ class ModelEvaluator:
         re.compile(r'[Tt]he (?:final )?answer is\s*\$?\s*(-?\d+(?:\.\d+)?)'),  # GSM-Symbolic format
         re.compile(r'[Aa]nswer:\s*\$?\s*(-?\d+(?:\.\d+)?)'),
         re.compile(r'=\s*(-?\d+(?:\.\d+)?)\s*(?:\n|$)'),
+    )
 
+    STOP_TOKENS = (
+        # from paper
+        "Q:",  # model moves on to generating a next question
+        "</s>",
+        "<|endoftext|>",
+
+        # other, suggested by Gemini
+        "**`<",  # OpenAI / Mistral / LLama3
+        "<end_of_turn>",  # Gemma
+        "[/INST]"  # Mistral Dialogic / Tool Use
     )
 
     def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType | None = None):
@@ -75,6 +86,8 @@ class ModelEvaluator:
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
         """
 
+        text = cls.trim_response(text)
+
         for pattern in cls.ANSWER_PATTERNS:
             match = pattern.search(text)
             if match:
@@ -86,6 +99,17 @@ class ModelEvaluator:
             return float(numbers[-1])
 
         return None
+
+    @classmethod
+    def trim_response(cls, text: str) -> str:
+        """'Trim' model response to the appearance of an end-of-response token - if any."""
+
+        for stop_token in cls.STOP_TOKENS:
+            idx = text.find(stop_token)
+            if idx != -1:
+                return text[:stop_token]  # don't look for other stop tokens
+
+        return text  # return original text if no stop tokens found
 
     def evaluate_dataset(self, dataset: list[GSMSymbolicDataset.Sample]) -> pd.DataFrame:
         """
