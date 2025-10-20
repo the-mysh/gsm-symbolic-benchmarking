@@ -26,6 +26,14 @@ class ModelEvaluator:
     QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
     SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
 
+    ANSWER_PATTERNS = (
+        re.compile(r'####\s*(-?\d+(?:\.\d+)?)'),  # GSM8K standard format: #### NUMBER
+        re.compile(r'[Tt]he (?:final )?answer is\s*\$?\s*(-?\d+(?:\.\d+)?)'),  # GSM-Symbolic format
+        re.compile(r'[Aa]nswer:\s*\$?\s*(-?\d+(?:\.\d+)?)'),
+        re.compile(r'=\s*(-?\d+(?:\.\d+)?)\s*(?:\n|$)'),
+
+    )
+
     def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType | None = None):
         self.original_shots = GSM8hotManager()
         self.model_wrapper = self._make_model_wrapper(model_name, config, api_type=api_type)
@@ -60,31 +68,19 @@ class ModelEvaluator:
 
         return prompt
 
-    @staticmethod
-    def extract_answer(text: str) -> float | None:
+    @classmethod
+    def extract_answer(cls, text: str) -> float | None:
         """
         Extract numerical answer from text.
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
         """
 
-        # GSM8K standard format: #### NUMBER
-        match = re.search(r'####\s*(-?\d+(?:\.\d+)?)', text)
-        if match:
-            return float(match.group(1))
-
-        # Alternative formats
-        patterns = [
-            r'[Tt]he (?:final )?answer is\s*\$?\s*(-?\d+(?:\.\d+)?)',
-            r'[Aa]nswer:\s*\$?\s*(-?\d+(?:\.\d+)?)',
-            r'=\s*(-?\d+(?:\.\d+)?)\s*(?:\n|$)',
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, text)
+        for pattern in cls.ANSWER_PATTERNS:
+            match = pattern.search(text)
             if match:
                 return float(match.group(1))
 
-        # Last resort: find last number in text
+        # Last resort if none of the patterns work: find last number in text
         numbers = re.findall(r'-?\d+(?:\.\d+)?', text)
         if numbers:
             return float(numbers[-1])
