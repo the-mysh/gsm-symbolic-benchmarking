@@ -14,6 +14,13 @@ $ uv sync
 ```
 (from project root).
 
+To install the current package in the environment:
+
+```commandline
+$ uv pip install -e .
+```
+# TODO: check the above for alternatives / recommendations
+
 To install a new package and 
 ```commandline
 $ uv add <package>

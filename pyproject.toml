@@ -6,24 +6,24 @@ authors = [
 ]
 description = "Reproducing and extending GSM-Symbolic benchmark"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = "==3.12"  # for now, to keep consistent with current remote version (on the cluster)
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
-  "accelerate>=1.11.0",
-  "anthropic>=0.71.0",
-  "datasets>=4.2.0",
-  "google-genai>=1.45.0",
-  "ipywidgets>=8.1.7",
-  "notebook>=7.4.7",
-  "numpy>=2.3.4",
-  "openai>=2.6.0",
-  "pandas>=2.3.3",
-  "psutil>=7.1.1",
+  "accelerate",
+  "anthropic",
+  "datasets",
+  "google-genai",
+  "ipywidgets",
+  "notebook",
+  "numpy",
+  "openai",
+  "pandas",
+  "psutil",
   "torch>=2.7.0",
-  "tqdm>=4.67.1",
-  "transformers>=4.57.1",
+  "tqdm",
+  "transformers",
 ]
 
 [tool.uv.sources]
