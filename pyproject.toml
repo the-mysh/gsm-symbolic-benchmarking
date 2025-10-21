@@ -11,7 +11,19 @@ classifiers = [
     "Programming Language :: Python :: 3",
 ]
 dependencies = [
+  "accelerate>=1.11.0",
+  "anthropic>=0.71.0",
+  "datasets>=4.2.0",
+  "google-genai>=1.45.0",
+  "ipywidgets>=8.1.7",
+  "notebook>=7.4.7",
+  "numpy>=2.3.4",
+  "openai>=2.6.0",
+  "pandas>=2.3.3",
+  "psutil>=7.1.1",
   "torch>=2.7.0",
+  "tqdm>=4.67.1",
+  "transformers>=4.57.1",
 ]
 
 [tool.uv.sources]
