@@ -33,10 +33,16 @@ Activating venv in command line:
 
 Running jupyter notebook:
 ```commandline
-$ uv run --with jupyter jupyter notebook
+$ uv run jupyter notebook
 ```
 
 Running Python from uv venv:
 ```commandline
 $ uv run python
 ```
+
+Running any of the scripts from uv venv: 
+```commandline
+$ uv run <path-to-script>
+```
+(doesn't need venv activated; just running this from root works)
