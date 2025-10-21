@@ -35,3 +35,8 @@ Running jupyter notebook:
 ```commandline
 $ uv run --with jupyter jupyter notebook
 ```
+
+Running Python from uv venv:
+```commandline
+$ uv run python
+```
