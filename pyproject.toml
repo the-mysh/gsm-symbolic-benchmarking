@@ -13,6 +13,7 @@ classifiers = [
 dependencies = [
   "accelerate",
   "anthropic",
+  "bitsandbytes",
   "coloredlogs",
   "datasets",
   "google-genai",
