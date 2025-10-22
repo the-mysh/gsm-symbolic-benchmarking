@@ -123,9 +123,12 @@ class ModelEvaluator:
         """'Trim' model response to the appearance of an end-of-response token - if any."""
 
         for stop_token in cls.STOP_TOKENS:
-            idx = text.find(stop_token)
-            if idx != -1:
-                return text[:stop_token]  # don't look for other stop tokens
+            try:
+                idx = text.find(stop_token)
+            except ValueError:
+                # not found
+                continue
+            return text[:idx]  # don't look for other stop tokens
 
         return text  # return original text if no stop tokens found
 
