@@ -1,7 +1,7 @@
 import os
 import logging
+import re
 from functools import cached_property
-
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
@@ -89,7 +89,7 @@ class MultiModelResultsAnalyser:
                 data_dict[model_name] = model_results.data
             else:
                 s = model_results.get_total_accuracy_and_std()
-                data_dict[''.join(item_name.split('.')[:-1])] = {'accuracy': s[0], 'std': s[1]}
+                data_dict[model_name] = {'accuracy': s[0], 'std': s[1]}
 
         return data_dict
 
@@ -103,4 +103,36 @@ class MultiModelResultsAnalyser:
         data_dict = self._load_data(dir_path=self._dir_path, full=True)
         df = pd.concat((v.reset_index() for v in data_dict.values()), keys=data_dict.keys())
 
+        return df
+
+
+class MultiVariantMultiModelResultsAnalyser:
+    VARIANT_NAME_PATTERN = re.compile(r"[\w_-]+_(?P<variant>\w+)_test")
+
+    def __init__(self, dir_path: str | Path):
+        self._dir_path = Path(dir_path).resolve()
+        self._summary_data = self._load_summary_data(self._dir_path)
+
+    @property
+    def summary_data(self):
+        return self._summary_data
+
+    @classmethod
+    def match_variant_name(cls, name):
+        match = cls.VARIANT_NAME_PATTERN.match(name)
+        if not match:
+            return name
+        return match.group('variant')
+
+    @classmethod
+    def _load_summary_data(cls, dir_path: Path) -> pd.DataFrame:
+        data_dict = {}
+
+        logger.debug("Loading per-model results")
+        for item_name in tqdm(os.listdir(dir_path), desc="Model"):
+            item_path = dir_path / item_name
+            multi_model_results = MultiModelResultsAnalyser(item_path)
+            data_dict[cls.match_variant_name(item_name)] = multi_model_results.summary_data
+
+        df = pd.concat(data_dict.values(), keys=data_dict.keys(), axis=1)
         return df
