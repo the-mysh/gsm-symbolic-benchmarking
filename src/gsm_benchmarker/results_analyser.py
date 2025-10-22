@@ -12,13 +12,13 @@ class ModelResultsAnalyser:
     def __init__(self, file_path: str | Path):
         self._file_path = Path(file_path)
 
-        data = self.load_data(self._file_path)
+        data = self._load_data(self._file_path)
         self._check_data(data)
         self._data = data
-        self._data.index.names = ['set', 'question']  # TODO: move to where it's saved
+        self._data.index.names = ['set_number', 'question_number']  # TODO: move to where it's saved
 
     @staticmethod
-    def load_data(file_path: str | Path) -> pd.DataFrame:
+    def _load_data(file_path: str | Path) -> pd.DataFrame:
         return pd.read_parquet(file_path)
 
     @staticmethod
@@ -57,17 +57,15 @@ class ModelResultsAnalyser:
 
 class MultiModelResultsAnalyser:
     def __init__(self, dir_path: str | Path):
-        self._dir_path = Path(dir_path)
-        self._summary_data = self.load_summary_data(self._dir_path)
+        self._dir_path = Path(dir_path).resolve()
+        self._summary_data = self._load_summary_data(self._dir_path)
 
     @property
     def summary_data(self) -> pd.DataFrame:
         return self._summary_data
 
     @staticmethod
-    def load_summary_data(dir_path: str | Path):
-        dir_path = Path(dir_path).resolve()
-
+    def _load_data(dir_path: Path, full: bool = False):
         data_dict = {}
 
         logger.debug("Loading per-model results")
@@ -77,8 +75,23 @@ class MultiModelResultsAnalyser:
                 logger.warning(f"The algorithm is not meant for non-flat directories; found subfolder '{item_name}'")
                 continue
             model_results = ModelResultsAnalyser(item_path)
-            s = model_results.get_total_accuracy_and_std()
-            data_dict[''.join(item_name.split('.')[:-1])] = {'accuracy': s[0], 'std': s[1]}
+            model_name = ''.join(item_name.split('.')[:-1])
+            if full:
+                data_dict[model_name] = model_results.data
+            else:
+                s = model_results.get_total_accuracy_and_std()
+                data_dict[''.join(item_name.split('.')[:-1])] = {'accuracy': s[0], 'std': s[1]}
 
+        return data_dict
+
+    @staticmethod
+    def _load_summary_data(dir_path):
+        data_dict = MultiModelResultsAnalyser._load_data(dir_path)
         data_df = pd.DataFrame(data_dict)
         return data_df.T
+
+    def load_full_data(self):
+        data_dict = self._load_data(dir_path=self._dir_path, full=True)
+        df = pd.concat((v.reset_index() for v in data_dict.values()), keys=data_dict.keys())
+
+        return df
