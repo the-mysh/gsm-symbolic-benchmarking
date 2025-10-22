@@ -6,7 +6,7 @@ authors = [
 ]
 description = "Reproducing and extending GSM-Symbolic benchmark"
 readme = "README.md"
-requires-python = "==3.12"  # for now, to keep consistent with current remote version (on the cluster)
+requires-python = "==3.12.*"  # for now, to keep consistent with current remote version (on the cluster)
 classifiers = [
     "Programming Language :: Python :: 3",
 ]
@@ -21,6 +21,7 @@ dependencies = [
   "openai",
   "pandas",
   "psutil",
+  "pytest",
   "torch>=2.7.0",
   "tqdm",
   "transformers",

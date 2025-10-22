@@ -11,7 +11,6 @@ from gsm_benchmarker.model_evaluator import ModelEvaluator
     ("answer:    22", 22, "'Answer:' format"),
     ("#### -1", -1, "GSM8K standard format"),
     ("###### 3", 3, "GSM8K standard format"),
-    ("A: 31", 31, ""),
     ("=2.5", 2.5, "'= <number> format'"),
     ("=      -23.8", -23.8, "'= <number> format'"),
     ("value=3.2\n", 3.2, "'= <number> format'")
@@ -30,7 +29,7 @@ def test_extract_answer_from_pattern(resp, value, pattern, caplog):
     ("A: 31", 31),
     ("was 5, subtracted 1, left 4", 4)
 ))
-def test_extract_answer_from_pattern(resp, value, caplog):
+def test_extract_answer_no_pattern(resp, value, caplog):
 
     with caplog.at_level(logging.DEBUG):
         extracted_value = ModelEvaluator.extract_answer(resp)
