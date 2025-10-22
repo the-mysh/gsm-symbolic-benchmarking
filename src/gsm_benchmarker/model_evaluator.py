@@ -197,7 +197,7 @@ class ModelEvaluator:
                 logger.error(f"Full stack:\n{traceback.format_exc()}")
 
         if all_results:
-            full_result = pd.concat(all_results, keys=np.arange(n))
+            full_result = pd.concat(all_results, keys=np.arange(n), names=['set_number', 'question_number'])
         else:
             logger.warning("All evaluations failed, no results to return")
             full_result = None
