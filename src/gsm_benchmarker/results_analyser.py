@@ -1,5 +1,7 @@
 import os
 import logging
+from functools import cached_property
+
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
@@ -59,6 +61,13 @@ class MultiModelResultsAnalyser:
     def __init__(self, dir_path: str | Path):
         self._dir_path = Path(dir_path).resolve()
         self._summary_data = self._load_summary_data(self._dir_path)
+        self._full_data = None
+
+    @cached_property
+    def full_data(self) -> pd.DataFrame:
+        if self._full_data is None:
+            self._full_data = self._load_full_data()
+        return self._full_data
 
     @property
     def summary_data(self) -> pd.DataFrame:
@@ -90,7 +99,7 @@ class MultiModelResultsAnalyser:
         data_df = pd.DataFrame(data_dict)
         return data_df.T
 
-    def load_full_data(self):
+    def _load_full_data(self):
         data_dict = self._load_data(dir_path=self._dir_path, full=True)
         df = pd.concat((v.reset_index() for v in data_dict.values()), keys=data_dict.keys())
 
