@@ -13,6 +13,7 @@ classifiers = [
 dependencies = [
   "accelerate",
   "anthropic",
+  "coloredlogs",
   "datasets",
   "google-genai",
   "ipywidgets",
