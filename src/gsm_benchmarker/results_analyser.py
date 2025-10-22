@@ -1,5 +1,10 @@
+import os
+import logging
 import pandas as pd
 from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 class ModelResultsAnalyser:
@@ -45,3 +50,29 @@ class ModelResultsAnalyser:
         std_acc = float(accuracies.std()) if len(accuracies) > 1 else None
         return mean_acc, std_acc
 
+
+class MultiModelResultsAnalyser:
+    def __init__(self, data: pd.DataFrame):
+        self._data = data
+
+    @property
+    def data(self) -> pd.DataFrame:
+        return self._data
+
+    @classmethod
+    def from_multi_model_directory(cls, dir_path: str | Path):
+        dir_path = Path(dir_path).resolve()
+
+        data_dict = {}
+
+        for item_name in os.listdir(dir_path):
+            item_path = dir_path / item_name
+            if item_path.is_dir():
+                logger.warning(f"The algorithm is not meant for non-flat directories; found subfolder '{item_name}'")
+                continue
+            model_results = ModelResultsAnalyser.from_file(item_path)
+            s = model_results.get_total_accuracy_and_std()
+            data_dict[''.join(item_name.split('.')[:-1])] = {'accuracy': s[0], 'std': s[1]}
+
+        data_df = pd.DataFrame(data_dict)
+        return cls(data_df.T)
