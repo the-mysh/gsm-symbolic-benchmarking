@@ -12,21 +12,26 @@ classifiers = [
 ]
 dependencies = [
   "accelerate",
-  "anthropic",
   "bitsandbytes",
   "coloredlogs",
   "datasets",
-  "google-genai",
   "ipywidgets",
   "notebook",
   "numpy",
-  "openai",
   "pandas",
   "psutil",
   "pytest",
   "torch>=2.7.0",
   "tqdm",
   "transformers",
+]
+
+[project.optional-dependencies]
+testing = ["pytest"]
+api_models = [
+  "openai",
+  "anthropic",
+  "google-genai"
 ]
 
 [tool.uv.sources]
