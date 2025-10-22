@@ -3,10 +3,21 @@ from pathlib import Path
 
 
 class ModelResultsAnalyser:
-    def __init__(self, results: pd.DataFrame):
-        self._data = results
-
+    def __init__(self, data: pd.DataFrame):
+        self._check_data(data)
+        self._data = data
         self._data.index.names = ['set', 'question']  # TODO: move to where it's saved
+
+    @staticmethod
+    def _check_data(data: pd.DataFrame):
+        if not isinstance(data, pd.DataFrame):
+            raise TypeError(f"Expected a pandas.DataFrame, got {type(data)}: {data}")
+
+        if 'correct' not in data.columns:
+            raise ValueError("The provided dataframe is missing a 'correct' column")
+
+        if not isinstance(data.index, pd.MultiIndex) or data.index.nlevels != 2:
+            raise ValueError("The results dataframe must have a 2-level multiindex")
 
     @property
     def data(self) -> pd.DataFrame:
