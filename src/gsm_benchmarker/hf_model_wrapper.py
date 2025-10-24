@@ -15,6 +15,7 @@ class HFModelWrapper(BaseModelWrapper):
         super().__init__(model_name, config)
 
         logger.info(f"Setting up model {model_name}")
+        self._model_name = model_name
         self.tokeniser = self._load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
         self.model = self._load_model(model_name, config=self.config)
         logger.info("Model loaded")
@@ -106,7 +107,7 @@ class HFModelWrapper(BaseModelWrapper):
 
         return generated_text
     
-    def delete_from_cache(self, model_name):
+    def delete_from_cache(self):
         del self.model
         del self.tokeniser
 
@@ -116,12 +117,12 @@ class HFModelWrapper(BaseModelWrapper):
         # Find the CachedRepoInfo object for the specific model
         repo_to_delete = None
         for repo_info in cache_info.repos:
-            if repo_info.repo_id == model_name:
+            if repo_info.repo_id == self._model_name:
                 repo_to_delete = repo_info
                 break
                 
         if repo_to_delete is None:
-            logger.info(f"Model '{model_name}' not found in cache. Skipping deletion.")
+            logger.info(f"Model '{self._model_name}' not found in cache. Skipping deletion.")
             return
 
         # Get all revision hashes associated with that model
@@ -134,6 +135,6 @@ class HFModelWrapper(BaseModelWrapper):
         logger.debug("Deleting model {model_repo_id}")
         delete_strategy.execute()
         
-        logger.info(f"Model {model_name} deleted from cache")
+        logger.info(f"Model {self._model_name} deleted from cache")
 
 
