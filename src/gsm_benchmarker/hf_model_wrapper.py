@@ -48,9 +48,10 @@ class HFModelWrapper(BaseModelWrapper):
     def _load_model_cuda(model_name, config: BenchmarkConfig):
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
-            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_compute_dtype=torch.bfloat16,
             bnb_4bit_use_double_quant=True,  # Extra compression
-            bnb_4bit_quant_type="nf4"
+            bnb_4bit_quant_type="nf4",
+            llm_int8_enable_fp32_cpu_offload=True
         )
 
         logger.debug("Loading model with CUDA")
@@ -58,6 +59,7 @@ class HFModelWrapper(BaseModelWrapper):
             model_name,
             quantization_config=bnb_config,
             device_map="auto",
+            torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
             trust_remote_code=config.trust_remote_code
