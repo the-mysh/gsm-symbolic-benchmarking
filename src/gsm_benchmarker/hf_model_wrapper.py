@@ -1,5 +1,6 @@
 import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from huggingface_hub import scan_cache_dir
 import torch
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -102,3 +103,35 @@ class HFModelWrapper(BaseModelWrapper):
         )
 
         return generated_text
+    
+    def delete_from_cache(self, model_name):
+        del self.model
+        del self.tokeniser
+
+        # Scan the entire cache directory
+        cache_info = scan_cache_dir()
+        
+        # Find the CachedRepoInfo object for the specific model
+        repo_to_delete = None
+        for repo_info in cache_info.repos:
+            if repo_info.repo_id == model_name:
+                repo_to_delete = repo_info
+                break
+                
+        if repo_to_delete is None:
+            logger.info(f"Model '{model_name}' not found in cache. Skipping deletion.")
+            return
+
+        # Get all revision hashes associated with that model
+        # Create the deletion strategy based on the model's revision hashes
+        # This automatically finds all files (blobs) unique to this model's revisions
+        revisions_to_delete = {rev.commit_hash for rev in repo_to_delete.revisions}
+        delete_strategy = cache_info.delete_revisions(*revisions_to_delete)
+        
+        # perform the actual file deletion
+        logger.debug("Deleting model {model_repo_id}")
+        delete_strategy.execute()
+        
+        logger.info(f"Model {model_name} deleted from cache")
+
+

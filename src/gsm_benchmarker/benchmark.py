@@ -173,9 +173,8 @@ class BenchmarkRunner:
 
     @staticmethod
     def _delete_model(model_evaluator):
-        logger.debug("Deleting model from memory")
-        del model_evaluator.model_wrapper
         torch.cuda.empty_cache()
+        model_evaluator.model_wrapper.delete_from_cache()
 
     def _store_model_x_variant_result(self, dataset_wrapper, model_evaluator, res):
         logger.debug("Storing results")
