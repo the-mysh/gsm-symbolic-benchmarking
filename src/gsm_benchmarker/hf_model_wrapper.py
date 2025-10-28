@@ -60,7 +60,7 @@ class HFModelWrapper(BaseModelWrapper):
             model_name,
             quantization_config=bnb_config,
             device_map="auto",
-            dtype=torch.bfloat16,
+            torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
             trust_remote_code=config.trust_remote_code
