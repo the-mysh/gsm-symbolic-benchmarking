@@ -6,9 +6,6 @@ import logging
 from enum import Enum, auto
 
 
-from gsm_benchmarker.api_model_wrapper import APIType
-
-
 logger = logging.getLogger(__name__)
 _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 
