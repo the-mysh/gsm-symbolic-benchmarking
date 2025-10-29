@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
+from typing import Any
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
@@ -57,18 +58,19 @@ class ModelEvaluator:
         "[/INST]"  # Mistral Dialogic / Tool Use
     )
 
-    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType | None = None):
+    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType | None = None, extra_init_kwargs: dict[str, Any] | None = None):
         self.original_shots = GSM8hotManager()
-        self.model_wrapper = self._make_model_wrapper(model_name, config, api_type=api_type)
+        self.model_wrapper = self._make_model_wrapper(model_name, config, api_type=api_type, extra_init_kwargs=extra_init_kwargs)
 
     @staticmethod
-    def _make_model_wrapper(model_name: str, config: BenchmarkConfig, api_type: APIType | None = None) -> BaseModelWrapper:
+    def _make_model_wrapper(model_name: str, config: BenchmarkConfig, api_type: APIType | None = None, 
+                            extra_init_kwargs: dict[str, Any] | None = None) -> BaseModelWrapper:
         if api_type is None:
             logger.debug("Initialising a HuggingFace model")
-            return HFModelWrapper(model_name, config=config)
+            return HFModelWrapper(model_name, config=config, extra_init_kwargs=extra_init_kwargs)
         else:
             logger.debug("Initialising an API-based model")
-            return APIModelWrapper(model_name, config=config, api_type=api_type)
+            return APIModelWrapper(model_name, config=config, api_type=api_type, extra_init_kwargs=extra_init_kwargs)
 
     @property
     def model_name(self) -> str:

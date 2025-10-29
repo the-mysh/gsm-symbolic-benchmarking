@@ -6,175 +6,204 @@
       "family": "gemma",
       "size": "2.0e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-2b-it",
       "family": "gemma",
       "size": "2.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-7b",
       "family": "gemma",
       "size": "7.0e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-7b-it",
       "family": "gemma",
       "size": "7.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-2-2b",
       "family": "gemma",
       "size": "2.0e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-2-2b-it",
       "family": "gemma",
       "size": "2.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-2-9b",
       "family": "gemma",
       "size": "9.0e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-2-9b-it",
       "family": "gemma",
       "size": "9.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "google/gemma-2-27b-it",
       "family": "gemma",
       "size": "2.7e10",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "microsoft/phi-2",
       "family": "phi",
       "size": "2.7e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "microsoft/Phi-3-mini-128k-instruct",
       "family": "phi",
       "size": "3.8e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "microsoft/Phi-3-small-128k-instruct",
       "family": "phi",
       "size": "7.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "microsoft/Phi-3-medium-128k-instruct",
       "family": "phi",
       "size": "1.4e10",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "microsoft/Phi-3.5-mini-instruct",
       "family": "phi",
       "size": "4.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {
+        "from_pretrained": {
+          "attn_implementation": "eager"
+        }
+      }
     },
     {
       "name": "mistralai/Mistral-7B-v0.1",
       "family": "mistral",
       "size": "7.3e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "mistralai/Mistral-7B-Instruct-v0.1",
       "family": "mistral",
       "size": "7.3e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "mistralai/Mistral-7B-v0.3",
       "family": "mistral",
       "size": "7.3e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "mistralai/Mistral-7B-Instruct-v0.3",
       "family": "mistral",
       "size": "7.3e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "mistralai/Mathstral-7B-v0.1",
       "family": "mistral",
       "size": "7.3e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "meta-llama/Meta-Llama-3-8B",
       "family": "llama",
       "size": "8.0e9",
       "instruction_tuned": false,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "meta-llama/Meta-Llama-3-8B-Instruct",
       "family": "llama",
       "size": "8.0e9",
       "instruction_tuned": true,
-      "api_type": null
+      "api_type": null,
+      "extra_kwargs": {}
     },
     {
       "name": "gpt-4o-mini",
       "family": "gpt",
       "size": "proprietary",
       "instruction_tuned": true,
-      "api_type": "openai"
+      "api_type": "openai",
+      "extra_kwargs": {}
     },
     {
       "name": "gpt-4o",
       "family": "gpt",
       "size": "proprietary",
       "instruction_tuned": true,
-      "api_type": "openai"
+      "api_type": "openai",
+      "extra_kwargs": {}
     },
     {
       "name": "o1-mini",
       "family": "o1",
       "size": "proprietary",
       "instruction_tuned": true,
-      "api_type": "openai"
+      "api_type": "openai",
+      "extra_kwargs": {}
     },
     {
       "name": "o1-preview",
       "family": "o1",
       "size": "proprietary",
       "instruction_tuned": true,
-      "api_type": "openai"
+      "api_type": "openai",
+      "extra_kwargs": {}
     }
   ]
 }

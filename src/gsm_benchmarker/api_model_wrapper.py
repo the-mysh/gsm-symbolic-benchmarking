@@ -1,6 +1,7 @@
 import logging
 from typing import Callable
 from enum import Enum, auto
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,34 +35,34 @@ class APIType(Enum):
 
 
 class APIModelWrapper(BaseModelWrapper):
-    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType):
+    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType, extra_init_kwargs: dict[str, Any] | None = None):
         super().__init__(model_name, config)
 
-        self._client_interface = self._setup_client(self._model_name, api_type, self.config)
+        self._client_interface = self._setup_client(self._model_name, api_type, self.config, extra_init_kwargs=extra_init_kwargs)
 
-    def _setup_client(self, model_name: str, api_type: APIType, config: BenchmarkConfig) -> Callable[[str], str]:
+    def _setup_client(self, model_name: str, api_type: APIType, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
         if not isinstance(api_type, APIType):
             raise TypeError(f"Expected an APIType enum member; got {type(api_type)}: {api_type}")
 
         match api_type:
             case APIType.openai:
-                return self._setup_openai(model_name, config)
+                return self._setup_openai(model_name, config, extra_init_kwargs=extra_init_kwargs)
 
             case APIType.anthropic:
-                return self._setup_anthropic(model_name, config)
+                return self._setup_anthropic(model_name, config, extra_init_kwargs=extra_init_kwargs)
             
             case APIType.google_genai:
-                return self._setup_google_genai(model_name, config)
+                return self._setup_google_genai(model_name, config, extra_init_kwargs=extra_init_kwargs)
 
             case _:
                 raise ValueError(f"API type not recognised: {api_type}; expected {' / '.join(APIType.__members__)}")
 
     @staticmethod
-    def _setup_openai(model_name: str, config: BenchmarkConfig) -> Callable[[str], str]:
+    def _setup_openai(model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
         if openai is None:
             raise ImportError("openai package not installed")
 
-        client = openai.OpenAI()
+        client = openai.OpenAI(**(extra_init_kwargs or {}))
 
         def ask_openai(prompt: str) -> str:
             response = client.chat.completions.create(
@@ -74,11 +75,11 @@ class APIModelWrapper(BaseModelWrapper):
         return ask_openai
 
     @staticmethod
-    def _setup_anthropic(model_name: str, config: BenchmarkConfig) -> Callable[[str], str]:
+    def _setup_anthropic(model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
         if anthropic is None:
             raise ImportError("anthropic package not installed")
 
-        client = anthropic.Anthropic()
+        client = anthropic.Anthropic(**(extra_init_kwargs or {}))
         def ask_anthropic(prompt: str) -> str:
             message = client.messages.create(
                 model=model_name,
@@ -90,11 +91,11 @@ class APIModelWrapper(BaseModelWrapper):
         return ask_anthropic
 
     @staticmethod
-    def _setup_google_genai(model_name: str, config: BenchmarkConfig) -> Callable[[str], str]:
+    def _setup_google_genai(model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
         if genai is None:
             raise ImportError("google-genai package not installed")
 
-        client = genai.Client()
+        client = genai.Client(**(extra_init_kwargs or {}))
 
         generation_config = types.GenerateContentConfig(
             temperature=config.temperature,

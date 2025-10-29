@@ -1,11 +1,13 @@
 import json
 from dataclasses import dataclass
 from importlib.resources import files
-
+from typing import Any
+import logging
 
 from gsm_benchmarker.api_model_wrapper import APIType
 
 
+logger = logging.getLogger(__name__)
 _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 
 
@@ -17,6 +19,7 @@ class SingleModelConfig:
     size: float | None
     instruction_tuned: bool
     api_type: APIType | None
+    extra_kwargs: dict[str, dict[str, Any]]
 
     @classmethod
     def from_json_dict(cls, d: dict):
@@ -57,3 +60,11 @@ class ModelsConfig:
         data_bytes = (_RESOURCES_PATH / "original-models-config.json").read_bytes()
         data_dict = json.loads(data_bytes)
         return tuple(SingleModelConfig.from_json_dict(s) for s in data_dict["models"])
+    
+    def __getitem__(self, item: str) -> SingleModelConfig:
+        matches = [m for m in self._all_models if m.name == item]
+        if not matches:
+            raise KeyError(f"No model with name '{item}' found")
+        if len(matches) > 1:
+            logger.warning(f"Multiple models with name '{item}' found")
+        return matches[0]
