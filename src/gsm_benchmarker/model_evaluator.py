@@ -1,7 +1,7 @@
 import os
 import re
 import traceback
-from tqdm.auto import tqdm
+from tqdm import tqdm
 import logging
 import numpy as np
 import pandas as pd
