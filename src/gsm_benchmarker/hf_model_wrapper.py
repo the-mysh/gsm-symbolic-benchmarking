@@ -65,7 +65,7 @@ class HFModelWrapper(BaseModelWrapper):
         model = AutoModelForCausalLM.from_pretrained(
             self._model_spec.name,
             quantization_config=bnb_config,
-            device_map="auto",
+            device_map="cuda",
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
