@@ -7,13 +7,13 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
-from typing import Any
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
+from gsm_benchmarker.models_config_parser import SingleModelConfig
 from gsm_benchmarker.shot_manager import GSM8hotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly, remove_intermediate_results_folder
-from gsm_benchmarker.api_model_wrapper import APIModelWrapper, APIType
+from gsm_benchmarker.api_model_wrapper import APIModelWrapper
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 
@@ -58,19 +58,18 @@ class ModelEvaluator:
         "[/INST]"  # Mistral Dialogic / Tool Use
     )
 
-    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType | None = None, extra_init_kwargs: dict[str, Any] | None = None):
+    def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig):
         self.original_shots = GSM8hotManager()
-        self.model_wrapper = self._make_model_wrapper(model_name, config, api_type=api_type, extra_init_kwargs=extra_init_kwargs)
+        self.model_wrapper = self._make_model_wrapper(model_spec, config)
 
     @staticmethod
-    def _make_model_wrapper(model_name: str, config: BenchmarkConfig, api_type: APIType | None = None, 
-                            extra_init_kwargs: dict[str, Any] | None = None) -> BaseModelWrapper:
-        if api_type is None:
+    def _make_model_wrapper(model_spec: SingleModelConfig, config: BenchmarkConfig) -> BaseModelWrapper:
+        if model_spec.api_type is None:
             logger.debug("Initialising a HuggingFace model")
-            return HFModelWrapper(model_name, config=config, extra_init_kwargs=extra_init_kwargs)
+            return HFModelWrapper(model_spec, config=config)
         else:
             logger.debug("Initialising an API-based model")
-            return APIModelWrapper(model_name, config=config, api_type=api_type, extra_init_kwargs=extra_init_kwargs)
+            return APIModelWrapper(model_spec, config=config)
 
     @property
     def model_name(self) -> str:

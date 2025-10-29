@@ -6,10 +6,8 @@ from pathlib import Path
 from functools import cached_property
 from dataclasses import dataclass
 import traceback
-from typing import Any
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
-from gsm_benchmarker.api_model_wrapper import APIType
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.models_config_parser import SingleModelConfig
 from gsm_benchmarker.model_evaluator import ModelEvaluator
@@ -78,43 +76,35 @@ class BenchmarkRunner:
             if variant not in self._results:
                 self._results[variant] = {}
 
-    def _load_model(self, model: str, api_type: APIType | None = None, extra_init_kwargs: dict[str, Any] | None = None) -> ModelEvaluator | None:
+    def _load_model(self, model_spec: str | SingleModelConfig) -> ModelEvaluator | None:
         try:
-            model_evaluator = ModelEvaluator(model, self._config, api_type=api_type, extra_init_kwargs=extra_init_kwargs)
+            model_evaluator = ModelEvaluator(model_spec, self._config)
         except Exception as exc:
-            self._handle_model_loading_exception(model, exc)
+            self._handle_model_loading_exception(self._model_name_from_spec(model_spec), exc)
             return None
 
         return model_evaluator
 
     @staticmethod
-    def _unpack_model_spec(model_spec: str | tuple[str, APIType | None]) -> tuple[str, APIType | None, dict[str, Any] | None]:
-        if isinstance(model_spec, str):
-            return model_spec, None, {}
-
-        if not isinstance(model_spec, SingleModelConfig):
-            raise TypeError(f"Expected a model name string or a SingleModelConfig spec object; "
-                            f"got {type(model_spec)}: {model_spec}")
-            
-        kw_name = 'client_init' if model_spec.api_type is not None else 'from_pretrained'
-
-        return model_spec.name, model_spec.api_type, model_spec.extra_kwargs.get(kw_name, None)
+    def _model_name_from_spec(model_spec: str | SingleModelConfig) -> str:
+        return model_spec.name if isinstance(model_spec, SingleModelConfig) else model_spec
 
     def run(self, n_sets: int | None = None, n_per_set: int | None = None,
             remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
         self._pre_populate_results()
 
         for im, model_spec in enumerate(self._models):
-            model, api_type, extra_init_kwargs = self._unpack_model_spec(model_spec)
-            logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model} {10*'='}")
+            model_name = self._model_name_from_spec(model_spec)
+            logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model_name} {10*'='}")
 
-            model_evaluator = self._load_model(model, api_type=api_type, extra_init_kwargs=extra_init_kwargs)
+            model_evaluator = self._load_model(model_spec)
             if not model_evaluator:
                 continue  # failed to load; already handled
 
             for iv, variant in enumerate(self._dset_variants):
                 try:
-                    logger.info(f"Evaluating {model} on dataset variant {iv+1}/{len(self._dset_variants)}: {variant}")
+                    logger.info(f"Evaluating {model_name} on dataset variant "
+                                f"{iv+1}/{len(self._dset_variants)}: {variant}")
 
                     # Load dataset
                     dataset_wrapper = GSMSymbolicDataset(variant=variant)
@@ -128,20 +118,21 @@ class BenchmarkRunner:
                     )
 
                     # Store results
-                    self._results[variant][model] = res
+                    self._results[variant][model_name] = res
 
                     if res is not None:
                         self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
                         
                     if caught_exceptions:
                         # raise an exception to note the failure in the evaluation exceptions summary later on
-                        raise RuntimeError(f"Encountered {len(caught_exceptions)} error(s() when evaluating {model} on variant {variant}; first one was: {caught_exceptions[0]}")
+                        raise RuntimeError(f"Encountered {len(caught_exceptions)} error(s() when evaluating "
+                                           f"{model_name} on variant {variant}; first one was: {caught_exceptions[0]}")
 
-                    logger.info(f"Evaluation of model {model} on variant {variant} completed")
+                    logger.info(f"Evaluation of model {model_name} on variant {variant} completed")
                 except Exception as exc:
-                    self._handle_evaluation_exception(model, variant, exc)
+                    self._handle_evaluation_exception(model_name, variant, exc)
 
-            logger.info(f"Evaluation of model {model} on all dataset variants completed")
+            logger.info(f"Evaluation of model {model_name} on all dataset variants completed")
             self._delete_model(model_evaluator)
 
         logger.info("EVALUATION COMPLETE")
