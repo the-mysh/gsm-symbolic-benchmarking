@@ -2,31 +2,29 @@ import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from huggingface_hub import scan_cache_dir
 import torch
-from typing import Any
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
-
+from gsm_benchmarker.models_config_parser import SingleModelConfig
 
 logger = logging.getLogger(__name__)
 
 
 class HFModelWrapper(BaseModelWrapper):
-    def __init__(self, model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None):
-        super().__init__(model_name, config)
+    def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig):
+        super().__init__(model_spec, config)
 
-        logger.info(f"Setting up model {model_name}")
-        self._model_name = model_name
-        self.tokeniser = self._load_tokeniser(model_name, trust_remote_code=self.config.trust_remote_code)
-        self.model = self._load_model(model_name, config=self.config, extra_init_kwargs=extra_init_kwargs)
+        logger.info(f"Setting up model {self.model_name}")
+        self.tokeniser = self._load_tokeniser(trust_remote_code=self.config.trust_remote_code)
+        self.model = self._load_model(config=self.config)
         logger.info("Model loaded")
 
-    @staticmethod
-    def _load_tokeniser(model_name: str, trust_remote_code: bool = False):
+    def _load_tokeniser(self, trust_remote_code: bool = False):
         logger.debug("Loading tokeniser")
         tokeniser = AutoTokenizer.from_pretrained(
-            model_name,
-            trust_remote_code=trust_remote_code
+            self._model_spec.name,
+            trust_remote_code=trust_remote_code,
+            **self._model_spec.extra_kwargs_tokeniser_init
         )
 
         # Set padding token if not set
@@ -35,19 +33,17 @@ class HFModelWrapper(BaseModelWrapper):
 
         return tokeniser
 
-    @staticmethod
-    def _load_model(model_name, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None):
+    def _load_model(self, config: BenchmarkConfig):
         if torch.cuda.is_available():
             logger.info("CUDA available")
-            model = HFModelWrapper._load_model_cuda(model_name, config=config, extra_init_kwargs=extra_init_kwargs)
+            model = self._load_model_cuda(config=config)
         else:
             logger.info("CUDA not available - using only CPU")
-            model = HFModelWrapper._load_model_cpu(model_name, config=config, extra_init_kwargs=extra_init_kwargs)
+            model = self._load_model_cpu(config=config)
 
         return model
 
-    @staticmethod
-    def _load_model_cuda(model_name, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None):
+    def _load_model_cuda(self, config: BenchmarkConfig):
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.bfloat16,
@@ -57,31 +53,31 @@ class HFModelWrapper(BaseModelWrapper):
         )
 
         logger.debug("Loading model with CUDA")
-        if extra_init_kwargs:
-            logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extra_init_kwargs}")
+        extras = self._model_spec.extra_kwargs_model_init
+        if extras:
+            logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
         
         model = AutoModelForCausalLM.from_pretrained(
-            model_name,
+            self._model_spec.name,
             quantization_config=bnb_config,
             device_map="auto",
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
             trust_remote_code=config.trust_remote_code,
-            **(extra_init_kwargs or {})
+            **extras
         )
 
         return model
 
-    @staticmethod
-    def _load_model_cpu(model_name, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None):
+    def _load_model_cpu(self, config: BenchmarkConfig):
         logger.debug("Loading model for CPU only")
         model = AutoModelForCausalLM.from_pretrained(
-            model_name,
+            self._model_spec.name,
             dtype=torch.float32,
             low_cpu_mem_usage=True,
             trust_remote_code=config.trust_remote_code,
-            **(extra_init_kwargs or {})
+            **self._model_spec.extra_kwargs_model_init
         )
 
         return model
@@ -123,12 +119,12 @@ class HFModelWrapper(BaseModelWrapper):
         # Find the CachedRepoInfo object for the specific model
         repo_to_delete = None
         for repo_info in cache_info.repos:
-            if repo_info.repo_id == self._model_name:
+            if repo_info.repo_id == self.model_name:
                 repo_to_delete = repo_info
                 break
                 
         if repo_to_delete is None:
-            logger.info(f"Model '{self._model_name}' not found in cache. Skipping deletion.")
+            logger.info(f"Model '{self.model_name}' not found in cache. Skipping deletion.")
             return
 
         # Get all revision hashes associated with that model
@@ -141,6 +137,6 @@ class HFModelWrapper(BaseModelWrapper):
         logger.debug("Deleting model {model_repo_id}")
         delete_strategy.execute()
         
-        logger.info(f"Model {self._model_name} deleted from cache")
+        logger.info(f"Model {self.model_name} deleted from cache")
 
 

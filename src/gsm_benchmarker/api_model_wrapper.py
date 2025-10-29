@@ -1,7 +1,9 @@
 import logging
 from typing import Callable
 from enum import Enum, auto
-from typing import Any
+
+from gsm_benchmarker.models_config_parser import SingleModelConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -35,38 +37,46 @@ class APIType(Enum):
 
 
 class APIModelWrapper(BaseModelWrapper):
-    def __init__(self, model_name: str, config: BenchmarkConfig, api_type: APIType, extra_init_kwargs: dict[str, Any] | None = None):
-        super().__init__(model_name, config)
+    def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig, api_type: APIType | None = None):
+        if isinstance(model_spec, str) and api_type is None:
+            raise RuntimeError(f"api_type must be specified for {self.__class__.__name__} either through model spec "
+                               f"(given as a SingleModelConfig object) or through api_type arg; got neither")
 
-        self._client_interface = self._setup_client(self._model_name, api_type, self.config, extra_init_kwargs=extra_init_kwargs)
+        super().__init__(model_spec, config)
 
-    def _setup_client(self, model_name: str, api_type: APIType, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
+        if api_type is not None:
+            self._model_spec.api_type = api_type
+
+        self._client_interface = self._setup_client(self.config)
+
+    def _setup_client(self, config: BenchmarkConfig) -> Callable[[str], str]:
+        api_type = self._model_spec.api_type
         if not isinstance(api_type, APIType):
             raise TypeError(f"Expected an APIType enum member; got {type(api_type)}: {api_type}")
 
         match api_type:
             case APIType.openai:
-                return self._setup_openai(model_name, config, extra_init_kwargs=extra_init_kwargs)
+                return self._setup_openai(self._model_spec, config)
 
             case APIType.anthropic:
-                return self._setup_anthropic(model_name, config, extra_init_kwargs=extra_init_kwargs)
+                return self._setup_anthropic(self._model_spec, config)
             
             case APIType.google_genai:
-                return self._setup_google_genai(model_name, config, extra_init_kwargs=extra_init_kwargs)
+                return self._setup_google_genai(self._model_spec, config)
 
             case _:
                 raise ValueError(f"API type not recognised: {api_type}; expected {' / '.join(APIType.__members__)}")
 
     @staticmethod
-    def _setup_openai(model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
+    def _setup_openai(model_spec: SingleModelConfig, config: BenchmarkConfig) -> Callable[[str], str]:
         if openai is None:
             raise ImportError("openai package not installed")
 
-        client = openai.OpenAI(**(extra_init_kwargs or {}))
+        client = openai.OpenAI()
 
         def ask_openai(prompt: str) -> str:
             response = client.chat.completions.create(
-                model=model_name,
+                model=model_spec.name,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=config.temperature,
                 max_tokens=config.max_new_tokens
@@ -75,14 +85,14 @@ class APIModelWrapper(BaseModelWrapper):
         return ask_openai
 
     @staticmethod
-    def _setup_anthropic(model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
+    def _setup_anthropic(model_spec: SingleModelConfig, config: BenchmarkConfig) -> Callable[[str], str]:
         if anthropic is None:
             raise ImportError("anthropic package not installed")
 
-        client = anthropic.Anthropic(**(extra_init_kwargs or {}))
+        client = anthropic.Anthropic()
         def ask_anthropic(prompt: str) -> str:
             message = client.messages.create(
-                model=model_name,
+                model=model_spec.name,
                 max_tokens=config.max_new_tokens,
                 temperature=config.temperature,
                 messages=[{"role": "user", "content": prompt}]
@@ -91,11 +101,11 @@ class APIModelWrapper(BaseModelWrapper):
         return ask_anthropic
 
     @staticmethod
-    def _setup_google_genai(model_name: str, config: BenchmarkConfig, extra_init_kwargs: dict[str, Any] | None = None) -> Callable[[str], str]:
+    def _setup_google_genai(model_spec: SingleModelConfig, config: BenchmarkConfig) -> Callable[[str], str]:
         if genai is None:
             raise ImportError("google-genai package not installed")
 
-        client = genai.Client(**(extra_init_kwargs or {}))
+        client = genai.Client()
 
         generation_config = types.GenerateContentConfig(
             temperature=config.temperature,
@@ -104,7 +114,7 @@ class APIModelWrapper(BaseModelWrapper):
 
         def ask_google_genai(prompt: str) -> str:
             response = client.models.generate_content(
-                model=model_name,
+                model=model_spec.name,
                 contents=prompt,
                 config=generation_config
             )
