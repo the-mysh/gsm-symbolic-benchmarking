@@ -95,7 +95,11 @@
       "size": "7.0e9",
       "instruction_tuned": true,
       "api_type": null,
-      "extra_kwargs": {}
+      "extra_kwargs": {
+        "from_pretrained": {
+          "attn_implementation": "eager"
+        }
+      }
     },
     {
       "name": "microsoft/Phi-3-medium-128k-instruct",
@@ -111,11 +115,7 @@
       "size": "4.0e9",
       "instruction_tuned": true,
       "api_type": null,
-      "extra_kwargs": {
-        "from_pretrained": {
-          "attn_implementation": "eager"
-        }
-      }
+      "extra_kwargs": {}
     },
     {
       "name": "mistralai/Mistral-7B-v0.1",

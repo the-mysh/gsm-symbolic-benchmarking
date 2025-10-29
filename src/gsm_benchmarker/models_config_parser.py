@@ -47,11 +47,11 @@ class ModelsConfig:
 
     @property
     def all_models(self) -> list[tuple[str, APIType | None]]:
-        return [(m.name, m.api_type) for m in self._all_models]
+        return list(self._all_models)
 
     @property
     def open_models(self) -> list[str]:
-        return [m.name for m in self._all_models if m.api_type is None]
+        return list(self._all_models)
 
     # TODO: filter/order by size, family, etc.
 

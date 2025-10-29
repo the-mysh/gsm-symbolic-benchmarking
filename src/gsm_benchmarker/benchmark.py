@@ -11,7 +11,7 @@ from typing import Any
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.api_model_wrapper import APIType
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.models_config_parser import ModelsConfig, SingleModelConfig
+from gsm_benchmarker.models_config_parser import SingleModelConfig
 from gsm_benchmarker.model_evaluator import ModelEvaluator
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, remove_intermediate_results_folder
 
