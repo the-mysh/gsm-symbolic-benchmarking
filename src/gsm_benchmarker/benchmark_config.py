@@ -14,7 +14,7 @@ class BenchmarkConfig:
 
     # Model-specific
     use_4bit: bool = True  # For memory efficiency
-    trust_remote_code: bool = False
+    trust_remote_code_global: bool = False
 
     # memory settings
     gpu0_max_memory: str = "7GB"

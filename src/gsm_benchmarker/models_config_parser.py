@@ -20,6 +20,7 @@ class SingleModelConfig:
     instruction_tuned: bool | None = False
     api_type: APIType | None = None
     extra_kwargs: dict[str, dict[str, Any]] = None
+    trust_remote_code: bool = False
 
     def __post_init__(self):
         if self.extra_kwargs is None:

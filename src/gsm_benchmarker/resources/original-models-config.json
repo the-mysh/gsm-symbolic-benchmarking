@@ -95,6 +95,7 @@
       "size": "7.0e9",
       "instruction_tuned": true,
       "api_type": null,
+      "trust_remote_code": true,
       "extra_kwargs": {
         "from_pretrained": {
           "attn_implementation": "eager",

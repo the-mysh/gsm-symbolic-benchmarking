@@ -15,15 +15,15 @@ class HFModelWrapper(BaseModelWrapper):
         super().__init__(model_spec, config)
 
         logger.info(f"Setting up model {self.model_name}")
-        self.tokeniser = self._load_tokeniser(trust_remote_code=self.config.trust_remote_code)
+        self.tokeniser = self._load_tokeniser(config=self.config)
         self.model = self._load_model(config=self.config)
         logger.info("Model loaded")
 
-    def _load_tokeniser(self, trust_remote_code: bool = False):
+    def _load_tokeniser(self, config: BenchmarkConfig):
         logger.debug("Loading tokeniser")
         tokeniser = AutoTokenizer.from_pretrained(
             self._model_spec.name,
-            trust_remote_code=trust_remote_code,
+            trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
             **self._model_spec.extra_kwargs_tokeniser_init
         )
 
@@ -64,7 +64,7 @@ class HFModelWrapper(BaseModelWrapper):
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
-            trust_remote_code=config.trust_remote_code,
+            trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
             **extras
         )
 
@@ -76,7 +76,7 @@ class HFModelWrapper(BaseModelWrapper):
             self._model_spec.name,
             dtype=torch.float32,
             low_cpu_mem_usage=True,
-            trust_remote_code=config.trust_remote_code,
+            trust_remote_code=config.trust_remote_code_global,
             **self._model_spec.extra_kwargs_model_init
         )
 
