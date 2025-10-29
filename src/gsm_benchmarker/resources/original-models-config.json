@@ -100,6 +100,9 @@
         "from_pretrained": {
           "attn_implementation": "eager",
           "revision": "ad85cab62be398dc90203c4377a4ccbf090fbb36"
+        },
+        "tokeniser_from_pretrained": {
+          "revision": "ad85cab62be398dc90203c4377a4ccbf090fbb36"
         }
       }
     },
