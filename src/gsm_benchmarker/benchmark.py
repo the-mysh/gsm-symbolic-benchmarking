@@ -177,7 +177,10 @@ class BenchmarkRunner:
 
     @staticmethod
     def _delete_model(model_evaluator):
-        torch.cuda.empty_cache()
+        try:
+            torch.cuda.empty_cache()
+        except Exception as exc:  # expecting AcceleratorError, but couldn't find how to import it
+            logger.warning(f"Error emptying CUDA cache: {exc}")
         model_evaluator.model_wrapper.delete_from_cache()
 
     def _store_model_x_variant_result(self, dataset_wrapper, model_evaluator, res):
