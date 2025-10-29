@@ -21,10 +21,15 @@ class HFModelWrapper(BaseModelWrapper):
 
     def _load_tokeniser(self, config: BenchmarkConfig):
         logger.debug("Loading tokeniser")
+        
+        extras = self._model_spec.extra_kwargs_tokeniser_init
+        if extras:
+            logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
+            
         tokeniser = AutoTokenizer.from_pretrained(
             self._model_spec.name,
             trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
-            **self._model_spec.extra_kwargs_tokeniser_init
+            **extras
         )
 
         # Set padding token if not set
@@ -72,12 +77,17 @@ class HFModelWrapper(BaseModelWrapper):
 
     def _load_model_cpu(self, config: BenchmarkConfig):
         logger.debug("Loading model for CPU only")
+        
+        extras = self._model_spec.extra_kwargs_model_init
+        if extras:
+            logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
+        
         model = AutoModelForCausalLM.from_pretrained(
             self._model_spec.name,
             dtype=torch.float32,
             low_cpu_mem_usage=True,
             trust_remote_code=config.trust_remote_code_global,
-            **self._model_spec.extra_kwargs_model_init
+            **extras
         )
 
         return model
