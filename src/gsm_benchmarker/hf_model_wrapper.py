@@ -24,7 +24,7 @@ class HFModelWrapper(BaseModelWrapper):
         
         extras = self._model_spec.extra_kwargs_tokeniser_init
         if extras:
-            logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
+            logger.debug(f"Passing extra kwargs to 'AutoTokenizer.from_pretrained': {extras}")
             
         tokeniser = AutoTokenizer.from_pretrained(
             self._model_spec.name,
