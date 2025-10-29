@@ -138,7 +138,7 @@ class BenchmarkRunner:
                         
                     if caught_exceptions:
                         # raise an exception to note the failure in the evaluation exceptions summary later on
-                        raise RuntimeError(f"Encountered {len(caught_exceptions)} when evaluating {model} on variant {variant}") from caught_exceptions[0]
+                        raise RuntimeError(f"Encountered {len(caught_exceptions)} error(s() when evaluating {model} on variant {variant}; first one was: {caught_exceptions[0]}")
 
                     logger.info(f"Evaluation of model {model} on variant {variant} completed")
                 except Exception as exc:
