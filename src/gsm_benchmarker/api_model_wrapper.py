@@ -1,8 +1,7 @@
 import logging
 from typing import Callable
-from enum import Enum, auto
 
-from gsm_benchmarker.models_config_parser import SingleModelConfig
+from gsm_benchmarker.models_config_parser import SingleModelConfig, APIType
 
 
 logger = logging.getLogger(__name__)
@@ -28,12 +27,6 @@ except ImportError:
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
-
-
-class APIType(Enum):
-    openai = auto()
-    anthropic = auto()
-    google_genai = auto()
 
 
 class APIModelWrapper(BaseModelWrapper):

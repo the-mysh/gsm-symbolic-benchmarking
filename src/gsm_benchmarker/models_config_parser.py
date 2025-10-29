@@ -3,12 +3,20 @@ from dataclasses import dataclass
 from importlib.resources import files
 from typing import Any
 import logging
+from enum import Enum, auto
+
 
 from gsm_benchmarker.api_model_wrapper import APIType
 
 
 logger = logging.getLogger(__name__)
 _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
+
+
+class APIType(Enum):
+    openai = auto()
+    anthropic = auto()
+    google_genai = auto()
 
 
 
