@@ -61,14 +61,14 @@ class HFModelWrapper(BaseModelWrapper):
         extras = self._model_spec.extra_kwargs_model_init
         if extras:
             logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
-        
+
         model = AutoModelForCausalLM.from_pretrained(
             self._model_spec.name,
             quantization_config=bnb_config,
             device_map="cuda",
             torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
-            max_memory={0: config.gpu0_max_memory, "cpu": config.cpu_max_memory},
+            max_memory=config.memory_settings,
             trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
             **extras
         )

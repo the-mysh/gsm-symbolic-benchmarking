@@ -17,5 +17,18 @@ class BenchmarkConfig:
     trust_remote_code_global: bool = False
 
     # memory settings
-    gpu0_max_memory: str = "7GB"
+    gpu0_max_memory: str | None = "7GB"
+    gpu1_max_memory: str | None = None
     cpu_max_memory: str = "12GB"
+
+    @property
+    def memory_settings(self):
+        mem = {"cpu": self.cpu_max_memory}
+        if self.gpu0_max_memory is not None:
+            mem[0] = self.gpu0_max_memory
+        
+        if self.gpu1_max_memory is not None:
+                mem[1] = self.gpu1_max_memory
+        
+        return mem
+    
