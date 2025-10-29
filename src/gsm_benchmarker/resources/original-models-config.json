@@ -97,7 +97,8 @@
       "api_type": null,
       "extra_kwargs": {
         "from_pretrained": {
-          "attn_implementation": "eager"
+          "attn_implementation": "eager",
+          "revision": "ad85cab62be398dc90203c4377a4ccbf090fbb36"
         }
       }
     },

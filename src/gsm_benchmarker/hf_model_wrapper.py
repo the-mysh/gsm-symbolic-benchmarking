@@ -57,6 +57,9 @@ class HFModelWrapper(BaseModelWrapper):
         )
 
         logger.debug("Loading model with CUDA")
+        if extra_init_kwargs:
+            logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extra_init_kwargs}")
+        
         model = AutoModelForCausalLM.from_pretrained(
             model_name,
             quantization_config=bnb_config,
