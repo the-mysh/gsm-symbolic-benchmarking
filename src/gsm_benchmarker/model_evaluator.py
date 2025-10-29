@@ -177,7 +177,7 @@ class ModelEvaluator:
             datasets: list[list[GSMSymbolicDataset.Sample]],
             intermediate_storage_path: Path | str | None,
             remove_intermediate_results: bool = True
-        ) -> pd.DataFrame | None:
+        ) -> tuple[pd.DataFrame | None, list[Exception]]:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
 
         if intermediate_storage_path is None:
@@ -188,6 +188,7 @@ class ModelEvaluator:
 
         all_results = []
         n = len(datasets)
+        caught_exceptions = []
 
         for i, dataset in tqdm(enumerate(datasets), desc="Dataset", total=n):
             try:
@@ -195,6 +196,7 @@ class ModelEvaluator:
                 self._store_intermediate_result(result, intermediate_storage_path, i)
                 all_results.append(result)
             except Exception as exc:
+                caught_exceptions.append(exc)
                 logger.error(f"Exception occurred when evaluating dataset {i+1}/{n}: {exc}. "
                              f"Results for this dataset will be skipped.")
                 logger.error(f"Full stack:\n{traceback.format_exc()}")
@@ -208,7 +210,7 @@ class ModelEvaluator:
         if remove_intermediate_results and intermediate_storage_path is not None:
             remove_intermediate_results_folder(intermediate_storage_path)
 
-        return full_result
+        return full_result, caught_exceptions
 
     def _establish_storage_dir(self, storage_path: Path | str) -> Path:
         storage_path = confirm_or_create_folder(storage_path)

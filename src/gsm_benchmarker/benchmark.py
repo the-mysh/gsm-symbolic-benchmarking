@@ -124,7 +124,7 @@ class BenchmarkRunner:
                     eval_sets = dataset_wrapper.create_evaluation_sets(n_sets=n_sets, n_per_set=n_per_set)
 
                     # Evaluate model
-                    res = model_evaluator.evaluate_multiple_datasets(
+                    res, caught_exceptions = model_evaluator.evaluate_multiple_datasets(
                         eval_sets,
                         intermediate_storage_path=self.intermediate_storage_path,
                         remove_intermediate_results=remove_intermediate_results
@@ -135,6 +135,10 @@ class BenchmarkRunner:
 
                     if res is not None:
                         self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
+                        
+                    if caught_exceptions:
+                        # raise an exception to note the failure in the evaluation exceptions summary later on
+                        raise RuntimeError(f"Encountered {len(caught_exceptions)} when evaluating {model} on variant {variant}") from caught_exceptions[0]
 
                     logger.info(f"Evaluation of model {model} on variant {variant} completed")
                 except Exception as exc:
