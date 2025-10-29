@@ -14,9 +14,6 @@ $ uv sync
 ```
 (from project root).
 
-Next, install flash-attn following [these instructions](https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features). 
-Note: pip installation might take several hours. [Detaching the process](https://mlkd.idss.inesc-id.pt/cluster/using-machines#251---tmux) in an ssh session might be useful.
-
 To install the current package in the environment:
 
 ```commandline
