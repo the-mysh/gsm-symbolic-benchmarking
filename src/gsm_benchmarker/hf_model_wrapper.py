@@ -40,10 +40,10 @@ class HFModelWrapper(BaseModelWrapper):
 
     def _load_model(self, config: BenchmarkConfig):
         if torch.cuda.is_available():
-            logger.info("CUDA available")
+            logger.debug("CUDA available")
             model = self._load_model_cuda(config=config)
         else:
-            logger.info("CUDA not available - using only CPU")
+            logger.debug("CUDA not available - using only CPU")
             model = self._load_model_cpu(config=config)
 
         return model
@@ -134,7 +134,7 @@ class HFModelWrapper(BaseModelWrapper):
                 break
                 
         if repo_to_delete is None:
-            logger.info(f"Model '{self.model_name}' not found in cache. Skipping deletion.")
+            logger.debug(f"Model '{self.model_name}' not found in cache. Skipping deletion.")
             return
 
         # Get all revision hashes associated with that model
@@ -147,6 +147,6 @@ class HFModelWrapper(BaseModelWrapper):
         logger.debug("Deleting model {model_repo_id}")
         delete_strategy.execute()
         
-        logger.info(f"Model {self.model_name} deleted from cache")
+        logger.debug(f"Model {self.model_name} deleted from cache")
 
 

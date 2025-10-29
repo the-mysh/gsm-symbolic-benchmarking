@@ -19,8 +19,8 @@ def confirm_or_create_folder(folder_path: Path | str) -> Path:
 
     if not folder_path.exists():
         if not folder_path.parent.exists():
-            logger.warning(f"Storage root does not exist and will be created")
-        logger.info(f"Creating directories at {folder_path}")
+            logger.info(f"Storage root does not exist and will be created")
+        logger.debug(f"Creating directories at {folder_path}")
         os.makedirs(folder_path)
 
     return folder_path
@@ -37,7 +37,7 @@ def make_name_path_friendly(name: str) -> str:
 
 def remove_intermediate_results_folder(storage_path: Path) -> None:
     try:
-        logger.info("Removing intermediate results")
+        logger.debug("Removing intermediate results")
         rmtree(storage_path)
     except Exception as exc:
         logger.error(f"Failed to remove intermediate results: {exc}")

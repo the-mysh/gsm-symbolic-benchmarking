@@ -182,10 +182,10 @@ class ModelEvaluator:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
 
         if intermediate_storage_path is None:
-            logger.info("No intermediate storage path provided; intermediate results will not be stored")
+            logger.debug("No intermediate storage path provided; intermediate results will not be stored")
         else:
             intermediate_storage_path = self._establish_storage_dir(intermediate_storage_path)  # adds a subfolder
-            logger.info(f"Intermediate results will be stored at: {intermediate_storage_path}")
+            logger.debug(f"Intermediate results will be stored at: {intermediate_storage_path}")
 
         all_results = []
         n = len(datasets)

@@ -1,4 +1,3 @@
-from tqdm.auto import tqdm
 import logging
 from datasets import load_dataset, Dataset
 from enum import Enum, auto
@@ -45,12 +44,12 @@ class GSMSymbolicDataset:
 
         if self._variant is self.Variant.GSM8K:
             variant = self.Variant.main
-            logger.info(f"Loading GSM-Symbolic dataset in variant 'main'; original questions will be extracted from it")
+            logger.debug(f"Loading GSM-Symbolic dataset in variant 'main'; original questions will be extracted from it")
         else:
-            logger.info(f"Loading GSM-Symbolic dataset (variant: {variant.name})...")
+            logger.debug(f"Loading GSM-Symbolic dataset (variant: {variant.name})...")
 
         self.dataset = load_dataset(self.DSET_NAME, variant.name, split=self._split.name)
-        logger.info(f"Loaded {len(self.dataset)} examples")
+        logger.debug(f"Loaded {len(self.dataset)} examples")
 
     @staticmethod
     def _check_type(value: T, expected_type: type[T]) -> T:
@@ -108,11 +107,11 @@ class GSMSymbolicDataset:
                 n_sets = self.MAX_SETS
             sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['question'], s['answer'])
 
-        logger.info(f"Creating {n_sets} set(s) with {len(templates)} example(s) each")
+        logger.debug(f"Creating {n_sets} set(s) with {len(templates)} example(s) each")
 
         eval_sets = []
 
-        for instance_idx in tqdm(range(n_sets), desc="set", position=0):
+        for instance_idx in range(n_sets):
             eval_set = []
             for template_id in templates:
                 # Get all instances for this template
