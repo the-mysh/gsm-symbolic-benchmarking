@@ -14,18 +14,20 @@ $ uv sync
 ```
 (from project root).
 
+Next, install flash-attn following [these instructions](https://github.com/Dao-AILab/flash-attention?tab=readme-ov-file#installation-and-features). 
+Note: pip installation might take several hours. [Detaching the process](https://mlkd.idss.inesc-id.pt/cluster/using-machines#251---tmux) in an ssh session might be useful.
+
 To install the current package in the environment:
 
 ```commandline
-$ uv pip install -e .
+$ uv pip install --no-deps --no-build-isolation -e .
 ```
-# TODO: check the above for alternatives / recommendations
 
-To install a new package and 
+To install a new package and add the dependency to pyproject.toml:
 ```commandline
 $ uv add <package>
 ``` 
-installs the package and adds the dependency to pyproject.toml (usually pinning the version).
+Note: this usually pins the version in pyproject.toml. You might want to edit the pyproject.toml afterwards to loosen the requirement (depending on the package being installed).
 
 Activating venv in command line:
 - Windows: `.venv/Scripts/activate`
