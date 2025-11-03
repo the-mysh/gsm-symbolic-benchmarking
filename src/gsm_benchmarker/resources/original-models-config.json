@@ -98,11 +98,12 @@
       "trust_remote_code": true,
       "extra_kwargs": {
         "from_pretrained": {
-          "revision": "ad85cab62be398dc90203c4377a4ccbf090fbb36"
+          "revision": "ad85cab62be398dc90203c4377a4ccbf090fbb36",
+          "attn_implementation": "flash_attention_2"
         },
         "tokeniser_from_pretrained": {
           "revision": "ad85cab62be398dc90203c4377a4ccbf090fbb36",
-          "clean_up_tokenization_spaces": true
+          "use_fast": true
         }
       }
     },
