@@ -69,7 +69,7 @@ class ModelsConfig:
 
     @property
     def open_models(self) -> list[SingleModelConfig]:
-        return list(self._all_models)
+        return [m for m in self._all_models if m.api_type is None]
 
     # TODO: filter/order by size, family, etc.
 
