@@ -35,6 +35,9 @@ class HFModelWrapper(BaseModelWrapper):
         # Set padding token if not set
         if tokeniser.pad_token is None:
             tokeniser.pad_token = tokeniser.eos_token
+            tokeniser.pad_token_id = tokeniser.eos_token_id  # for generation
+
+        tokeniser.padding_side = "left"
 
         return tokeniser
 
