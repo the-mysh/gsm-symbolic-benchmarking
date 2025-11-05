@@ -49,6 +49,10 @@ def setup_log_file_handler(root_logs_path: str | Path, logger: logging.Logger | 
         root_logs_path  :   Path to the logs directory. Log file name will be created using the current timestamp.
         logger          :   Logger instance concerned. If None (default), the root logger is used.
     """
+
+    if logger is None:
+        logger = logging.getLogger('')  # get root logger
+    logger.setLevel(logging.DEBUG)
     
     # sanitise root path
     if not isinstance(root_logs_path, Path):
@@ -71,9 +75,6 @@ def setup_log_file_handler(root_logs_path: str | Path, logger: logging.Logger | 
     fh = logging.FileHandler(log_file_name)
     fh.setLevel(logging.DEBUG)
     fh.setFormatter(formatter)
-
-    if logger is None:
-        logger = logging.getLogger('')  # get root logger
 
     logger.addHandler(fh)
 
