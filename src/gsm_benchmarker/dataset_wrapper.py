@@ -100,7 +100,7 @@ class GSMSymbolicDataset:
         if self._variant is self.Variant.GSM8K:
             if n_sets is not None and n_sets > 1:
                 logger.warning(f"For variant {self._variant.GSM8K}, only one evaluation set can be created")
-                n_sets = 1
+            n_sets = 1
             sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['original_question'], s['original_answer'])
         else:
             sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['question'], s['answer'])
