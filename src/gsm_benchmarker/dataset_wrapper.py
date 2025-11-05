@@ -103,10 +103,11 @@ class GSMSymbolicDataset:
                 n_sets = 1
             sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['original_question'], s['original_answer'])
         else:
-            if n_sets is None:
-                n_sets = self.MAX_SETS
             sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['question'], s['answer'])
-
+        
+        if n_sets is None:
+            n_sets = self.MAX_SETS
+            
         logger.debug(f"Creating {n_sets} set(s) with {len(templates)} example(s) each")
 
         eval_sets = []
