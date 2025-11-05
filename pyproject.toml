@@ -25,11 +25,12 @@ dependencies = [
   "protobuf",
   "psutil",
   "pytest",
+  "python-dotenv>=1.2.1",
   "sentencepiece",
   "tiktoken",
   "torch>=2.7.0",
   "tqdm",
-  "transformers"
+  "transformers",
 ]
 
 [project.optional-dependencies]
