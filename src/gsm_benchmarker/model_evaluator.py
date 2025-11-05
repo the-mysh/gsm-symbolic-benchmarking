@@ -176,7 +176,7 @@ class ModelEvaluator:
     def evaluate_multiple_datasets(
             self,
             datasets: list[list[GSMSymbolicDataset.Sample]],
-            intermediate_storage_path: Path | str | None,
+            intermediate_storage_path: Path | str | None = None,
             remove_intermediate_results: bool = True
         ) -> tuple[pd.DataFrame | None, list[Exception]]:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
