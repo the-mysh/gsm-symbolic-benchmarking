@@ -58,15 +58,34 @@ def hf_login():
         logger.debug(f"HF_HOME is set to {hf_home}")
 
 
-def choose_models():
+def choose_models(model_names: list[str]):
     models_config = ModelsConfig()
-    return models_config.open_models
+
+    if not model_names:
+        return models_config.open_models
+
+    models = []
+    for m in model_names:
+        try:
+            models.append(models_config[m])
+        except KeyError:
+            raise ValueError(f"Unrecognised model name: '{m}'")
+    return models
 
 
-def choose_dataset_variants():
-    variants = GSMSymbolicDataset.Variant
-    return [variants.GSM8K, variants.main]
+def choose_dataset_variants(variant_names: list[str]):
+    vs = GSMSymbolicDataset.Variant
 
+    if not variant_names:
+        return [vs.GSM8K, vs.main, vs.p1, vs.p2]
+
+    variants = []
+    for v in variant_names:
+        try:
+            variants.append(vs[v])
+        except KeyError:
+            raise ValueError(f"'{v}' is not a valid dataset variant; choose from: {', '.join(vs.__members__)}")
+    return variants
 
 def get_paths(output_root_path: str | Path | None = None, run_folder_name: str | None = None):
     if output_root_path is None:
@@ -131,6 +150,10 @@ def make_parser() -> ArgumentParser:
     parser.add_argument('--log-level', default=logging.INFO)
     parser.add_argument('--output-root-path', default=None)
     parser.add_argument('--run-folder-name', default=None)
+
+    parser.add_argument('--variants', nargs='+', choices=['main', 'GSM8K', 'p1', 'p2'])
+    parser.add_argument('--models', type=str, nargs='+')
+
     return parser
 
 
@@ -146,8 +169,8 @@ def main():
     bc = make_config(pargs)
     logger.info(f"Configuration: {bc}")
     br = BenchmarkRunner(
-        models=choose_models(),
-        dset_variants=choose_dataset_variants(),
+        models=choose_models(pargs.models),
+        dset_variants=choose_dataset_variants(pargs.variants),
         storage_path=results_path,
         config=make_config(pargs)
     )
