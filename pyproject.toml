@@ -15,26 +15,24 @@ dependencies = [
   "bitsandbytes",
   "coloredlogs",
   "datasets",
-  "einops",
   "ipywidgets",
-  "ninja",
   "notebook",
   "numpy",
   "packaging",
   "pandas",
   "protobuf",
   "psutil",
-  "pytest",
-  "python-dotenv>=1.2.1",
+  "python-dotenv",
   "sentencepiece",
-  "tiktoken",
-  "torch>=2.7.0",
+  "torch>=2.7.0", # using 2.9.0+cu126
   "tqdm",
-  "transformers",
+  "transformers>=4.38.0", # using 4.45.0
 ]
 
 [project.optional-dependencies]
-testing = ["pytest"]
+testing = [
+  "pytest"
+]
 api_models = [
   "openai",
   "anthropic",
