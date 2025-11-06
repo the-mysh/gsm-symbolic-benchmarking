@@ -6,6 +6,8 @@ from huggingface_hub import login, whoami
 from transformers.utils.logging import disable_progress_bar
 import datasets
 import socket
+from argparse import ArgumentParser, Namespace
+from typing import Any
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -66,26 +68,69 @@ def get_paths():
     return output_root_path / 'logs', results_path
 
 
-def make_config():
-    machine = socket.gethostname().split('.')[0]
-    logger.info(f"Detected machine: {machine}")
+def make_config(pargs: Namespace):
+    kwargs: dict[str, Any] = dict(trust_remote_code_global=True)
 
-    bc = BenchmarkConfig.for_machine('tejo', trust_remote_code_global=True)
+    def add_to_kwargs(name, new_name=None):
+        if (value := getattr(pargs, name, None)) is not None:
+            kwargs[new_name or name] = value
+
+    add_to_kwargs('max_ram', 'cpu_max_memory')
+    add_to_kwargs('max_vram', 'gpu_max_memory')
+
+    if getattr(pargs, 'no_gpu', False):
+        kwargs['gpu_index'] = None
+    else:
+        add_to_kwargs('gpu_index')
+
+    if pargs.no_machine_preset:
+        bc = BenchmarkConfig(**kwargs)
+    else:
+        machine = socket.gethostname().split('.')[0]
+        logger.info(f"Detected machine: {machine}")
+
+        add_to_kwargs('ram_margin')
+        add_to_kwargs('vram_margin')
+        bc = BenchmarkConfig.for_machine(machine, **kwargs)
+
     return bc
 
 
+def make_parser() -> ArgumentParser:
+    parser = ArgumentParser("GSM-Symbolic Benchmark Reproduction")
+    parser.add_argument('--no-machine-preset', dest='no_machine_preset', action='store_true', default=False)
+
+    gc = parser.add_mutually_exclusive_group()
+    gc.add_argument('--max-ram', type=int, default=None)
+    gc.add_argument('--ram-margin', type=int, default=None)
+
+    gg = parser.add_mutually_exclusive_group()
+    gg.add_argument('--max-vram', type=int, default=None)
+    gg.add_argument('--vram-margin', type=int, default=None)
+
+    g = parser.add_mutually_exclusive_group()
+    g.add_argument('--gpu-index', type=int)
+    g.add_argument('--no-gpu', dest='no_gpu', action='store_true')
+
+    return parser
+
+
 def main():
+    pargs = make_parser().parse_args()
+
     logs_path, results_path = get_paths()
     setup_logs(logs_path)
 
     set_seed(42)
     hf_login()
 
+    bc = make_config(pargs)
+    logger.info(f"Configuration: {bc}")
     br = BenchmarkRunner(
         models=choose_models(),
         dset_variants=choose_dataset_variants(),
         storage_path=results_path,
-        config=make_config()
+        config=make_config(pargs)
     )
 
     br.run(n_sets=1) # n_sets=2, n_per_set=2)

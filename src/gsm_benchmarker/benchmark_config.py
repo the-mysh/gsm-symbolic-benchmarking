@@ -20,9 +20,9 @@ class BenchmarkConfig:
     trust_remote_code_global: bool = False
 
     # memory settings
-    gpu_max_memory: str | None = "7GiB"
-    gpu_index: int | None = _AUTO
-    cpu_max_memory: str = "12GiB"
+    gpu_max_memory: int | None = 7
+    gpu_index: int | None | type[_AUTO] = _AUTO
+    cpu_max_memory: int = 12
 
     def __post_init__(self):
         if self.gpu_index is _AUTO:
@@ -35,12 +35,12 @@ class BenchmarkConfig:
 
     @property
     def memory_settings(self):
-        mem: dict[str | int, str] = {"cpu": self.cpu_max_memory}
+        mem: dict[str | int, str] = {"cpu": f"{self.cpu_max_memory}GiB"}
 
         if self.gpu_index is not None:
             if not self.gpu_max_memory:
                 raise RuntimeError("gpu_max_memory is not defined")
-            mem[self.gpu_index] = self.gpu_max_memory
+            mem[self.gpu_index] = f"{self.gpu_max_memory}GiB"
         
         return mem
 
@@ -64,12 +64,16 @@ class BenchmarkConfig:
         assert isinstance(n_gpus, int)
 
         cls.validate_gpu_index(machine_name, n_gpus, gpu_index)
-        cpu_memory, gpu_memory = cls.get_max_memories(machine_params, gpu_index, ram_margin, vram_margin)
+        cpu_max_memory, gpu_max_memory = cls.get_max_memories(machine_params, gpu_index, ram_margin, vram_margin)
+
+        if 'gpu_max_memory' not in kwargs:
+            kwargs['gpu_max_memory'] = gpu_max_memory
+
+        if 'cpu_max_memory' not in kwargs:
+            kwargs['cpu_max_memory'] = cpu_max_memory
 
         return BenchmarkConfig(
-            gpu_max_memory=f"{gpu_memory}GiB" if gpu_memory is not None else None,
             gpu_index=gpu_index,
-            cpu_max_memory=f"{cpu_memory}GiB",
             **kwargs
         )
 
