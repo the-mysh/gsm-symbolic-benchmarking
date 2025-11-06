@@ -5,6 +5,7 @@ import logging
 from huggingface_hub import login, whoami
 from transformers.utils.logging import disable_progress_bar
 import datasets
+import socket
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -65,6 +66,14 @@ def get_paths():
     return output_root_path / 'logs', results_path
 
 
+def make_config():
+    machine = socket.gethostname().split('.')[0]
+    logger.info(f"Detected machine: {machine}")
+
+    bc = BenchmarkConfig.for_machine('tejo', trust_remote_code_global=True)
+    return bc
+
+
 def main():
     logs_path, results_path = get_paths()
     setup_logs(logs_path)
@@ -72,13 +81,11 @@ def main():
     set_seed(42)
     hf_login()
 
-    bc = BenchmarkConfig.for_machine('tejo', trust_remote_code_global=True)
-
     br = BenchmarkRunner(
         models=choose_models(),
         dset_variants=choose_dataset_variants(),
         storage_path=results_path,
-        config=bc
+        config=make_config()
     )
 
     br.run(n_sets=1) # n_sets=2, n_per_set=2)
