@@ -100,6 +100,8 @@ def get_paths(output_root_path: str | Path | None = None, run_folder_name: str |
         run_folder_name = datetime.now().strftime('%Y%m%d_%H%M%S')
 
     results_path = output_root_path / f"outputs/{run_folder_name}"
+    logger.info(f"Run results will be stored to: {results_path}")
+
     return output_root_path / 'logs', results_path
 
 
