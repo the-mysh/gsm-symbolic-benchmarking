@@ -1,10 +1,7 @@
-from importlib.resources import files
-import json
 from dataclasses import dataclass
 from typing import Iterator
 
-
-_RESOURCES_PATH = files("gsm_benchmarker")/"resources"
+from gsm_benchmarker.utils.resources_manager import load_resource_json
 
 
 @dataclass()
@@ -21,7 +18,6 @@ class SingleShot:
                 f"The SingleShot format string should have fields: 'question', 'solution', and 'result'. "
                 f"Got:\n{fmt_string}")
         return s
-
 
 
 class GSM8hotManager:
@@ -43,8 +39,7 @@ class GSM8hotManager:
 
     @staticmethod
     def _load_data() -> tuple[SingleShot, ...]:
-        data_bytes = (_RESOURCES_PATH / "standard-8-shots.json").read_bytes()
-        data_dict = json.loads(data_bytes)
+        data_dict = load_resource_json("standard-8-shots.json")
         return tuple(SingleShot(**s) for s in data_dict["samples"])
 
     def format(self, fmt_string: str, n_shots: int | None = None, separator: str = "\n\n"):
@@ -57,5 +52,3 @@ if __name__ == '__main__':
     f = "Question:\n{question}\n\nAnswer:\n{solution}\nThe final result is: {result}"
     print()
     print(m.format(f, n_shots=3, separator="\n\n\n"))
-
-

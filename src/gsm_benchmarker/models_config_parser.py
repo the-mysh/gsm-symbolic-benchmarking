@@ -1,20 +1,18 @@
-import json
 from dataclasses import dataclass
-from importlib.resources import files
 from typing import Any
 import logging
 from enum import Enum, auto
 
+from gsm_benchmarker.utils.resources_manager import load_resource_json
+
 
 logger = logging.getLogger(__name__)
-_RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 
 
 class APIType(Enum):
     openai = auto()
     anthropic = auto()
     google_genai = auto()
-
 
 
 @dataclass
@@ -75,8 +73,7 @@ class ModelsConfig:
 
     @staticmethod
     def _load_data() -> tuple[SingleModelConfig, ...]:
-        data_bytes = (_RESOURCES_PATH / "original-models-config.json").read_bytes()
-        data_dict = json.loads(data_bytes)
+        data_dict = load_resource_json("original-models-config.json")
         return tuple(SingleModelConfig.from_json_dict(s) for s in data_dict["models"])
     
     def __getitem__(self, item: str) -> SingleModelConfig:
