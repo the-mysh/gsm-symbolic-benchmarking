@@ -26,23 +26,24 @@ class ModelEvaluator:
 
     QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
     SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
+    _number_pattern = r'\s*(?P<number>(-?\s?\d+(?:\.\d+)?))'
 
     ANSWER_PATTERNS = (
         (
             "GSM8K standard format: '#### <number>",
-            re.compile(r'####\s*(-?\d+(?:\.\d+)?)')
+            re.compile(r'####' + _number_pattern)
         ),
         (
             "GSM-Symbolic format: 'The final answer is <number>'",
-            re.compile(r'[Tt]he (?:final )?answer is\s*\$?\s*(-?\d+(?:\.\d+)?)')
+            re.compile(r'[Tt]he (?:final )?answer is\s*\$?' + _number_pattern)
         ),
         (
             "'Answer:' format",
-            re.compile(r'[Aa]nswer:\s*\$?\s*(-?\d+(?:\.\d+)?)')
+            re.compile(r'[Aa]nswer:\s*\$?' + _number_pattern)
         ),
         (
             "'= <number> format'",
-            re.compile(r'=\s*(-?\d+(?:\.\d+)?)\s*(?:\n|$)')
+            re.compile(r'=' + _number_pattern)
         ),
     )
 
@@ -105,15 +106,15 @@ class ModelEvaluator:
             match = pattern.search(text)
             if match:
                 logger.debug(f"Matched answer pattern: {pattern_name}")
-                return float(match.group(1))
+                return float(match.group('number'))
 
         logger.debug("No predefined answer pattern matched")
 
         # Last resort if none of the patterns work: find last number in text
-        numbers = re.findall(r'-?\d+(?:\.\d+)?', text)
+        numbers = re.findall(cls._number_pattern, text)
         if numbers:
             logger.debug("Extracting answer as the last number in text")
-            return float(numbers[-1])
+            return float(numbers[-1][0])
 
         logger.warning("Could not extract answer from text")
 
@@ -124,12 +125,9 @@ class ModelEvaluator:
         """'Trim' model response to the appearance of an end-of-response token - if any."""
 
         for stop_token in cls.STOP_TOKENS:
-            try:
-                idx = text.find(stop_token)
-            except ValueError:
-                # not found
-                continue
-            return text[:idx]  # don't look for other stop tokens
+            idx = text.find(stop_token)
+            if idx >= 0:  # -1 if not found
+                return text[:idx]  # don't look for other stop tokens
 
         return text  # return original text if no stop tokens found
 
