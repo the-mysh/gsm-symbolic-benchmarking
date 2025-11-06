@@ -1,0 +1,42 @@
+{
+  "source": "https://mlkd.idss.inesc-id.pt/cluster/cluster-intro#12---computation-machines",
+  "machine_types": {
+    "no-gpu": {
+      "ram": 120,
+      "vram": null,
+      "gpus": 0
+    },
+    "single-v100": {
+      "ram": 64,
+      "vram": 32,
+      "gpus": 1
+    },
+    "double-a40": {
+      "ram": 240,
+      "vram": 48,
+      "gpus": 2
+    },
+    "quadruple-v100": {
+      "ram": 256,
+      "vram": 32,
+      "gpus": 4
+    },
+    "quadruple-a100": {
+      "ram": 960,
+      "vram": 80,
+      "gpus": 4
+    }
+  },
+  "machines": {
+    "lima": "no-gpu",
+    "tamega": "no-gpu",
+    "douro": "single-v100",
+    "mondego": "single-v100",
+    "sado": "single-v100",
+    "tejo": "single-v100",
+    "cavado": "double-a40",
+    "vouga": "double-a40",
+    "zezere": "quadruple-v100",
+    "guadiana": "quadruple-a100"
+  }
+}
