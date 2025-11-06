@@ -154,6 +154,9 @@ def make_parser() -> ArgumentParser:
     parser.add_argument('--variants', nargs='+', choices=['main', 'GSM8K', 'p1', 'p2'])
     parser.add_argument('--models', type=str, nargs='+')
 
+    parser.add_argument('--n-sets', type=int, default=None)
+    parser.add_argument('--n-per-set', type=int, default=None)
+
     return parser
 
 
@@ -175,7 +178,7 @@ def main():
         config=make_config(pargs)
     )
 
-    br.run(n_sets=1) # n_sets=2, n_per_set=2)
+    br.run(n_sets=pargs.n_sets, n_per_set=pargs.n_per_set)
 
     print(br.summarise_failures())
 
