@@ -38,3 +38,24 @@ def test_extract_answer_no_pattern(resp, value, caplog):
     assert "No predefined answer pattern" in caplog.text
     assert "Extracting answer as the last number" in caplog.text
 
+
+@pytest.mark.parametrize(("resp", "trimmed"), (
+    ("some answer blah blah\n\nQ:", "some answer blah blah\n\n"),
+    ("xyz!Q:ddd", "xyz!"),
+    ("abc </s> saaaa", "abc "),
+    ("response.<|endoftext|>", "response."),
+    ("some text = 3 \n **`<", "some text = 3 \n "),
+    ("blahblah<end_of_turn>\t\t\t", "blahblah"),
+    ("The final answer is 42.[/INST]", "The final answer is 42."),
+))
+def test_trim_response(resp, trimmed):
+    assert ModelEvaluator.trim_response(resp) == trimmed
+
+
+@pytest.mark.parametrize("resp", (
+    "The answer is 42!",
+    "This is it<s>",
+    "Or is it?**"
+))
+def test_trim_response_no_trim(resp):
+    assert ModelEvaluator.trim_response(resp) == resp
