@@ -55,21 +55,21 @@ def test_post_init_with_explicit_index():
 
 def test_memory_settings_with_gpu():
     """Test memory settings when a GPU is configured."""
-    config = BenchmarkConfig(cpu_max_memory="12GiB", gpu_index=1, gpu_max_memory="8GiB")
+    config = BenchmarkConfig(cpu_max_memory=12, gpu_index=1, gpu_max_memory=8)
     expected_mem = {"cpu": "12GiB", 1: "8GiB"}
     assert config.memory_settings == expected_mem
 
 
 def test_memory_settings_without_gpu():
     """Test memory settings when no GPU is configured (gpu_index is None)."""
-    config = BenchmarkConfig(cpu_max_memory="6GiB", gpu_index=None)
+    config = BenchmarkConfig(cpu_max_memory=6, gpu_index=None)
     expected_mem = {"cpu": "6GiB"}
     assert config.memory_settings == expected_mem
 
 
 def test_memory_settings_raises_on_missing_gpu_max_memory():
     """Test RuntimeError is raised if gpu_index is set but gpu_max_memory is not."""
-    config = BenchmarkConfig(gpu_index=0, gpu_max_memory="")
+    config = BenchmarkConfig(gpu_index=0, gpu_max_memory=None)
     with pytest.raises(RuntimeError, match="gpu_max_memory is not defined"):
         _ = config.memory_settings
 
@@ -134,7 +134,7 @@ def test_for_machine_no_gpu_machine(machines_config, caplog):
     caplog.set_level(logging.DEBUG)
     config = BenchmarkConfig.for_machine("lima", gpu_index=None, ram_margin=2, vram_margin=0, temperature=0.5)
 
-    assert config.cpu_max_memory == "118GiB"  # 120 - 2
+    assert config.cpu_max_memory == 118  # 120 - 2
     assert config.gpu_max_memory is None # For no GPU machines, vram is null, and it calculates as None
     assert config.gpu_index is None
     assert config.temperature == 0.5 # Test kwargs passing
@@ -152,8 +152,8 @@ def test_for_machine_single_gpu_machine_auto_index(mock_cuda_avail, caplog):
     # CPU: 64 - 4 = 60GiB
     # VRAM: 32 - 2 = 30GiB (Post-init will set index to 0 since CUDA is mocked as available)
 
-    assert config.cpu_max_memory == "60GiB"
-    assert config.gpu_max_memory == "30GiB"
+    assert config.cpu_max_memory == 60
+    assert config.gpu_max_memory == 30
     # Note: The _AUTO resolves to 0 in __post_init__ because torch.cuda.is_available is mocked True
     assert config.gpu_index == 0
 
@@ -166,8 +166,8 @@ def test_for_machine_multi_gpu_machine_explicit_index(machines_config):
     # CPU: 240 - 10 = 230GiB
     # VRAM: 48 - 5 = 43GiB
 
-    assert config.cpu_max_memory == "230GiB"
-    assert config.gpu_max_memory == "43GiB"
+    assert config.cpu_max_memory == 230
+    assert config.gpu_max_memory == 43
     assert config.gpu_index == 1
     assert config.max_new_tokens == 1024 # Test default preserved
 
@@ -194,7 +194,7 @@ def test_for_machine_with_explicit_none_gpu_index(caplog):
     # CPU: 960 - 5 = 955GiB
     # VRAM should be None
 
-    assert config.cpu_max_memory == "955GiB"
+    assert config.cpu_max_memory == 955
     assert config.gpu_max_memory is None
     assert config.gpu_index is None
     assert "gpu_index is set to None; none of the available 4 GPUs will be used" in caplog.text
