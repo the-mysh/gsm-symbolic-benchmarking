@@ -20,14 +20,20 @@ from gsm_benchmarker.utils.seeds import set_seed
 logger = logging.getLogger(__name__)
 
 
-def setup_logs(logs_path):
+def setup_logs(logs_path, log_level=logging.INFO):
     for log_name in (
             'urllib3', 'fsspec', 'filelock', 'h5py', 'httpcore', 'httpx', 'google_genai', 'jax',
             'root', 'bitsandbytes', 'transformers_modules'
     ):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
-    install_colored_logger(level=logging.INFO)
+    if isinstance(log_level, str):
+        try:
+            log_level = int(log_level)
+        except ValueError:
+            pass
+
+    install_colored_logger(level=log_level)
 
     disable_progress_bar()
     datasets.disable_progress_bars()
@@ -62,13 +68,19 @@ def choose_dataset_variants():
     return [variants.GSM8K, variants.main]
 
 
-def get_paths():
-    output_root_path = Path(__file__).resolve()
-    for i in range(6):
-        output_root_path = output_root_path.parent
-    output_root_path = output_root_path / "data/gsm-symbolic"
+def get_paths(output_root_path: str | Path | None = None, run_folder_name: str | None = None):
+    if output_root_path is None:
+        output_root_path = Path(__file__).resolve()
+        for i in range(6):
+            output_root_path = output_root_path.parent
+        output_root_path = output_root_path / "data/gsm-symbolic"
+    else:
+        output_root_path = Path(output_root_path).resolve()
 
-    results_path = output_root_path / f"outputs/{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    if run_folder_name is None:
+        run_folder_name = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+    results_path = output_root_path / f"outputs/{run_folder_name}"
     return output_root_path / 'logs', results_path
 
 
@@ -116,14 +128,17 @@ def make_parser() -> ArgumentParser:
     g.add_argument('--gpu-index', type=int)
     g.add_argument('--no-gpu', dest='no_gpu', action='store_true')
 
+    parser.add_argument('--log-level', default=logging.INFO)
+    parser.add_argument('--output-root-path', default=None)
+    parser.add_argument('--run-folder-name', default=None)
     return parser
 
 
 def main():
     pargs = make_parser().parse_args()
 
-    logs_path, results_path = get_paths()
-    setup_logs(logs_path)
+    logs_path, results_path = get_paths(pargs.output_root_path, pargs.run_folder_name)
+    setup_logs(logs_path, log_level=pargs.log_level)
 
     set_seed(42)
     hf_login()
