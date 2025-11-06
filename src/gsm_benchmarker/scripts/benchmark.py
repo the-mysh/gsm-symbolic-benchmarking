@@ -63,7 +63,11 @@ def choose_dataset_variants():
 
 
 def get_paths():
-    output_root_path = Path(__file__).resolve().parent.parent.parent.parent / "data/gsm-symbolic"
+    output_root_path = Path(__file__).resolve()
+    for i in range(6):
+        output_root_path = output_root_path.parent
+    output_root_path = output_root_path / "data/gsm-symbolic"
+
     results_path = output_root_path / f"outputs/{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     return output_root_path / 'logs', results_path
 
