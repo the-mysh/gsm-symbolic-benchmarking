@@ -7,7 +7,6 @@ from gsm_benchmarker.utils.resources_manager import load_resource_json
 
 
 _AUTO = object()
-
 logger = logging.getLogger(__name__)
 
 
@@ -68,7 +67,7 @@ class BenchmarkConfig:
         cpu_memory, gpu_memory = cls.get_max_memories(machine_params, gpu_index, ram_margin, vram_margin)
 
         return BenchmarkConfig(
-            gpu_max_memory=f"{gpu_memory}GiB",
+            gpu_max_memory=f"{gpu_memory}GiB" if gpu_memory is not None else None,
             gpu_index=gpu_index,
             cpu_max_memory=f"{cpu_memory}GiB",
             **kwargs
