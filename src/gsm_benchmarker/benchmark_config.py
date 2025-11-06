@@ -6,40 +6,33 @@ import logging
 from gsm_benchmarker.utils.resources_manager import load_resource_json
 
 
-_UNDEFINED = object()
 _AUTO = object()
 
 logger = logging.getLogger(__name__)
 
 
-
 @dataclass
 class BenchmarkConfig:
     """Configuration for GSM-Symbolic benchmark"""
-    random_seed: int = 42
-    num_shots: int = 8
+
     temperature: float = 0.0  # greedy decoding
     max_new_tokens: int = 1024
-    batch_size: int = 1
-    device: str = ""
-
-    # Model-specific
-    use_4bit: bool = True  # For memory efficiency
+    use_4bit: bool = True  # for memory efficiency
     trust_remote_code_global: bool = False
 
     # memory settings
     gpu_max_memory: str | None = "7GiB"
-    gpu_index: int | None = _UNDEFINED
+    gpu_index: int | None = _AUTO
     cpu_max_memory: str = "12GiB"
 
     def __post_init__(self):
-        cuda_available = torch.cuda.is_available()
-
-        if not self.device:
-            self.device = "cuda" if cuda_available else "cpu"
-
-        if self.gpu_index is _UNDEFINED:
-            self.gpu_index = 0 if cuda_available else None
+        if self.gpu_index is _AUTO:
+            if torch.cuda.is_available():
+                logger.info("Setting default gpu index: 0")
+                self.gpu_index = 0
+            else:
+                logger.info("No GPUs available")
+                self.gpu_index = None
 
     @property
     def memory_settings(self):
@@ -71,6 +64,7 @@ class BenchmarkConfig:
         n_gpus = machine_params.get('gpus')
         assert isinstance(n_gpus, int)
 
+        cls.validate_gpu_index(machine_name, n_gpus, gpu_index)
         cpu_memory, gpu_memory = cls.get_max_memories(machine_params, gpu_index, ram_margin, vram_margin)
 
         return BenchmarkConfig(
@@ -81,25 +75,16 @@ class BenchmarkConfig:
         )
 
     @staticmethod
-    def validate_gpu_index(machine_name: str, n_gpus: int, gpu_index: int | None | type[_AUTO] = _AUTO) -> int | None:
+    def validate_gpu_index(machine_name: str, n_gpus: int, gpu_index: int | None | type[_AUTO] = _AUTO) -> None:
 
         if gpu_index is _AUTO:
-            if n_gpus:
-                logger.info("Setting default gpu index: 0")
-                return 0
-            logger.info("No GPUs available")
-            return None
+            return  # auto-defined in __post_init__
 
-        if gpu_index is None:
-            if n_gpus:
-                logger.warning(f"gpu_index is set to None; none of the available {n_gpus} GPUs will be used")
-            return None
+        if gpu_index is None and n_gpus:
+            logger.warning(f"gpu_index is set to None; none of the available {n_gpus} GPUs will be used")
 
-        # gpu_index is not None
-        if gpu_index >= n_gpus:
+        if gpu_index is not None and gpu_index >= n_gpus:
             raise ValueError(f"Cannot use GPU {gpu_index} for machine '{machine_name}' with a total of {n_gpus} GPUs")
-
-        return gpu_index
 
     @staticmethod
     def get_max_memories(machine_params: dict, gpu_index: int | None, ram_margin: int, vram_margin: int
