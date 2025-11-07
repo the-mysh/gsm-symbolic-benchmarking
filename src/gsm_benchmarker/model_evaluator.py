@@ -84,7 +84,7 @@ class ModelEvaluator:
 
             if true_result is None:
                 logger.warning(f"Could not extract numerical result from: {example['answer']}")
-                response, predicted_result, correct = None, None, None
+                response, predicted_result, result_pattern, correct = None, None, None, None
             else:
                 # Generate prediction
                 prompt = prompt_template.format(example['question'])
@@ -96,7 +96,7 @@ class ModelEvaluator:
                 **example,
                 'predicted_numerical_result': predicted_result,
                 'correct': correct,
-                'detected_result_pattern': result_pattern.name,
+                'detected_result_pattern': result_pattern.name if result_pattern is not None else None,
                 'full_response': response
             })
 
