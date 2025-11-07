@@ -69,6 +69,24 @@ class GSMSymbolicDataset:
 
         ds = load_dataset(self.DSET_NAME, load_variant.name, split=self._split.name)
         logger.debug(f"Loaded {len(ds)} examples")
+
+        if self._variant is self.Variant.GSM8K:
+            def set_instance(d):
+                d['instance'] = -1  # mark original questions as instance -1
+                return d
+            ds = ds.map(set_instance)
+
+            ds = ds.remove_columns(['question', 'answer', 'canary'])
+            ds = ds.rename_column('original_question', 'question')
+            ds = ds.rename_column('original_answer', 'answer')
+
+        else:
+            ds = ds.remove_columns(['original_question', 'original_answer', 'canary'])
+
+        # unify column order
+        ds = ds.select_columns(['id', 'original_id', 'instance', 'question', 'answer'])
+
+        logger.debug(f"After transformations: {len(ds)} examples")
         return ds
 
     def get_subdataset_for_instance(self, original_id: int) -> Dataset:
@@ -93,22 +111,6 @@ class GSMSymbolicDataset:
                 logger.warning(f"For variant {self._variant.GSM8K}, only one evaluation set can be created")
             n_sets = 1
 
-            def transform_dset(dset):
-                def set_instance(d):
-                    d['instance'] = -1
-                    return d
-                dset = dset.map(set_instance)
-
-                dset = dset.remove_columns(['question', 'answer', 'canary'])
-                dset = dset.rename_column('original_question', 'question')
-                dset = dset.rename_column('original_answer', 'answer')
-                return dset
-
-        else:
-            def transform_dset(dset):
-                dset = dset.remove_columns(['original_question', 'original_answer', 'canary'])
-                return dset
-
         if n_sets is None:
             n_sets = self.MAX_SETS
             
@@ -126,6 +128,6 @@ class GSMSymbolicDataset:
             if n_per_set:
                 instance_dset = instance_dset.select(range(n_per_set))
 
-            eval_sets.append(transform_dset(instance_dset))
+            eval_sets.append(instance_dset)
 
         return eval_sets
