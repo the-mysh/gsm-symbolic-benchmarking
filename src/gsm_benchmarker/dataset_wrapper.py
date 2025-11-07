@@ -35,15 +35,7 @@ class GSMSymbolicDataset:
 
         self._variant = self._check_type(variant, self.Variant)
         self._split = self._check_type(split, self.Split)
-
-        if self._variant is self.Variant.GSM8K:
-            variant = self.Variant.main
-            logger.debug(f"Loading GSM-Symbolic dataset in variant 'main'; original questions will be extracted from it")
-        else:
-            logger.debug(f"Loading GSM-Symbolic dataset (variant: {variant.name})...")
-
-        self.dataset = load_dataset(self.DSET_NAME, variant.name, split=self._split.name)
-        logger.debug(f"Loaded {len(self.dataset)} examples")
+        self.dataset = self.load_dataset()
 
     @staticmethod
     def _check_type(value: T, expected_type: type[T]) -> T:
@@ -66,6 +58,18 @@ class GSMSymbolicDataset:
     @property
     def path_friendly_name(self) -> str:
         return make_name_path_friendly(f"{self.DSET_NAME}_{self._variant.name}_{self._split.name}")
+
+    def load_dataset(self):
+        if self._variant is self.Variant.GSM8K:
+            load_variant = self.Variant.main
+            logger.debug(f"Loading GSM-Symbolic dataset in variant 'main'; original questions will be extracted from it")
+        else:
+            logger.debug(f"Loading GSM-Symbolic dataset (variant: {self._variant.name})...")
+            load_variant = self._variant
+
+        ds = load_dataset(self.DSET_NAME, load_variant.name, split=self._split.name)
+        logger.debug(f"Loaded {len(ds)} examples")
+        return ds
 
     def get_subdataset_for_instance(self, original_id: int) -> Dataset:
         """Get all instances of a specific question template"""
