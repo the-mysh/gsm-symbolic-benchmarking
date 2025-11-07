@@ -9,6 +9,7 @@ import traceback
 from datasets import Dataset
 import socket
 import json
+from time import time
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -107,8 +108,17 @@ class BenchmarkRunner:
 
         return dsets, dset_names
 
+    @staticmethod
+    def format_time_diff(td: float):
+        minutes, seconds = divmod(td, 60)
+        hours, minutes = divmod(minutes, 60)
+
+        return f"{(f"{int(hours)}:" if hours else "")}{int(minutes):d}:{seconds:.3f}"
+
     def run(self, n_sets: int | None = None, n_per_set: int | None = None,
             remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
+
+        tt = time()   # t0 for total evaluation time
 
         self._pre_populate_results()
 
@@ -116,6 +126,7 @@ class BenchmarkRunner:
         self.store_setup_info(n_sets=n_sets, n_per_set=n_per_set)
 
         for im, model_spec in enumerate(self._models):
+            tm = time()  # t0 for model evaluation
             model_name = self._model_name_from_spec(model_spec)
             logger.info(f"{10*'='} Evaluating model {im+1}/{len(self._models)}: {model_name} {10*'='}")
 
@@ -124,6 +135,7 @@ class BenchmarkRunner:
                 continue  # failed to load; already handled
 
             for iv, variant in enumerate(self._dset_variants):
+                tv = time()  # t0 for variant evaluation
                 try:
                     logger.info(f"Evaluating {model_name} on dataset variant "
                                 f"{iv+1}/{len(self._dset_variants)}: {variant}")
@@ -146,14 +158,16 @@ class BenchmarkRunner:
                         raise RuntimeError(f"Encountered {len(caught_exceptions)} error(s() when evaluating "
                                            f"{model_name} on variant {variant}; first one was: {caught_exceptions[0]}")
 
-                    logger.info(f"Evaluation of model {model_name} on variant {variant} completed")
+                    logger.info(f"Evaluation of model {model_name} on variant {variant} completed "
+                                f"in {self.format_time_diff(time() - tv)}")
                 except Exception as exc:
                     self._handle_evaluation_exception(model_name, variant, exc)
 
-            logger.info(f"Evaluation of model {model_name} on all dataset variants completed")
+            logger.info(f"Evaluation of model {model_name} on all dataset variants completed "
+                        f"in a total of {self.format_time_diff(time() - tm)}")
             self._delete_model(model_evaluator)
 
-        logger.info("EVALUATION COMPLETE")
+        logger.info(f"EVALUATION COMPLETE; total time: {self.format_time_diff(time() - tt)}")
 
         if remove_intermediate_results:
             remove_intermediate_results_folder(self.intermediate_storage_path)
