@@ -144,7 +144,8 @@ class BenchmarkRunner:
                     res, caught_exceptions = model_evaluator.evaluate_multiple_datasets(
                         dsets[variant],
                         intermediate_storage_path=self.intermediate_storage_path,
-                        remove_intermediate_results=remove_intermediate_results
+                        remove_intermediate_results=remove_intermediate_results,
+                        leave_progressbar=False
                     )
 
                     # Store results

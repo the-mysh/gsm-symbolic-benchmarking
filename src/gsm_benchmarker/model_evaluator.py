@@ -106,7 +106,8 @@ class ModelEvaluator:
             self,
             datasets: list[Dataset],
             intermediate_storage_path: Path | str | None = None,
-            remove_intermediate_results: bool = True
+            remove_intermediate_results: bool = True,
+            leave_progressbar: bool = True,
         ) -> tuple[pd.DataFrame | None, list[Exception]]:
         """Evaluate model on a set of datasets. Return results in a combined dataframe."""
 
@@ -120,7 +121,7 @@ class ModelEvaluator:
         n = len(datasets)
         caught_exceptions = []
 
-        for i, dataset in tqdm(enumerate(datasets), desc="Dataset", total=n):
+        for i, dataset in tqdm(enumerate(datasets), desc="Dataset", total=n, leave=leave_progressbar):
             try:
                 result = self.evaluate_dataset(dataset, leave_progressbar=False)
                 self._store_intermediate_result(result, intermediate_storage_path, i)
