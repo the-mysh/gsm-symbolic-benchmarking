@@ -15,6 +15,7 @@ dependencies = [
   "bitsandbytes",
   "coloredlogs",
   "datasets",
+  "einops>=0.8.1",
   "ipywidgets",
   "notebook",
   "numpy",
