@@ -86,12 +86,13 @@ class ModelEvaluator:
                 # Generate prediction
                 prompt = prompt_template.format(example['question'])
                 response = self.model_wrapper.ask(prompt)
-                predicted_result = AnswerExtractor.extract_answer(response)
+                predicted_result, result_pattern = AnswerExtractor.extract_answer(response)
                 correct = predicted_result is not None and abs(predicted_result - true_result) < 1e-5
 
             results.append({
                 **example,
                 'predicted_numerical_result': predicted_result,
+                'detected_result_pattern': result_pattern.name,
                 'correct': correct,
                 'full_response': response
             })

@@ -89,7 +89,7 @@ class GSMSymbolicDataset:
         ds = ds.select_columns(['id', 'original_id', 'instance', 'question', 'answer'])
 
         # extract numerical results from answers
-        ds = ds.map(lambda example: {'numerical_result': AnswerExtractor.extract_answer(example['answer'])})
+        ds = ds.map(lambda example: {'numerical_result': AnswerExtractor.extract_answer(example['answer'])[0]})
 
         logger.debug(f"After transformations: {len(ds)} examples")
         return ds

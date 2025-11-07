@@ -1,43 +1,40 @@
 import logging
 import pytest
 
-from gsm_benchmarker.answer_extractor import AnswerExtractor
+from gsm_benchmarker.answer_extractor import AnswerExtractor, AnswerPattern
 
 
 @pytest.mark.parametrize(("resp", "value", "pattern"), (
-    ("The final answer is 42.", 42, "GSM-Symbolic format"),
-    ("The answer is 38", 38, "GSM-Symbolic format"),
-    ("Answer: 3.1", 3.1, "'Answer:' format"),
-    ("answer:    22", 22, "'Answer:' format"),
-    ("#### -1", -1, "GSM8K standard format"),
-    ("###### 3", 3, "GSM8K standard format"),
-    ("=2.5", 2.5, "'= <number> format'"),
-    ("=      -23.8", -23.8, "'= <number> format'"),
-    ("value=3.2\n", 3.2, "'= <number> format'")
+    ("The final answer is 42.", 42, AnswerPattern.GSM_SYMBOLIC),
+    ("The answer is 38", 38, AnswerPattern.GSM_SYMBOLIC),
+    ("#### -1", -1, AnswerPattern.GMS8K),
+    ("###### 3", 3, AnswerPattern.GMS8K),
+    ("=2.5", 2.5, AnswerPattern.EQUAL_SIGN),
+    ("=      -23.8", -23.8, AnswerPattern.EQUAL_SIGN),
+    ("value=3.2\n", 3.2, AnswerPattern.EQUAL_SIGN)
 ))
 def test_extract_answer_from_pattern(resp, value, pattern, caplog):
 
     with caplog.at_level(logging.DEBUG):
-        extracted_value = AnswerExtractor.extract_answer(resp)
+        extracted_value, detected_pattern = AnswerExtractor.extract_answer(resp)
 
     assert extracted_value == pytest.approx(value, abs=1e-5)
-    assert "No predefined answer pattern" not in caplog.text
-    assert pattern in caplog.text
+    assert detected_pattern is pattern
 
 
 @pytest.mark.parametrize(("resp", "value"), (
+    ("Answer: 3.1", 3.1),
+    ("answer:    22", 22),
     ("A: 31", 31),
     ("was 5, subtracted 1, left 4", 4)
 ))
 def test_extract_answer_no_pattern(resp, value, caplog):
 
     with caplog.at_level(logging.DEBUG):
-        extracted_value = AnswerExtractor.extract_answer(resp)
+        extracted_value, detected_pattern = AnswerExtractor.extract_answer(resp)
 
     assert extracted_value == pytest.approx(value, abs=1e-5)
-    assert "No predefined answer pattern" in caplog.text
-    assert "Extracting answer as the last number" in caplog.text
-
+    assert detected_pattern is AnswerPattern.LAST_NUMBER
 
 @pytest.mark.parametrize(("resp", "trimmed"), (
     ("some answer blah blah\n\nQ:", "some answer blah blah\n\n"),

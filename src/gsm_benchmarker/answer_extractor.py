@@ -1,31 +1,26 @@
 import re
 import logging
+from enum import Enum, auto
 
 
 logger = logging.getLogger(__name__)
 
 
+class AnswerPattern(Enum):
+    GMS8K = auto()
+    GSM_SYMBOLIC = auto()
+    EQUAL_SIGN = auto()
+    LAST_NUMBER = auto()
+
+
 class AnswerExtractor:
     _number_pattern = r'\s*(?P<number>(-?\s?\d+(?:\.\d+)?))'
 
-    ANSWER_PATTERNS = (
-        (
-            "GSM8K standard format: '#### <number>",
-            re.compile(r'####' + _number_pattern)
-        ),
-        (
-            "GSM-Symbolic format: 'The final answer is <number>'",
-            re.compile(r'[Tt]he (?:final )?answer is\s*\$?' + _number_pattern)
-        ),
-        (
-            "'Answer:' format",
-            re.compile(r'[Aa]nswer:\s*\$?' + _number_pattern)
-        ),
-        (
-            "'= <number> format'",
-            re.compile(r'=' + _number_pattern)
-        ),
-    )
+    ANSWER_PATTERNS = {
+        AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern),
+        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is\s*\$?' + _number_pattern),
+        AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
+    }
 
     STOP_TOKENS = (
         # from paper
@@ -40,7 +35,7 @@ class AnswerExtractor:
     )
 
     @classmethod
-    def extract_answer(cls, text: str) -> float | None:
+    def extract_answer(cls, text: str) -> tuple[float | None, AnswerPattern | None]:
         """
         Extract numerical answer from text.
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
@@ -48,23 +43,19 @@ class AnswerExtractor:
 
         text = cls.trim_response(text)
 
-        for pattern_name, pattern in cls.ANSWER_PATTERNS:
+        for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
             match = pattern.search(text)
             if match:
-                logger.debug(f"Matched answer pattern: {pattern_name}")
-                return float(match.group('number'))
-
-        logger.debug("No predefined answer pattern matched")
+                return float(match.group('number')), pattern_enum
 
         # Last resort if none of the patterns work: find last number in text
         numbers = re.findall(cls._number_pattern, text)
         if numbers:
-            logger.debug("Extracting answer as the last number in text")
-            return float(numbers[-1][0])
+            return float(numbers[-1][0]), AnswerPattern.LAST_NUMBER
 
-        logger.warning("Could not extract answer from text")
+        logger.warning(f"Could not extract answer from text: '{text}'")
 
-        return None
+        return None, None
 
     @classmethod
     def trim_response(cls, text: str) -> str:
