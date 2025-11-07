@@ -72,7 +72,7 @@ class HFModelWrapper(BaseModelWrapper):
             self._model_spec.name,
             quantization_config=bnb_config,
             device_map="cuda",
-            torch_dtype=torch.bfloat16,
+            dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
             max_memory=config.memory_settings,
             trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
