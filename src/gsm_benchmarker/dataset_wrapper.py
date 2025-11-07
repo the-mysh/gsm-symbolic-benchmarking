@@ -59,7 +59,7 @@ class GSMSymbolicDataset:
 
     @property
     def path_friendly_name(self) -> str:
-        return make_name_path_friendly(f"{self.DSET_NAME}_{self._variant.name}_{self._split.name}")
+        return make_name_path_friendly(f"{self._variant.name}_{self._split.name}")
 
     def load_dataset(self):
         if self._variant is self.Variant.GSM8K:

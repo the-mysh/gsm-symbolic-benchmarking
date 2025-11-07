@@ -6,6 +6,7 @@ from pathlib import Path
 from functools import cached_property
 from dataclasses import dataclass
 import traceback
+from datasets import Dataset
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -89,9 +90,26 @@ class BenchmarkRunner:
     def _model_name_from_spec(model_spec: str | SingleModelConfig) -> str:
         return model_spec.name if isinstance(model_spec, SingleModelConfig) else model_spec
 
+    def load_datasets(self, n_sets: int | None = None, n_per_set: int | None = None
+                      ) -> tuple[dict[GSMSymbolicDataset.Variant, list[Dataset]], dict[GSMSymbolicDataset.Variant, str]]:
+
+        dsets = {}
+        dset_names = {}
+
+        logger.debug(f"Loading datasets in {len(self._dset_variants)} variant(s)")
+
+        for variant in self._dset_variants:
+            dataset_wrapper = GSMSymbolicDataset(variant=variant)
+            dsets[variant] = dataset_wrapper.create_evaluation_sets(n_sets=n_sets, n_per_set=n_per_set)
+            dset_names[variant] = dataset_wrapper.path_friendly_name
+
+        return dsets, dset_names
+
     def run(self, n_sets: int | None = None, n_per_set: int | None = None,
             remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
         self._pre_populate_results()
+
+        dsets, dset_names = self.load_datasets(n_sets, n_per_set)
 
         for im, model_spec in enumerate(self._models):
             model_name = self._model_name_from_spec(model_spec)
@@ -106,13 +124,9 @@ class BenchmarkRunner:
                     logger.info(f"Evaluating {model_name} on dataset variant "
                                 f"{iv+1}/{len(self._dset_variants)}: {variant}")
 
-                    # Load dataset
-                    dataset_wrapper = GSMSymbolicDataset(variant=variant)
-                    eval_sets = dataset_wrapper.create_evaluation_sets(n_sets=n_sets, n_per_set=n_per_set)
-
                     # Evaluate model
                     res, caught_exceptions = model_evaluator.evaluate_multiple_datasets(
-                        eval_sets,
+                        dsets[variant],
                         intermediate_storage_path=self.intermediate_storage_path,
                         remove_intermediate_results=remove_intermediate_results
                     )
@@ -121,7 +135,7 @@ class BenchmarkRunner:
                     self._results[variant][model_name] = res
 
                     if res is not None:
-                        self._store_model_x_variant_result(dataset_wrapper, model_evaluator, res)
+                        self._store_model_x_variant_result(dset_names[variant], model_evaluator, res)
                         
                     if caught_exceptions:
                         # raise an exception to note the failure in the evaluation exceptions summary later on
@@ -171,10 +185,10 @@ class BenchmarkRunner:
             logger.warning(f"Error emptying CUDA cache: {exc}")
         model_evaluator.model_wrapper.delete_from_cache()
 
-    def _store_model_x_variant_result(self, dataset_wrapper, model_evaluator, res):
+    def _store_model_x_variant_result(self, dset_variant_name, model_evaluator, res):
         logger.debug("Storing results")
 
-        res_path = self.final_storage_path / dataset_wrapper.path_friendly_name
+        res_path = self.final_storage_path / dset_variant_name
         confirm_or_create_folder(res_path)
 
         fname = res_path / f"{model_evaluator.path_friendly_model_name}.parquet"
@@ -186,7 +200,7 @@ class BenchmarkRunner:
         summaries = []
         for variant_name, variant_results in self._results.items():
             for model_name, result in variant_results.items():
-                correctness = result.loc[result['true_answer'].notna(), 'correct']
+                correctness = result.loc[result['numerical_result'].notna(), 'correct']
                 summaries.append(
                     {
                         'variant': variant_name,
