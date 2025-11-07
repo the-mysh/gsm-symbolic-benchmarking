@@ -77,7 +77,7 @@ class ModelEvaluator:
 
         for example in tqdm(dataset, desc="Example"):
             # Extract ground truth answer
-            true_result = AnswerExtractor.extract_answer(example['answer'])
+            true_result = example['numerical_result']
 
             if true_result is None:
                 logger.warning(f"Could not extract numerical result from: {example['answer']}")
@@ -91,10 +91,9 @@ class ModelEvaluator:
 
             results.append({
                 **example,
-                'true_numerical_result': true_result,
                 'predicted_numerical_result': predicted_result,
                 'correct': correct,
-                'response': response
+                'full_response': response
             })
 
         return pd.DataFrame(results)

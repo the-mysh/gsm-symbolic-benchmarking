@@ -4,6 +4,8 @@ from enum import Enum, auto
 from typing import TypeVar
 
 from gsm_benchmarker.utils.path_ops import make_name_path_friendly
+from gsm_benchmarker.answer_extractor import AnswerExtractor
+
 
 T = TypeVar("T")
 
@@ -30,7 +32,7 @@ class GSMSymbolicDataset:
         Load GSM-Symbolic dataset
 
         Args:
-            variant: Dataset variant - 'main' (default) / 'p1' / 'p2'.
+            variant: Dataset variant - 'main' (default) / 'p1' / 'p2' / 'GSM8K' (constructed from 'main').
         """
 
         self._variant = self._check_type(variant, self.Variant)
@@ -85,6 +87,9 @@ class GSMSymbolicDataset:
 
         # unify column order
         ds = ds.select_columns(['id', 'original_id', 'instance', 'question', 'answer'])
+
+        # extract numerical results from answers
+        ds = ds.map(lambda example: {'numerical_result': AnswerExtractor.extract_answer(example['answer'])})
 
         logger.debug(f"After transformations: {len(ds)} examples")
         return ds
