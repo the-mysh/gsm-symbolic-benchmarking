@@ -78,7 +78,7 @@ class ModelEvaluator:
         results = []
         prompt_template = self.create_prompt(question="{}")
 
-        for example in tqdm(dataset, desc="Example", leave=leave_progressbar):
+        for example in tqdm(dataset, desc="Examples in dataset", leave=leave_progressbar):
             # Extract ground truth answer
             true_result = example['numerical_result']
 
@@ -121,7 +121,7 @@ class ModelEvaluator:
         n = len(datasets)
         caught_exceptions = []
 
-        for i, dataset in tqdm(enumerate(datasets), desc="Dataset", total=n, leave=leave_progressbar):
+        for i, dataset in tqdm(enumerate(datasets), desc="Datasets", total=n, leave=leave_progressbar):
             try:
                 result = self.evaluate_dataset(dataset, leave_progressbar=False)
                 self._store_intermediate_result(result, intermediate_storage_path, i)
