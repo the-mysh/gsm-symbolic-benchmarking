@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
+from datasets import Dataset
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
@@ -131,7 +132,7 @@ class ModelEvaluator:
 
         return text  # return original text if no stop tokens found
 
-    def evaluate_dataset(self, dataset: list[GSMSymbolicDataset.Sample]) -> pd.DataFrame:
+    def evaluate_dataset(self, dataset: Dataset) -> pd.DataFrame:
         """
         Evaluate model on a dataset
 
@@ -147,24 +148,22 @@ class ModelEvaluator:
 
         for example in tqdm(dataset, desc="Example"):
             # Extract ground truth answer
-            true_answer = self.extract_answer(example.answer)
+            true_result = self.extract_answer(example['answer'])
 
-            if true_answer is None:
-                logger.warning(f"Could not extract numerical answer from: {example.answer}")
-                response, predicted_answer, correct = None, None, None
+            if true_result is None:
+                logger.warning(f"Could not extract numerical result from: {example['answer']}")
+                response, predicted_result, correct = None, None, None
             else:
                 # Generate prediction
-                prompt = prompt_template.format(example.question)
+                prompt = prompt_template.format(example['question'])
                 response = self.model_wrapper.ask(prompt)
-                predicted_answer = self.extract_answer(response)
-                correct = predicted_answer is not None and abs(predicted_answer - true_answer) < 1e-5
+                predicted_result = self.extract_answer(response)
+                correct = predicted_result is not None and abs(predicted_result - true_result) < 1e-5
 
             results.append({
-                'id': example.id,
-                'original_id': example.original_id,
-                'question': example.question,
-                'true_answer': true_answer,
-                'predicted_answer': predicted_answer,
+                **example,
+                'true_numerical_result': true_result,
+                'predicted_numerical_result': predicted_result,
                 'correct': correct,
                 'response': response
             })
@@ -173,7 +172,7 @@ class ModelEvaluator:
 
     def evaluate_multiple_datasets(
             self,
-            datasets: list[list[GSMSymbolicDataset.Sample]],
+            datasets: list[Dataset],
             intermediate_storage_path: Path | str | None = None,
             remove_intermediate_results: bool = True
         ) -> tuple[pd.DataFrame | None, list[Exception]]:

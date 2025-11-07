@@ -1,7 +1,7 @@
 import logging
 from datasets import load_dataset, Dataset
 from enum import Enum, auto
-from typing import TypeVar, NamedTuple
+from typing import TypeVar
 
 from gsm_benchmarker.utils.path_ops import make_name_path_friendly
 
@@ -24,12 +24,6 @@ class GSMSymbolicDataset:
 
     class Split(Enum):
         test = auto()
-
-    class Sample(NamedTuple):
-        id: int
-        original_id: int
-        question: str
-        answer: str
 
     def __init__(self, variant: Variant, split: Split = Split.test):
         """
@@ -73,20 +67,15 @@ class GSMSymbolicDataset:
     def path_friendly_name(self) -> str:
         return make_name_path_friendly(f"{self.DSET_NAME}_{self._variant.name}_{self._split.name}")
 
-    def get_subdataset_for_original_id(self, original_id: int) -> Dataset:
+    def get_subdataset_for_instance(self, original_id: int) -> Dataset:
         """Get all instances of a specific question template"""
 
         return self.dataset.filter(
             lambda x: x == original_id,
-            input_columns=["original_id"]
+            input_columns=["instance"]
         )
 
-    def get_unique_templates(self) -> list[int]:
-        """Get list of unique template IDs"""
-
-        return list(set(self.dataset['original_id']))
-
-    def create_evaluation_sets(self, n_sets: int | None = None, n_per_set: int = None) -> list[list[Sample]]:
+    def create_evaluation_sets(self, n_sets: int | None = None, n_per_set: int = None) -> list[Dataset]:
         """
         Create evaluation sets (matching paper's methodology)
         Each set contains up to 100 examples (one per template)
@@ -95,36 +84,44 @@ class GSMSymbolicDataset:
             list of <num_instances> sets, each with 100 examples
         """
 
-        templates = self.get_unique_templates()[:n_per_set]
-
         if self._variant is self.Variant.GSM8K:
             if n_sets is not None and n_sets > 1:
                 logger.warning(f"For variant {self._variant.GSM8K}, only one evaluation set can be created")
             n_sets = 1
-            sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['original_question'], s['original_answer'])
+
+            def transform_dset(dset):
+                def set_instance(d):
+                    d['instance'] = -1
+                    return d
+                dset = dset.map(set_instance)
+
+                dset = dset.remove_columns(['question', 'answer', 'canary'])
+                dset = dset.rename_column('original_question', 'question')
+                dset = dset.rename_column('original_answer', 'answer')
+                return dset
+
         else:
-            sample_creator = lambda s: self.Sample(s['id'], s['original_id'], s['question'], s['answer'])
-        
+            def transform_dset(dset):
+                dset = dset.remove_columns(['original_question', 'original_answer', 'canary'])
+                return dset
+
         if n_sets is None:
             n_sets = self.MAX_SETS
             
-        logger.debug(f"Creating {n_sets} set(s) with {len(templates)} example(s) each")
+        logger.info(f"Creating {n_sets} set(s) with {n_per_set or 'maximum available number of'} example(s) each")
 
         eval_sets = []
+        all_instances = list(set(self.dataset['instance']))
 
         for instance_idx in range(n_sets):
-            eval_set = []
-            for template_id in templates:
-                # Get all instances for this template
-                sub_dset = self.get_subdataset_for_original_id(template_id)
+            instance_dset = self.get_subdataset_for_instance(all_instances[instance_idx])
+            if not len(instance_dset):
+                logger.warning(f"Not enough instances for {n_sets} evaluation sets")
+                break
 
-                # Take the instance_idx-th example (if exists)
-                if instance_idx < len(sub_dset):
-                    eval_set.append(sample_creator(sub_dset[instance_idx]))
-                else:
-                    logger.warning(f"Not enough examples for template id {template_id}")
+            if n_per_set:
+                instance_dset = instance_dset.select(range(n_per_set))
 
-            if eval_set:
-                eval_sets.append(eval_set)
+            eval_sets.append(transform_dset(instance_dset))
 
         return eval_sets
