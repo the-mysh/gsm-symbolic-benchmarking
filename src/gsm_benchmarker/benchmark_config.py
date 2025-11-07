@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import torch
 from typing import Any
 import logging
@@ -32,6 +32,9 @@ class BenchmarkConfig:
             else:
                 logger.info("No GPUs available")
                 self.gpu_index = None
+
+    def to_dict(self):
+        return asdict(self)
 
     @property
     def memory_settings(self):

@@ -7,6 +7,8 @@ from functools import cached_property
 from dataclasses import dataclass
 import traceback
 from datasets import Dataset
+import socket
+import json
 
 from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
@@ -107,9 +109,11 @@ class BenchmarkRunner:
 
     def run(self, n_sets: int | None = None, n_per_set: int | None = None,
             remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
+
         self._pre_populate_results()
 
         dsets, dset_names = self.load_datasets(n_sets, n_per_set)
+        self.store_setup_info(n_sets=n_sets, n_per_set=n_per_set)
 
         for im, model_spec in enumerate(self._models):
             model_name = self._model_name_from_spec(model_spec)
@@ -184,6 +188,24 @@ class BenchmarkRunner:
         except Exception as exc:  # expecting AcceleratorError, but couldn't find how to import it
             logger.warning(f"Error emptying CUDA cache: {exc}")
         model_evaluator.model_wrapper.delete_from_cache()
+
+    def store_setup_info(self, **run_params):
+        logger.debug("Storing benchmark setup info")
+
+        confirm_or_create_folder(self.final_storage_path)
+        fname = self.final_storage_path / 'benchmark_setup_info.json'
+
+        info = dict(
+            benchmark_config=self._config.to_dict(),
+            run_params=run_params,
+            models=[(m.name if isinstance(m, SingleModelConfig) else m) for m in self._models],
+            variants=[v.name for v in self._dset_variants],
+            machine=socket.gethostname()
+        )
+
+        with open(fname, 'w') as f:
+            json.dump(info, f, indent=4)
+        logger.debug(f"Benchmark setup info stored to: {fname}")
 
     def _store_model_x_variant_result(self, dset_variant_name, model_evaluator, res):
         logger.debug("Storing results")
