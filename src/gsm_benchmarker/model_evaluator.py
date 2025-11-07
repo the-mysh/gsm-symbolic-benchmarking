@@ -1,5 +1,4 @@
 import os
-import re
 import traceback
 from tqdm.auto import tqdm
 import logging
@@ -10,7 +9,7 @@ from datetime import datetime
 from datasets import Dataset
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
+from gsm_benchmarker.answer_extractor import AnswerExtractor
 from gsm_benchmarker.models_config_parser import SingleModelConfig
 from gsm_benchmarker.shot_manager import GSM8hotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly, remove_intermediate_results_folder
@@ -27,38 +26,6 @@ class ModelEvaluator:
 
     QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
     SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
-    _number_pattern = r'\s*(?P<number>(-?\s?\d+(?:\.\d+)?))'
-
-    ANSWER_PATTERNS = (
-        (
-            "GSM8K standard format: '#### <number>",
-            re.compile(r'####' + _number_pattern)
-        ),
-        (
-            "GSM-Symbolic format: 'The final answer is <number>'",
-            re.compile(r'[Tt]he (?:final )?answer is\s*\$?' + _number_pattern)
-        ),
-        (
-            "'Answer:' format",
-            re.compile(r'[Aa]nswer:\s*\$?' + _number_pattern)
-        ),
-        (
-            "'= <number> format'",
-            re.compile(r'=' + _number_pattern)
-        ),
-    )
-
-    STOP_TOKENS = (
-        # from paper
-        "Q:",  # model moves on to generating a next question
-        "</s>",
-        "<|endoftext|>",
-
-        # other, suggested by Gemini
-        "**`<",  # OpenAI / Mistral / LLama3
-        "<end_of_turn>",  # Gemma
-        "[/INST]"  # Mistral Dialogic / Tool Use
-    )
 
     def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig):
         self.original_shots = GSM8hotManager()
@@ -94,44 +61,6 @@ class ModelEvaluator:
 
         return prompt
 
-    @classmethod
-    def extract_answer(cls, text: str) -> float | None:
-        """
-        Extract numerical answer from text.
-        Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
-        """
-
-        text = cls.trim_response(text)
-
-        for pattern_name, pattern in cls.ANSWER_PATTERNS:
-            match = pattern.search(text)
-            if match:
-                logger.debug(f"Matched answer pattern: {pattern_name}")
-                return float(match.group('number'))
-
-        logger.debug("No predefined answer pattern matched")
-
-        # Last resort if none of the patterns work: find last number in text
-        numbers = re.findall(cls._number_pattern, text)
-        if numbers:
-            logger.debug("Extracting answer as the last number in text")
-            return float(numbers[-1][0])
-
-        logger.warning("Could not extract answer from text")
-
-        return None
-
-    @classmethod
-    def trim_response(cls, text: str) -> str:
-        """'Trim' model response to the appearance of an end-of-response token - if any."""
-
-        for stop_token in cls.STOP_TOKENS:
-            idx = text.find(stop_token)
-            if idx >= 0:  # -1 if not found
-                return text[:idx]  # don't look for other stop tokens
-
-        return text  # return original text if no stop tokens found
-
     def evaluate_dataset(self, dataset: Dataset) -> pd.DataFrame:
         """
         Evaluate model on a dataset
@@ -148,7 +77,7 @@ class ModelEvaluator:
 
         for example in tqdm(dataset, desc="Example"):
             # Extract ground truth answer
-            true_result = self.extract_answer(example['answer'])
+            true_result = AnswerExtractor.extract_answer(example['answer'])
 
             if true_result is None:
                 logger.warning(f"Could not extract numerical result from: {example['answer']}")
@@ -157,7 +86,7 @@ class ModelEvaluator:
                 # Generate prediction
                 prompt = prompt_template.format(example['question'])
                 response = self.model_wrapper.ask(prompt)
-                predicted_result = self.extract_answer(response)
+                predicted_result = AnswerExtractor.extract_answer(response)
                 correct = predicted_result is not None and abs(predicted_result - true_result) < 1e-5
 
             results.append({

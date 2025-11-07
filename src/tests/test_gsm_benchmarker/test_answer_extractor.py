@@ -1,7 +1,7 @@
 import logging
 import pytest
 
-from gsm_benchmarker.model_evaluator import ModelEvaluator
+from gsm_benchmarker.answer_extractor import AnswerExtractor
 
 
 @pytest.mark.parametrize(("resp", "value", "pattern"), (
@@ -18,7 +18,7 @@ from gsm_benchmarker.model_evaluator import ModelEvaluator
 def test_extract_answer_from_pattern(resp, value, pattern, caplog):
 
     with caplog.at_level(logging.DEBUG):
-        extracted_value = ModelEvaluator.extract_answer(resp)
+        extracted_value = AnswerExtractor.extract_answer(resp)
 
     assert extracted_value == pytest.approx(value, abs=1e-5)
     assert "No predefined answer pattern" not in caplog.text
@@ -32,7 +32,7 @@ def test_extract_answer_from_pattern(resp, value, pattern, caplog):
 def test_extract_answer_no_pattern(resp, value, caplog):
 
     with caplog.at_level(logging.DEBUG):
-        extracted_value = ModelEvaluator.extract_answer(resp)
+        extracted_value = AnswerExtractor.extract_answer(resp)
 
     assert extracted_value == pytest.approx(value, abs=1e-5)
     assert "No predefined answer pattern" in caplog.text
@@ -49,7 +49,7 @@ def test_extract_answer_no_pattern(resp, value, caplog):
     ("The final answer is 42.[/INST]", "The final answer is 42."),
 ))
 def test_trim_response(resp, trimmed):
-    assert ModelEvaluator.trim_response(resp) == trimmed
+    assert AnswerExtractor.trim_response(resp) == trimmed
 
 
 @pytest.mark.parametrize("resp", (
@@ -58,4 +58,4 @@ def test_trim_response(resp, trimmed):
     "Or is it?**"
 ))
 def test_trim_response_no_trim(resp):
-    assert ModelEvaluator.trim_response(resp) == resp
+    assert AnswerExtractor.trim_response(resp) == resp
