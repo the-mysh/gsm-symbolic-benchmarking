@@ -61,21 +61,24 @@ class ModelEvaluator:
 
         return prompt
 
-    def evaluate_dataset(self, dataset: Dataset) -> pd.DataFrame:
+    def evaluate_dataset(self, dataset: Dataset, leave_progressbar: bool = True) -> pd.DataFrame:
         """
         Evaluate model on a dataset
 
         Args:
-            dataset: list of examples with 'question' and 'answer' fields
+            dataset             :   A Dataset of examples to evaluate.
+                                    Required fields: 'question', 'answer', 'numerical_result'.
+            leave_progressbar   :   If True, let the shown progress bar remain on the screen after completion.
+                                    Otherwise, remove it when done.
 
         Returns:
-            Dictionary with accuracy and detailed results
+            Pandas DataFrame with detailed results, including all columns from the dataset.
         """
 
         results = []
         prompt_template = self.create_prompt(question="{}")
 
-        for example in tqdm(dataset, desc="Example"):
+        for example in tqdm(dataset, desc="Example", leave=leave_progressbar):
             # Extract ground truth answer
             true_result = example['numerical_result']
 
@@ -92,8 +95,8 @@ class ModelEvaluator:
             results.append({
                 **example,
                 'predicted_numerical_result': predicted_result,
-                'detected_result_pattern': result_pattern.name,
                 'correct': correct,
+                'detected_result_pattern': result_pattern.name,
                 'full_response': response
             })
 
@@ -119,7 +122,7 @@ class ModelEvaluator:
 
         for i, dataset in tqdm(enumerate(datasets), desc="Dataset", total=n):
             try:
-                result = self.evaluate_dataset(dataset)
+                result = self.evaluate_dataset(dataset, leave_progressbar=False)
                 self._store_intermediate_result(result, intermediate_storage_path, i)
                 all_results.append(result)
             except Exception as exc:

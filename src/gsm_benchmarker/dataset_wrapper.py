@@ -119,7 +119,8 @@ class GSMSymbolicDataset:
         if n_sets is None:
             n_sets = self.MAX_SETS
             
-        logger.info(f"Creating {n_sets} set(s) with {n_per_set or 'maximum available number of'} example(s) each")
+        logger.info(f"Dataset variant {self._variant.name}: creating {n_sets} set(s) "
+                    f"with {n_per_set or 'maximum available number of'} example(s) each")
 
         eval_sets = []
         all_instances = list(set(self.dataset['instance']))
