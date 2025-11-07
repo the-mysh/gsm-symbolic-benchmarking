@@ -15,7 +15,7 @@ dependencies = [
   "bitsandbytes",
   "coloredlogs",
   "datasets",
-  "einops>=0.8.1",
+  "einops",
   "ipywidgets",
   "notebook",
   "numpy",
@@ -28,7 +28,7 @@ dependencies = [
   "tiktoken",
   "torch>=2.7.0", # using 2.9.0+cu126
   "tqdm",
-  "transformers>=4.38.0", # using 4.45.0
+  "transformers>=4.51",  # using 4.57.1
 ]
 
 [project.optional-dependencies]
