@@ -73,6 +73,8 @@ class GSMSymbolicDataset:
         logger.debug(f"Loaded {len(ds)} examples")
 
         if self._variant is self.Variant.GSM8K:
+            ds = self.get_subdataset_for_instance(min(ds['instance']), dset=ds)  # limit to 100 from 5000 examples
+
             def set_instance(d):
                 d['instance'] = -1  # mark original questions as instance -1
                 return d
@@ -94,13 +96,15 @@ class GSMSymbolicDataset:
         logger.debug(f"After transformations: {len(ds)} examples")
         return ds
 
-    def get_subdataset_for_instance(self, original_id: int) -> Dataset:
-        """Get all instances of a specific question template"""
+    def get_subdataset_for_instance(self, inst: int, dset: Dataset | None = None) -> Dataset:
+        """Get all questions for a specific template instance"""
 
-        return self.dataset.filter(
-            lambda x: x == original_id,
-            input_columns=["instance"]
-        )
+        if dset is None:
+            dset = self.dataset
+
+        dset_filtered = dset.filter(lambda x: x == inst, input_columns=["instance"])
+        assert isinstance(dset_filtered, Dataset)  # type hinting
+        return dset_filtered
 
     def create_evaluation_sets(self, n_sets: int | None = None, n_per_set: int = None) -> list[Dataset]:
         """
