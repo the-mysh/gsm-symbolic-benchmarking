@@ -131,6 +131,8 @@ class MultiVariantMultiModelResultsAnalyser:
         logger.debug("Loading per-model results")
         for item_name in tqdm(os.listdir(dir_path), desc="Model"):
             item_path = dir_path / item_name
+            if not item_path.is_dir():
+                continue
             multi_model_results = MultiModelResultsAnalyser(item_path)
             data_dict[cls.match_variant_name(item_name)] = multi_model_results.summary_data
 
