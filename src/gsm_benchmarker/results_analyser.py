@@ -15,9 +15,8 @@ class ModelResultsAnalyser:
         self._file_path = Path(file_path)
 
         data = self._load_data(self._file_path)
-        self._check_data(data)
+        data = self._check_data(data)
         self._data = data
-        self._data.index.names = ['set_number', 'question_number']  # TODO: move to where it's saved
 
     @staticmethod
     def _load_data(file_path: str | Path) -> pd.DataFrame:
@@ -28,11 +27,17 @@ class ModelResultsAnalyser:
         if not isinstance(data, pd.DataFrame):
             raise TypeError(f"Expected a pandas.DataFrame, got {type(data)}: {data}")
 
-        if 'correct' not in data.columns:
-            raise ValueError("The results dataframe is missing a 'correct' column")
+        if isinstance(data.index, pd.MultiIndex):
+            # old version of results  # TODO: remove
+            if data.index.nlevels != 2:
+                raise ValueError("If multi-indexed, the results dataframe must have a 2 levels")
+            data = data.reset_index().drop('set_number', axis=1).drop('question_number', axis=1)  # repeated
 
-        if not isinstance(data.index, pd.MultiIndex) or data.index.nlevels != 2:
-            raise ValueError("The results dataframe must have a 2-level multiindex")
+        for c in ('id', 'original_id', 'instance', 'correct'):
+            if c not in data.columns:
+                raise ValueError(f"The results dataframe is missing a '{c}' column")
+
+        return data
 
     @property
     def data(self) -> pd.DataFrame:
