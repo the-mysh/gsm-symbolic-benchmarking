@@ -14,7 +14,7 @@ class AnswerPattern(Enum):
 
 
 class AnswerExtractor:
-    _number_pattern = r'\s*(?P<number>(-?\s?\d+(?:\.\d+)?))'
+    _number_pattern = r'\s*(?P<number>(-?\d+(?:\.\d+)?))'
 
     ANSWER_PATTERNS = {
         AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern),
