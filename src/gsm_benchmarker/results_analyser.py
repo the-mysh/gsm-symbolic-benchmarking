@@ -47,16 +47,16 @@ class ModelResultsAnalyser:
     def correctness(self) -> pd.Series:
         return self._data['correct']
 
-    def get_accuracy_per_set(self) -> pd.Series:
-        return self.correctness.groupby(level=0).mean()
+    def get_accuracy_per_instance(self) -> pd.Series:
+        return self._data.groupby('instance').correct.mean()
 
-    def get_accuracy_per_question(self) -> pd.Series:
-        return self.correctness.groupby(level=1).mean()
+    def get_accuracy_per_template_id(self) -> pd.Series:
+        return self._data.groupby('id').correct.mean()
 
     def get_total_accuracy_and_std(self) -> tuple[float, float | None]:
         """Compute mean of accuracies per set and the corresponding standard deviation (if more than 1 set)."""
 
-        accuracies = self.get_accuracy_per_set()
+        accuracies = self.get_accuracy_per_instance()
         mean_acc = float(accuracies.mean())
         std_acc = float(accuracies.std()) if len(accuracies) > 1 else None
         return mean_acc, std_acc
