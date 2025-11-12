@@ -1,0 +1,108 @@
+import os
+import logging
+from functools import cached_property
+import pandas as pd
+from pathlib import Path
+from tqdm import tqdm
+from typing import Any
+
+from gsm_benchmarker.results_analyser.model import ModelResultsAnalyser
+
+
+logger = logging.getLogger(__name__)
+
+
+class MultiModelResultsAnalyser:
+    def __init__(self, dir_path: str | Path, load_full_data: bool = False):
+        self._dir_path = Path(dir_path).resolve()
+
+        summary_data_dict, full_data_dict = self._load_data(self._dir_path, load_full_data=load_full_data)
+        self._summary_data = self._make_summary_df(summary_data_dict)
+        self._full_data = self._make_full_df(full_data_dict) if full_data_dict else None
+
+    @cached_property
+    def full_data(self) -> pd.DataFrame:
+        if self._full_data is None:
+            self._full_data = self._load_full_data()
+        return self._full_data
+
+    @property
+    def summary_data(self) -> pd.DataFrame:
+        return self._summary_data
+
+    @staticmethod
+    def _load_data(dir_path: Path, load_full_data: bool = False):
+        full_data_dict = {}
+        summary_data_dict = {}
+
+        logger.debug("Loading per-model results")
+        for item_name in tqdm(os.listdir(dir_path), desc="Model"):
+            item_path = dir_path / item_name
+            if item_path.is_dir():
+                logger.warning(f"The algorithm is not meant for non-flat directories; found subfolder '{item_name}'")
+                continue
+            model_results = ModelResultsAnalyser(item_path)
+            model_name = ''.join(item_name.split('.')[:-1])
+
+            if load_full_data:
+                full_data_dict[model_name] = model_results.data
+            s = model_results.get_total_accuracy_and_std()
+            summary_data_dict[model_name] = {'accuracy': s[0], 'std': s[1]}
+
+        return summary_data_dict, full_data_dict
+
+    @staticmethod
+    def _make_summary_df(summary_data_dict):
+        data_df = pd.DataFrame(summary_data_dict)
+        return data_df.T
+
+    @staticmethod
+    def _make_full_df(full_data_dict):
+        df = pd.concat(full_data_dict.values(), keys=full_data_dict.keys(), names=['model', 'old_index'])
+        df = df.reset_index().drop('old_index', axis=1)
+        return df
+
+    def _load_full_data(self):
+        _, data_dict = self._load_data(dir_path=self._dir_path, load_full_data=True)
+        return self._make_full_df(data_dict)
+
+    @property
+    def models(self) -> list[str]:
+        return self.full_data.model.unique().tolist()
+
+    @property
+    def instances(self) -> list[int]:
+        return self.full_data.instance.unique().tolist()
+
+    @property
+    def ids(self) -> list[int]:
+        return self.full_data.id.unique().tolist()
+
+    def filter(self, **pairs: Any) -> pd.DataFrame:
+        df = self.full_data
+        for (column, value) in pairs.items():
+            df = df[df[column] == value]
+        return df
+
+    def get_example(self, id: int, instance: int, model: str) -> dict[str, Any] | None:
+        df = self.filter(id=id, instance=instance, model=model)
+
+        if not len(df):
+            if model not in self.models:
+                raise ValueError(f"Model {model} does not exist in data")
+            if id not in self.ids:
+                raise ValueError(f"Id {id} does not exist in data")
+            if instance not in self.instances:
+                raise ValueError(f"Instance {instance} does not exist in data")
+
+            # each exists, just not the combo
+            logger.warning(f"No example with template id {id}, instance number {instance},"
+                           f"and model {model} found")
+            return None
+
+        if len(df) > 1:
+            raise RuntimeError(f"Multiple examples with the same template id {id}, "
+                               f"instance number {instance}, and model {model} found")
+
+        return df.to_dict(orient='index')[df.index[0]]
+
