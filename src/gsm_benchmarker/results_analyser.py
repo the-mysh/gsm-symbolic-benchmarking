@@ -62,21 +62,35 @@ class ModelResultsAnalyser:
         std_acc = float(accuracies.std()) if len(accuracies) > 1 else None
         return mean_acc, std_acc
 
+    @property
+    def instances(self) -> list[int]:
+        return self.data.instance.unique().tolist()
+
+    @property
+    def ids(self) -> list[int]:
+        return self.data.id.unique().tolist()
+
     def filter(self, **pairs: Any) -> pd.DataFrame:
         df = self._data
         for (column, value) in pairs.items():
             df = df[df[column] == value]
         return df
 
-    def get_example(self, template_id: int, instance: int) -> dict[str, Any] | None:
-        df = self.filter(id=template_id, instance=instance)
+    def get_example(self, id: int, instance: int) -> dict[str, Any] | None:
+        df = self.filter(id=id, instance=instance)
 
         if not len(df):
-            logger.warning(f"No example with template id {template_id} and instance number {instance} found")
+            if id not in self.ids:
+                raise ValueError(f"Id {id} does not exist in data")
+            if instance not in self.instances:
+                raise ValueError(f"Instance {instance} does not exist in data")
+
+            # both id and instance exist in data, but no example for this combination
+            logger.warning(f"No example with template id {id} and instance number {instance} found")
             return None
 
         if len(df) > 1:
-            raise RuntimeError(f"Multiple examples with the same template id {template_id} "
+            raise RuntimeError(f"Multiple examples with the same template id {id} "
                                f"and instance number {instance} found")
 
         return df.to_dict(orient='index')[df.index[0]]
@@ -135,6 +149,46 @@ class MultiModelResultsAnalyser:
     def _load_full_data(self):
         _, data_dict = self._load_data(dir_path=self._dir_path, load_full_data=True)
         return self._make_full_df(data_dict)
+
+    @property
+    def models(self) -> list[str]:
+        return self.full_data.model.unique().tolist()
+
+    @property
+    def instances(self) -> list[int]:
+        return self.full_data.instance.unique().tolist()
+
+    @property
+    def ids(self) -> list[int]:
+        return self.full_data.id.unique().tolist()
+
+    def filter(self, **pairs: Any) -> pd.DataFrame:
+        df = self.full_data
+        for (column, value) in pairs.items():
+            df = df[df[column] == value]
+        return df
+
+    def get_example(self, id: int, instance: int, model: str) -> dict[str, Any] | None:
+        df = self.filter(id=id, instance=instance, model=model)
+
+        if not len(df):
+            if model not in self.models:
+                raise ValueError(f"Model {model} does not exist in data")
+            if id not in self.ids:
+                raise ValueError(f"Id {id} does not exist in data")
+            if instance not in self.instances:
+                raise ValueError(f"Instance {instance} does not exist in data")
+
+            # each exists, just not the combo
+            logger.warning(f"No example with template id {id}, instance number {instance},"
+                           f"and model {model} found")
+            return None
+
+        if len(df) > 1:
+            raise RuntimeError(f"Multiple examples with the same template id {id}, "
+                               f"instance number {instance}, and model {model} found")
+
+        return df.to_dict(orient='index')[df.index[0]]
 
 
 class MultiVariantMultiModelResultsAnalyser:
