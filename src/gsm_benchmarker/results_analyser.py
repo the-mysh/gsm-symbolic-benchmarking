@@ -5,6 +5,7 @@ from functools import cached_property
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
+from typing import Any
 
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,25 @@ class ModelResultsAnalyser:
         mean_acc = float(accuracies.mean())
         std_acc = float(accuracies.std()) if len(accuracies) > 1 else None
         return mean_acc, std_acc
+
+    def filter(self, **pairs: Any) -> pd.DataFrame:
+        df = self._data
+        for (column, value) in pairs.items():
+            df = df[df[column] == value]
+        return df
+
+    def get_example(self, template_id: int, instance: int) -> dict[str, Any] | None:
+        df = self.filter(id=template_id, instance=instance)
+
+        if not len(df):
+            logger.warning(f"No example with template id {template_id} and instance number {instance} found")
+            return None
+
+        if len(df) > 1:
+            raise RuntimeError(f"Multiple examples with the same template id {template_id} "
+                               f"and instance number {instance} found")
+
+        return df.to_dict(orient='index')[df.index[0]]
 
 
 class MultiModelResultsAnalyser:
