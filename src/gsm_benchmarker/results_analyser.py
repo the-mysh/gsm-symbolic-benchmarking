@@ -83,10 +83,12 @@ class ModelResultsAnalyser:
 
 
 class MultiModelResultsAnalyser:
-    def __init__(self, dir_path: str | Path):
+    def __init__(self, dir_path: str | Path, load_full_data: bool = False):
         self._dir_path = Path(dir_path).resolve()
-        self._summary_data = self._load_summary_data(self._dir_path)
-        self._full_data = None
+
+        summary_data_dict, full_data_dict = self._load_data(self._dir_path, load_full_data=load_full_data)
+        self._summary_data = self._make_summary_df(summary_data_dict)
+        self._full_data = self._make_full_df(full_data_dict) if full_data_dict else None
 
     @cached_property
     def full_data(self) -> pd.DataFrame:
@@ -99,8 +101,9 @@ class MultiModelResultsAnalyser:
         return self._summary_data
 
     @staticmethod
-    def _load_data(dir_path: Path, full: bool = False):
-        data_dict = {}
+    def _load_data(dir_path: Path, load_full_data: bool = False):
+        full_data_dict = {}
+        summary_data_dict = {}
 
         logger.debug("Loading per-model results")
         for item_name in tqdm(os.listdir(dir_path), desc="Model"):
@@ -110,25 +113,28 @@ class MultiModelResultsAnalyser:
                 continue
             model_results = ModelResultsAnalyser(item_path)
             model_name = ''.join(item_name.split('.')[:-1])
-            if full:
-                data_dict[model_name] = model_results.data
-            else:
-                s = model_results.get_total_accuracy_and_std()
-                data_dict[model_name] = {'accuracy': s[0], 'std': s[1]}
 
-        return data_dict
+            if load_full_data:
+                full_data_dict[model_name] = model_results.data
+            s = model_results.get_total_accuracy_and_std()
+            summary_data_dict[model_name] = {'accuracy': s[0], 'std': s[1]}
+
+        return summary_data_dict, full_data_dict
 
     @staticmethod
-    def _load_summary_data(dir_path):
-        data_dict = MultiModelResultsAnalyser._load_data(dir_path)
-        data_df = pd.DataFrame(data_dict)
+    def _make_summary_df(summary_data_dict):
+        data_df = pd.DataFrame(summary_data_dict)
         return data_df.T
 
-    def _load_full_data(self):
-        data_dict = self._load_data(dir_path=self._dir_path, full=True)
-        df = pd.concat((v.reset_index() for v in data_dict.values()), keys=data_dict.keys())
-
+    @staticmethod
+    def _make_full_df(full_data_dict):
+        df = pd.concat(full_data_dict.values(), keys=full_data_dict.keys(), names=['model', 'old_index'])
+        df = df.reset_index().drop('old_index', axis=1)
         return df
+
+    def _load_full_data(self):
+        _, data_dict = self._load_data(dir_path=self._dir_path, load_full_data=True)
+        return self._make_full_df(data_dict)
 
 
 class MultiVariantMultiModelResultsAnalyser:
