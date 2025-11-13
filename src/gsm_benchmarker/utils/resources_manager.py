@@ -15,3 +15,9 @@ def load_resource_json(file_name: str) -> dict[str, Any]:
     data_bytes = full_path.read_bytes()
     data_dict = json.loads(data_bytes)
     return data_dict
+
+
+def load_json_file(file_name: str | Path) -> dict[str, Any]:
+    with open(file_name, "r") as f:
+        data_dict = json.load(f)
+    return data_dict

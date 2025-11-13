@@ -1,15 +1,17 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 from gsm_benchmarker.shot_manager import GSMShotManager
+from gsm_benchmarker.utils.resources_manager import load_resource_json, load_json_file
 
 
 @dataclass
 class PromptConfig:
-    n_shots: int = 8
-    question_format: str = "Q: {question}\nA: Let's think step by step."
-    answer_format: str = " {solution} The final answer is {result}."
-    intro: str = "As an expert problem solver, solve step by step the following mathematical questions."
-    target_intro: str = ""
+    n_shots: int
+    question_format: str
+    answer_format: str
+    intro: str
+    target_intro: str
     separator: str = "\n\n"
 
     def __post_init__(self):
@@ -37,3 +39,19 @@ class PromptConfig:
         prompt += self.question_format.format(question=question)
 
         return prompt
+
+    @classmethod
+    def from_file(cls, file_name: str | Path, **kwargs) -> "PromptConfig":
+        data_dict = load_json_file(file_name)
+        data_dict = data_dict | kwargs  # values from kwargs take precedence
+        return cls(**data_dict)
+
+    @classmethod
+    def from_preset(cls, preset_name: str, **kwargs) -> "PromptConfig":
+        data_dict = load_resource_json(f"prompt-formats/{preset_name}.json")
+        data_dict = data_dict | kwargs
+        return cls(**data_dict)
+
+    @classmethod
+    def default(cls, **kwargs) -> "PromptConfig":
+        return cls.from_preset("default", **kwargs)
