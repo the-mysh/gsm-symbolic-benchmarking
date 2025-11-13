@@ -16,6 +16,7 @@ from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.models_config_parser import SingleModelConfig
 from gsm_benchmarker.model_evaluator import ModelEvaluator
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, remove_intermediate_results_folder
+from gsm_benchmarker.prompt_config import PromptConfig
 
 
 logger = logging.getLogger(__name__)
@@ -42,12 +43,14 @@ class BenchmarkRunner:
             models: list[str | SingleModelConfig],
             dset_variants: list[GSMSymbolicDataset.Variant],
             storage_path: Path | str,
-            config: BenchmarkConfig | None = None
+            config: BenchmarkConfig | None = None,
+            prompt_config: PromptConfig | None = None
     ):
 
         self._models = models
         self._dset_variants = dset_variants
         self._config = config if config is not None else BenchmarkConfig()
+        self._prompt_config = prompt_config
         self._storage_path = confirm_or_create_folder(storage_path)
 
         self._results: dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]] = {}
@@ -82,7 +85,7 @@ class BenchmarkRunner:
 
     def _load_model(self, model_spec: str | SingleModelConfig) -> ModelEvaluator | None:
         try:
-            model_evaluator = ModelEvaluator(model_spec, self._config)
+            model_evaluator = ModelEvaluator(model_spec, self._config, prompt_config=self._prompt_config)
         except Exception as exc:
             self._handle_model_loading_exception(self._model_name_from_spec(model_spec), exc)
             return None

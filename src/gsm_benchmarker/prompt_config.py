@@ -48,7 +48,10 @@ class PromptConfig:
 
     @classmethod
     def from_preset(cls, preset_name: str, **kwargs) -> "PromptConfig":
-        data_dict = load_resource_json(f"prompt-formats/{preset_name}.json")
+        try:
+            data_dict = load_resource_json(f"prompt-formats/{preset_name}.json")
+        except FileNotFoundError:
+            raise ValueError(f"Preset '{preset_name}' is not known")
         data_dict = data_dict | kwargs
         return cls(**data_dict)
 

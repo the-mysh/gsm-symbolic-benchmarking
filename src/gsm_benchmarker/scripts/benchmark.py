@@ -13,8 +13,10 @@ from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.benchmark import BenchmarkRunner
 from gsm_benchmarker.models_config_parser import ModelsConfig
+from gsm_benchmarker.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.logging_setup import install_colored_logger, setup_log_file_handler
 from gsm_benchmarker.utils.seeds import set_seed
+from gsm_benchmarker.prompt_config import PromptConfig
 
 
 logger = logging.getLogger(__name__)
@@ -129,7 +131,24 @@ def make_config(pargs: Namespace):
         add_to_kwargs('vram_margin')
         bc = BenchmarkConfig.for_machine(machine, **kwargs)
 
+    logger.info(f"Benchmark configuration: {bc}")
+
     return bc
+
+
+def make_prompt_config(preset_name: str | None = None, file_path: str | None = None) -> PromptConfig:
+    if file_path is not None:
+        pc = PromptConfig.from_file(file_path)
+
+    elif preset_name is not None:
+        pc = PromptConfig.from_preset(preset_name)
+
+    else:
+        pc = PromptConfig.default()
+
+    logger.info(f"Example prompt according to loaded format:\n{pc("<Question here>", GSMShotManager())}")
+
+    return pc
 
 
 def make_parser() -> ArgumentParser:
@@ -158,6 +177,10 @@ def make_parser() -> ArgumentParser:
     parser.add_argument('--n-sets', type=int, default=None)
     parser.add_argument('--n-per-set', type=int, default=None)
 
+    gp = parser.add_mutually_exclusive_group()
+    gp.add_argument('--prompt-preset', default=None)
+    gp.add_argument('--prompt-format-file')
+
     return parser
 
 
@@ -170,14 +193,21 @@ def main():
     set_seed(42)
     hf_login()
 
-    bc = make_config(pargs)
-    logger.info(f"Configuration: {bc}")
     logger.info(f"Run results will be stored to: {results_path}")
+
+    bc = make_config(pargs)
+
+    pc = make_prompt_config(
+        preset_name=getattr(pargs, 'prompt_preset', None),
+        file_path=getattr(pargs, 'prompt_format_file', None)
+    )
+
     br = BenchmarkRunner(
         models=choose_models(pargs.models),
         dset_variants=choose_dataset_variants(pargs.variants),
         storage_path=results_path,
-        config=make_config(pargs)
+        config=bc,
+        prompt_config=pc
     )
 
     br.run(n_sets=pargs.n_sets, n_per_set=pargs.n_per_set)
