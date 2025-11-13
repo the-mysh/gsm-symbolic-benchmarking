@@ -28,12 +28,13 @@ dependencies = [
   "tiktoken",
   "torch>=2.7.0", # using 2.9.0+cu126
   "tqdm",
-  "transformers>=4.51",  # using 4.57.1
+  "transformers>=4.51", # using 4.57.1
 ]
 
 [project.optional-dependencies]
 testing = [
-  "pytest"
+  "pytest",
+  "pytest-mock"
 ]
 api_models = [
   "openai",

@@ -20,7 +20,7 @@ class SingleShot:
         return s
 
 
-class GSM8hotManager:
+class GSMShotManager:
     def __init__(self):
         self._shots = self._load_data()
 
@@ -42,13 +42,13 @@ class GSM8hotManager:
         data_dict = load_resource_json("standard-8-shots.json")
         return tuple(SingleShot(**s) for s in data_dict["samples"])
 
-    def format(self, fmt_string: str, n_shots: int | None = None, separator: str = "\n\n"):
+    def compile(self, fmt_string: str, n_shots: int | None = None, separator: str = "\n\n"):
         return separator.join(s.format(fmt_string) for s in self._shots[:n_shots])
 
 
 if __name__ == '__main__':
-    m = GSM8hotManager()
+    m = GSMShotManager()
 
     f = "Question:\n{question}\n\nAnswer:\n{solution}\nThe final result is: {result}"
     print()
-    print(m.format(f, n_shots=3, separator="\n\n\n"))
+    print(m.compile(f, n_shots=3, separator="\n\n\n"))

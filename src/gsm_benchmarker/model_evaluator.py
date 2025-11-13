@@ -7,11 +7,12 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from datasets import Dataset
+from dataclasses import dataclass
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.answer_extractor import AnswerExtractor
 from gsm_benchmarker.models_config_parser import SingleModelConfig
-from gsm_benchmarker.shot_manager import GSM8hotManager
+from gsm_benchmarker.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly, remove_intermediate_results_folder
 from gsm_benchmarker.api_model_wrapper import APIModelWrapper
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
@@ -21,15 +22,35 @@ from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class PromptConfig:
+    n_shots: int = 8
+    question_format: str = "Q: {question}\nA: Let's think step by step."
+    answer_format: str = " {solution} The final answer is {result}."
+    intro: str = "As an expert problem solver, solve step by step the following mathematical questions."
+    target_intro: str = ""
+    separator = "\n\n"
+
+    def __post_init__(self):
+        if '{question}' not in self.question_format:
+            raise ValueError("question_format must contain '{question}' placeholder")
+
+        if '{solution}' not in self.answer_format:
+            raise ValueError("answer_format must contain '{solution}' placeholder")
+
+    @property
+    def shot_format(self) -> str:
+        return self.question_format + self.answer_format
+
+
 class ModelEvaluator:
     """Evaluate models using HuggingFace transformers"""
 
-    QUESTION_FORMAT = "Q: {question}\nA: Let's think step by step."
-    SHOT_FORMAT = QUESTION_FORMAT + " {solution} The final answer is {result}."
-
-    def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig):
-        self.original_shots = GSM8hotManager()
+    def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig,
+                 prompt_config: PromptConfig | None = None):
+        self.original_shots = GSMShotManager()
         self.model_wrapper = self._make_model_wrapper(model_spec, config)
+        self.prompt_config = prompt_config or PromptConfig()
 
     @staticmethod
     def _make_model_wrapper(model_spec: SingleModelConfig, config: BenchmarkConfig) -> BaseModelWrapper:
@@ -51,13 +72,13 @@ class ModelEvaluator:
     def create_prompt(self, question: str) -> str:
         """Create 8-shot CoT prompt following paper's format"""
 
-        sep = "\n\n"
+        pc = self.prompt_config
 
-        prompt = "As an expert problem solver, solve step by step the following mathematical questions."
-        prompt += sep
-        prompt += self.original_shots.format(self.SHOT_FORMAT, separator=sep)
-        prompt += sep
-        prompt += self.QUESTION_FORMAT.format(question=question)
+        prompt = pc.intro
+        prompt += pc.separator
+        prompt += self.original_shots.compile(pc.shot_format, n_shots=pc.n_shots, separator=pc.separator)
+        prompt += pc.separator
+        prompt += pc.question_format.format(question=question)
 
         return prompt
 
