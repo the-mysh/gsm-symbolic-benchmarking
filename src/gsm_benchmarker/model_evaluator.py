@@ -7,7 +7,6 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from datasets import Dataset
-from dataclasses import dataclass
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.answer_extractor import AnswerExtractor
@@ -17,30 +16,12 @@ from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_p
 from gsm_benchmarker.api_model_wrapper import APIModelWrapper
 from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
 from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
+from gsm_benchmarker.prompt_config import PromptConfig
 
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class PromptConfig:
-    n_shots: int = 8
-    question_format: str = "Q: {question}\nA: Let's think step by step."
-    answer_format: str = " {solution} The final answer is {result}."
-    intro: str = "As an expert problem solver, solve step by step the following mathematical questions."
-    target_intro: str = ""
-    separator = "\n\n"
-
-    def __post_init__(self):
-        if '{question}' not in self.question_format:
-            raise ValueError("question_format must contain '{question}' placeholder")
-
-        if '{solution}' not in self.answer_format:
-            raise ValueError("answer_format must contain '{solution}' placeholder")
-
-    @property
-    def shot_format(self) -> str:
-        return self.question_format + self.answer_format
 
 
 class ModelEvaluator:
@@ -72,15 +53,7 @@ class ModelEvaluator:
     def create_prompt(self, question: str) -> str:
         """Create 8-shot CoT prompt following paper's format"""
 
-        pc = self.prompt_config
-
-        prompt = pc.intro
-        prompt += pc.separator
-        prompt += self.original_shots.compile(pc.shot_format, n_shots=pc.n_shots, separator=pc.separator)
-        prompt += pc.separator
-        prompt += pc.question_format.format(question=question)
-
-        return prompt
+        return self.prompt_config(question, self.original_shots)
 
     def evaluate_dataset(self, dataset: Dataset, leave_progressbar: bool = True) -> pd.DataFrame:
         """
