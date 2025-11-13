@@ -10,7 +10,7 @@ class PromptConfig:
     answer_format: str = " {solution} The final answer is {result}."
     intro: str = "As an expert problem solver, solve step by step the following mathematical questions."
     target_intro: str = ""
-    separator = "\n\n"
+    separator: str = "\n\n"
 
     def __post_init__(self):
         if '{question}' not in self.question_format:
@@ -29,6 +29,11 @@ class PromptConfig:
         prompt += self.separator
         prompt += shots.compile(self.shot_format, n_shots=self.n_shots, separator=self.separator)
         prompt += self.separator
+
+        if self.target_intro:
+            prompt += self.target_intro
+            prompt += self.separator
+
         prompt += self.question_format.format(question=question)
 
         return prompt
