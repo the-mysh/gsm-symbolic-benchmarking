@@ -56,5 +56,32 @@ class MultiVariantMultiModelResultsAnalyser:
             return pd.concat(d.values(), keys=d.keys(), axis=1)
 
         df_summary = concat(summary_data_dict)
+
+        comparative_data_dict = cls._fix_comparison_data(comparative_data_dict)
         df_comparison = concat(comparative_data_dict).reset_index()
         return df_summary, df_comparison
+
+    @staticmethod
+    def _fix_comparison_data(data: dict) -> dict:
+        gsm8k_keys = [k for k in data.keys() if 'gsm8k' in k.lower()]
+        if not gsm8k_keys:
+            return data
+        if len(gsm8k_keys) > 1:
+            logger.warning("Multiple GSM8K columns detected")
+            return data
+
+        k = gsm8k_keys[0]
+        gsm = data.pop(k)
+        gsm = gsm.reset_index().drop('instance', axis=1)
+
+        all_instances = []
+        for dset in data.values():
+            all_instances.extend(dset.reset_index().instance.unique())
+        df_instances = pd.DataFrame({'instance': list(set(all_instances))})
+
+        gsm_new = gsm.merge(df_instances, how='cross')
+        gsm_new = gsm_new.set_index(['model', 'id', 'instance'])[['correct']]
+
+        data[k] = gsm_new
+
+        return data
