@@ -115,9 +115,8 @@ class BenchmarkRunner:
     def format_time_diff(td: float):
         minutes, seconds = divmod(td, 60)
         hours, minutes = divmod(minutes, 60)
-        seconds, ms = divmod(seconds, 1)
 
-        return f"{(f"{int(hours)}:" if hours else "")}{int(minutes):02d}:{int(seconds):02d}.{ms:.3f}"
+        return f"{(f"{int(hours)}:" if hours else "")}{int(minutes):02d}:{round(seconds):02d}"
 
     def run(self, n_sets: int | None = None, n_per_set: int | None = None,
             remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
