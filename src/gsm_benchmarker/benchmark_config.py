@@ -43,7 +43,7 @@ class BenchmarkConfig:
         if self.gpu_index is not None:
             if not self.gpu_max_memory:
                 raise RuntimeError("gpu_max_memory is not defined")
-            mem[self.gpu_index] = f"{self.gpu_max_memory}GiB"
+            mem[0] = f"{self.gpu_max_memory}GiB"
         
         return mem
 

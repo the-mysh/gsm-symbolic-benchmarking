@@ -1,4 +1,5 @@
 import logging
+import os
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from huggingface_hub import scan_cache_dir
 import torch
@@ -68,13 +69,19 @@ class HFModelWrapper(BaseModelWrapper):
         if extras:
             logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
 
+        gpu_index = self.config.gpu_index
+        if gpu_index is None:
+            raise RuntimeError("GPU index is None - cannot use CUDA")
+        logger.info(f"Setting GPU index to {gpu_index}")
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(gpu_index)  # makes physical gpu of this index be seen as cuda:0
+
         model = AutoModelForCausalLM.from_pretrained(
             self._model_spec.name,
             quantization_config=bnb_config,
             device_map="cuda",
             dtype=torch.bfloat16,
             low_cpu_mem_usage=True,
-            max_memory=config.memory_settings,
+            max_memory=config.memory_settings,  # GPU memory at entry 0
             trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
             **extras
         )
