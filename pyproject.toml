@@ -17,6 +17,7 @@ dependencies = [
   "datasets",
   "einops",
   "ipywidgets",
+  "matplotlib>=3.10.7",
   "notebook",
   "numpy",
   "packaging",
