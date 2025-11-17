@@ -1,8 +1,8 @@
 {
   "n_shots": 8,
   "shot_intro": "Example {sid}:\n",
-  "question_format": "Q: {question}",
-  "answer_format": "\nA: {solution} The final answer is: {result}.",
+  "question_format": "Q: {question}\n",
+  "answer_format": "A: {solution} The final answer is: {result}.",
   "intro": "Here are some example problems with answers:",
   "target_intro": "Based on the examples above, please solve the following problem:"
 }
