@@ -69,9 +69,10 @@ def test_pc_from_preset(mock_shot_manager):
 
     assert prompt == """Here are some example problems with answers:
 
+Example 1:
 Q: Q1?
 A: A1. The final answer is: 11.
 
-Following the examples above, please solve the following problem:
+Based on the examples above, please solve the following problem:
 
 Q: QQ?"""

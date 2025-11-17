@@ -13,6 +13,7 @@ class PromptConfig:
     intro: str
     target_intro: str
     separator: str = "\n\n"
+    shot_intro: str = ""
 
     def __post_init__(self):
         if '{question}' not in self.question_format:
@@ -23,7 +24,7 @@ class PromptConfig:
 
     @property
     def shot_format(self) -> str:
-        return self.question_format + self.answer_format
+        return self.shot_intro + self.question_format + self.answer_format
 
     def __call__(self, question: str, shots: GSMShotManager) -> str:
 

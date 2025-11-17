@@ -4,18 +4,20 @@ from typing import Iterator
 from gsm_benchmarker.utils.resources_manager import load_resource_json
 
 
-@dataclass()
+@dataclass
 class SingleShot:
     question: str
     solution: str
     result: str
+    sid: int  # shot id
 
-    def format(self, fmt_string: str) -> str:
+    def compile(self, fmt_string: str) -> str:
         try:
-            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result)
+            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result, sid=self.sid)
         except KeyError:
             raise ValueError(
-                f"The SingleShot format string should have fields: 'question', 'solution', and 'result'. "
+                f"The SingleShot format string should have fields: 'question', 'solution', and 'result', "
+                f"and optionally 'sid' (shot id). "
                 f"Got:\n{fmt_string}")
         return s
 
@@ -40,10 +42,10 @@ class GSMShotManager:
     @staticmethod
     def _load_data() -> tuple[SingleShot, ...]:
         data_dict = load_resource_json("standard-8-shots.json")
-        return tuple(SingleShot(**s) for s in data_dict["samples"])
+        return tuple(SingleShot(**s, sid=i+1) for i, s in enumerate(data_dict["samples"]))
 
     def compile(self, fmt_string: str, n_shots: int | None = None, separator: str = "\n\n"):
-        return separator.join(s.format(fmt_string) for s in self._shots[:n_shots])
+        return separator.join(s.compile(fmt_string) for s in self._shots[:n_shots])
 
 
 if __name__ == '__main__':
