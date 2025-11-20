@@ -1,6 +1,6 @@
 {
   "n_shots": 8,
-  "shot_intro": "Example {sid}:\n",
+  "shot_intro": "",
   "question_format": "Q: {question}\n",
   "answer_format": "A: {solution} The final answer is: {result}.",
   "intro": "Here are some example problems with answers:",

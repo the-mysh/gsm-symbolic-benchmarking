@@ -64,7 +64,7 @@ Question: QQ?"""
 
 
 def test_pc_from_preset(mock_shot_manager):
-    pc = PromptConfig.from_preset('separated-target', n_shots=1)
+    pc = PromptConfig.from_preset('separated-target', n_shots=1, shot_intro="Example {sid}:\n")
     prompt = pc(question="QQ?", shots=mock_shot_manager)
 
     assert prompt == """Here are some example problems with answers:
@@ -75,4 +75,5 @@ A: A1. The final answer is: 11.
 
 Based on the examples above, please solve the following problem:
 
-Q: QQ?"""
+Q: QQ?
+"""
