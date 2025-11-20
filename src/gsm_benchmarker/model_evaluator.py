@@ -7,6 +7,7 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from datasets import Dataset
+from time import time
 
 from gsm_benchmarker.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.answer_extractor import AnswerExtractor
@@ -78,11 +79,13 @@ class ModelEvaluator:
 
             if true_result is None:
                 logger.warning(f"Could not extract numerical result from: {example['answer']}")
-                response, predicted_result, result_pattern, correct = None, None, None, None
+                response, predicted_result, result_pattern, correct, t = None, None, None, None, None
             else:
                 # Generate prediction
                 prompt = prompt_template.format(example['question'])
+                t0 = time()
                 response = self.model_wrapper.ask(prompt)
+                t = time() - t0
                 predicted_result, result_pattern = AnswerExtractor.extract_answer(response)
                 correct = predicted_result is not None and abs(predicted_result - true_result) < 1e-5
 
@@ -91,7 +94,8 @@ class ModelEvaluator:
                 'predicted_numerical_result': predicted_result,
                 'correct': correct,
                 'detected_result_pattern': result_pattern.name if result_pattern is not None else None,
-                'full_response': response
+                'full_response': response,
+                'inference_time': t
             })
 
         return pd.DataFrame(results)
