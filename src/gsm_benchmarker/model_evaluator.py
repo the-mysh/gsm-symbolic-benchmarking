@@ -156,10 +156,17 @@ class ModelEvaluator:
         if dir_path is None:
             return
 
+        dir_path = confirm_or_create_folder(dir_path)  # had some issues at this stage
+
         fname = dir_path / f"intermediate_{result_index}.parquet"
         if fname.exists():
             # just in case
             logger.warning(f"Intermediate results file {fname} already exists; it will be overwritten")
-        result.to_parquet(fname, index=False)
-        logger.debug(f"Stored intermediate results at: {fname}")
 
+        try:
+            result.to_parquet(fname, index=False)
+        except OSError as exc:
+            logger.warning(f"Could not store intermediate results: {exc}")
+            logger.warning(f"Full stack:\n{traceback.format_exc()}")
+        else:
+            logger.debug(f"Stored intermediate results at: {fname}")
