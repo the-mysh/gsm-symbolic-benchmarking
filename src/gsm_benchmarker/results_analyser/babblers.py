@@ -31,4 +31,11 @@ def plot_babblers_by_family(b):
         bb =  b[b['family'] == family]
         ax.scatter(100*bb['babbler percentage'], 100*bb['accuracy'], marker='d', label=family)
     ax.legend(fancybox=True, framealpha=0.5, frameon=True, title='Family')
+    ax.set_aspect('equal')
+
+    m = 1
+    lims = (-m, 100+m)
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+
     return fig
