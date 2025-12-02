@@ -14,6 +14,7 @@ class PromptConfig:
     target_intro: str
     separator: str = "\n\n"
     shot_intro: str = ""
+    code_type_answer: bool = False
 
     def __post_init__(self):
         if '{question}' not in self.question_format:

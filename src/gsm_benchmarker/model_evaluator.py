@@ -28,12 +28,12 @@ logger = logging.getLogger(__name__)
 class ModelEvaluator:
     """Evaluate models using HuggingFace transformers"""
 
-    def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig,
+    def __init__(self, model_spec: SingleModelConfig, config: BenchmarkConfig,
                  prompt_config: PromptConfig | None = None):
         self.original_shots = GSMShotManager()
         self.model_wrapper = self._make_model_wrapper(model_spec, config)
         self.prompt_config = prompt_config or PromptConfig.default()
-        self.answer_extractor = AnswerExtractor()
+        self.answer_extractor = AnswerExtractor(code=self.prompt_config.code_type_answer)
 
     @staticmethod
     def _make_model_wrapper(model_spec: SingleModelConfig, config: BenchmarkConfig) -> BaseModelWrapper:
