@@ -45,11 +45,11 @@ class GSMShotManager:
         data_dict = load_resource_json("standard-8-shots.json")
 
         funcs = load_8shot_functions("python_8shot_solutions.py")
-        if len(funcs) != len(data_dict["samples"]):
+        if len(funcs) < len(data_dict["samples"]):
             raise RuntimeError(f"The number of functional solutions ({len(funcs)}) "
                                f"does not match the number of shots ({len(data_dict['samples'])})")
-        for i, func in enumerate(funcs):
-            data_dict["samples"][i]["code"] = func
+        for i in range(min(len(funcs), len(data_dict["samples"]))):
+            data_dict["samples"][i]["code"] = funcs[i]
 
         return tuple(SingleShot(**s, sid=i+1) for i, s in enumerate(data_dict["samples"]))
 
