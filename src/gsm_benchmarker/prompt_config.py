@@ -19,9 +19,6 @@ class PromptConfig:
         if '{question}' not in self.question_format:
             raise ValueError("question_format must contain '{question}' placeholder")
 
-        if '{solution}' not in self.answer_format:
-            raise ValueError("answer_format must contain '{solution}' placeholder")
-
     @property
     def shot_format(self) -> str:
         return self.shot_intro + self.question_format + self.answer_format
