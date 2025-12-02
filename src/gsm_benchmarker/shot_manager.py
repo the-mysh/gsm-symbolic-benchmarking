@@ -9,22 +9,23 @@ class SingleShot:
     question: str
     solution: str
     result: str
+    code: str  # solution in the form of code
     sid: int  # shot id
 
     def compile(self, fmt_string: str) -> str:
         try:
-            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result, sid=self.sid)
+            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result, sid=self.sid, code=self.code)
         except KeyError:
             raise ValueError(
-                f"The SingleShot format string should have fields: 'question', 'solution', and 'result', "
-                f"and optionally 'sid' (shot id). "
+                f"The SingleShot format string may have the following fields: 'question', 'solution', 'result', "
+                f"'code', and 'sid' (shot id). "
                 f"Got:\n{fmt_string}")
         return s
 
 
 class GSMShotManager:
-    def __init__(self, use_code: bool = False):
-        self._shots = self._load_data(use_code = use_code)
+    def __init__(self):
+        self._shots = self._load_data()
 
     @property
     def shots(self) -> tuple[SingleShot, ...]:
@@ -40,16 +41,15 @@ class GSMShotManager:
         return self._shots[item]
 
     @staticmethod
-    def _load_data(use_code: bool = False) -> tuple[SingleShot, ...]:
+    def _load_data() -> tuple[SingleShot, ...]:
         data_dict = load_resource_json("standard-8-shots.json")
 
-        if use_code:
-            funcs = load_8shot_functions("python_8shot_solutions.py")
-            if len(funcs) != len(data_dict["samples"]):
-                raise RuntimeError(f"The number of functional solutions ({len(funcs)}) "
-                                   f"does not match the number of shots ({len(data_dict['samples'])})")
-            for i, func in enumerate(funcs):
-                data_dict["samples"][i]["solution"] = func
+        funcs = load_8shot_functions("python_8shot_solutions.py")
+        if len(funcs) != len(data_dict["samples"]):
+            raise RuntimeError(f"The number of functional solutions ({len(funcs)}) "
+                               f"does not match the number of shots ({len(data_dict['samples'])})")
+        for i, func in enumerate(funcs):
+            data_dict["samples"][i]["code"] = func
 
         return tuple(SingleShot(**s, sid=i+1) for i, s in enumerate(data_dict["samples"]))
 
@@ -67,7 +67,7 @@ if __name__ == '__main__':
     print(20*"=")
     print()
 
-    m2 = GSMShotManager(use_code=True)
-    f = "Question:\n{question}\n\nAnswer:\n{solution}"
+    m2 = GSMShotManager()
+    f = "Question:\n{question}\n\nAnswer:\n{code}"
     print(m2.compile(f, n_shots=2, separator="\n\n"))
 
