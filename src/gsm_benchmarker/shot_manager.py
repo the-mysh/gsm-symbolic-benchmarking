@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterator
 
-from gsm_benchmarker.utils.resources_manager import load_resource_json
+from gsm_benchmarker.utils.resources_manager import load_resource_json, load_8shot_functions
 
 
 @dataclass
@@ -23,8 +23,8 @@ class SingleShot:
 
 
 class GSMShotManager:
-    def __init__(self):
-        self._shots = self._load_data()
+    def __init__(self, use_code: bool = False):
+        self._shots = self._load_data(use_code = use_code)
 
     @property
     def shots(self) -> tuple[SingleShot, ...]:
@@ -40,8 +40,17 @@ class GSMShotManager:
         return self._shots[item]
 
     @staticmethod
-    def _load_data() -> tuple[SingleShot, ...]:
+    def _load_data(use_code: bool = False) -> tuple[SingleShot, ...]:
         data_dict = load_resource_json("standard-8-shots.json")
+
+        if use_code:
+            funcs = load_8shot_functions("python_8shot_solutions.py")
+            if len(funcs) != len(data_dict["samples"]):
+                raise RuntimeError(f"The number of functional solutions ({len(funcs)}) "
+                                   f"does not match the number of shots ({len(data_dict['samples'])})")
+            for i, func in enumerate(funcs):
+                data_dict["samples"][i]["solution"] = func
+
         return tuple(SingleShot(**s, sid=i+1) for i, s in enumerate(data_dict["samples"]))
 
     def compile(self, fmt_string: str, n_shots: int | None = None, separator: str = "\n\n"):
@@ -49,8 +58,16 @@ class GSMShotManager:
 
 
 if __name__ == '__main__':
-    m = GSMShotManager()
 
+    m = GSMShotManager()
     f = "Question:\n{question}\n\nAnswer:\n{solution}\nThe final result is: {result}"
-    print()
     print(m.compile(f, n_shots=3, separator="\n\n\n"))
+
+    print()
+    print(20*"=")
+    print()
+
+    m2 = GSMShotManager(use_code=True)
+    f = "Question:\n{question}\n\nAnswer:\n{solution}"
+    print(m2.compile(f, n_shots=2, separator="\n\n"))
+
