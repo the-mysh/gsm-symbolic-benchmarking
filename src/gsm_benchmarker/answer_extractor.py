@@ -7,11 +7,6 @@ import traceback
 logger = logging.getLogger(__name__)
 
 
-class AnswerType(Enum):
-    TEXTUAL = auto()
-    CODE = auto()
-
-
 class AnswerPattern(Enum):
     GMS8K = auto()
     GSM_SYMBOLIC = auto()
@@ -46,26 +41,17 @@ class AnswerExtractor:
         "[/INST]"  # Mistral Dialogic / Tool Use
     )
 
-    @classmethod
-    def extract_answer(cls, text: str, answer_type: AnswerType = AnswerType.TEXTUAL
-                       ) -> tuple[float | None, AnswerPattern | None]:
+    def __init__(self, code: bool = False):
+        self._extraction_method = self.extract_answer_code if code else self.extract_answer_textual
+
+    def extract_answer(self, text: str) -> tuple[float | None, AnswerPattern | None]:
         """
         Extract numerical answer from text.
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
         """
 
-        match answer_type:
-            case AnswerType.TEXTUAL:
-                method = cls.extract_answer_textual
-            case AnswerType.CODE:
-                method = cls.extract_answer_code
-            case _:
-                raise ValueError(f"Unknown answer type: {answer_type}")
-
-        text = cls.trim_response(text)
-
         try:
-            res = method(text)
+            res = self._extraction_method(text)
         except AnswerExtractionError:
             logger.warning(f"Could not extract answer from model response:\n{text}")
             logger.warning(f"Extraction error stack:\n{traceback.format_exc()}")
@@ -74,7 +60,9 @@ class AnswerExtractor:
             return res
 
     @classmethod
-    def extract_answer_textual(cls, text) -> tuple[float | int, AnswerPattern]:
+    def extract_answer_textual(cls, text: str) -> tuple[float | int, AnswerPattern]:
+        text = cls.trim_response(text)
+
         for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
             match = pattern.search(text)
             if match:
@@ -88,7 +76,9 @@ class AnswerExtractor:
         raise AnswerExtractionError(f"Could not locate numerical answer")
 
     @classmethod
-    def extract_answer_code(cls, text) -> tuple[float | int, None]:
+    def extract_answer_code(cls, text: str) -> tuple[float | int, None]:
+        text = cls.trim_response(text)
+
         match = cls.FUNCTION_PATTERN.match(text)
         if not match:
             raise AnswerExtractionError("Failed to find valid function definition in text")

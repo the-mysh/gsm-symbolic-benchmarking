@@ -13,10 +13,10 @@ from gsm_benchmarker.answer_extractor import AnswerExtractor, AnswerPattern
     ("=      -23.8", -23.8, AnswerPattern.EQUAL_SIGN),
     ("value=3.2\n", 3.2, AnswerPattern.EQUAL_SIGN)
 ))
-def test_extract_answer_from_pattern(resp, value, pattern, caplog):
+def test_extract_answer_textual_from_pattern(resp, value, pattern, caplog):
 
     with caplog.at_level(logging.DEBUG):
-        extracted_value, detected_pattern = AnswerExtractor.extract_answer(resp)
+        extracted_value, detected_pattern = AnswerExtractor.extract_answer_textual(resp)
 
     assert extracted_value == pytest.approx(value, abs=1e-5)
     assert detected_pattern is pattern
@@ -28,10 +28,10 @@ def test_extract_answer_from_pattern(resp, value, pattern, caplog):
     ("A: 31", 31),
     ("was 5, subtracted 1, left 4", 4)
 ))
-def test_extract_answer_no_pattern(resp, value, caplog):
+def test_extract_answer_textual_no_pattern(resp, value, caplog):
 
     with caplog.at_level(logging.DEBUG):
-        extracted_value, detected_pattern = AnswerExtractor.extract_answer(resp)
+        extracted_value, detected_pattern = AnswerExtractor.extract_answer_textual(resp)
 
     assert extracted_value == pytest.approx(value, abs=1e-5)
     assert detected_pattern is AnswerPattern.LAST_NUMBER

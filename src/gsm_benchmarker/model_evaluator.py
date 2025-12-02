@@ -32,7 +32,8 @@ class ModelEvaluator:
                  prompt_config: PromptConfig | None = None):
         self.original_shots = GSMShotManager()
         self.model_wrapper = self._make_model_wrapper(model_spec, config)
-        self.prompt_config = prompt_config or PromptConfig()
+        self.prompt_config = prompt_config or PromptConfig.default()
+        self.answer_extractor = AnswerExtractor()
 
     @staticmethod
     def _make_model_wrapper(model_spec: SingleModelConfig, config: BenchmarkConfig) -> BaseModelWrapper:
@@ -86,7 +87,7 @@ class ModelEvaluator:
                 t0 = time()
                 response = self.model_wrapper.ask(prompt)
                 t = time() - t0
-                predicted_result, result_pattern = AnswerExtractor.extract_answer(response)
+                predicted_result, result_pattern = self.answer_extractor.extract_answer(response)
                 correct = predicted_result is not None and abs(predicted_result - true_result) < 1e-5
 
             results.append({

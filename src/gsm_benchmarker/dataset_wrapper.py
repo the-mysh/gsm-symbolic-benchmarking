@@ -38,6 +38,7 @@ class GSMSymbolicDataset:
         self._variant = self._check_type(variant, self.Variant)
         self._split = self._check_type(split, self.Split)
         self.dataset = self.load_dataset()
+        self.answer_extractor = AnswerExtractor(code=False)
 
     @staticmethod
     def _check_type(value: T, expected_type: type[T]) -> T:
@@ -91,7 +92,7 @@ class GSMSymbolicDataset:
         ds = ds.select_columns(['id', 'original_id', 'instance', 'question', 'answer'])
 
         # extract numerical results from answers
-        ds = ds.map(lambda example: {'numerical_result': AnswerExtractor.extract_answer(example['answer'])[0]})
+        ds = ds.map(lambda example: {'numerical_result': self.answer_extractor.extract_answer(example['answer'])[0]})
 
         logger.debug(f"After transformations: {len(ds)} examples")
         return ds
