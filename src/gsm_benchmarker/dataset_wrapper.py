@@ -37,8 +37,8 @@ class GSMSymbolicDataset:
 
         self._variant = self._check_type(variant, self.Variant)
         self._split = self._check_type(split, self.Split)
-        self.dataset = self.load_dataset()
         self.answer_extractor = AnswerExtractor(code=False)
+        self.dataset = self.load_dataset()
 
     @staticmethod
     def _check_type(value: T, expected_type: type[T]) -> T:
