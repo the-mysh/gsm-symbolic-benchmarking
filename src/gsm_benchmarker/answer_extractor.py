@@ -1,9 +1,15 @@
 import re
 import logging
 from enum import Enum, auto
+import traceback
 
 
 logger = logging.getLogger(__name__)
+
+
+class AnswerType(Enum):
+    TEXTUAL = auto()
+    CODE = auto()
 
 
 class AnswerPattern(Enum):
@@ -11,6 +17,10 @@ class AnswerPattern(Enum):
     GSM_SYMBOLIC = auto()
     EQUAL_SIGN = auto()
     LAST_NUMBER = auto()
+
+
+class AnswerExtractionError(RuntimeError):
+    pass
 
 
 class AnswerExtractor:
@@ -21,6 +31,8 @@ class AnswerExtractor:
         AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is\s*\$?' + _number_pattern),
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
     }
+
+    FUNCTION_PATTERN = re.compile(r"(\.*\n)?def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n+)+")
 
     STOP_TOKENS = (
         # from paper
@@ -35,14 +47,34 @@ class AnswerExtractor:
     )
 
     @classmethod
-    def extract_answer(cls, text: str) -> tuple[float | None, AnswerPattern | None]:
+    def extract_answer(cls, text: str, answer_type: AnswerType = AnswerType.TEXTUAL
+                       ) -> tuple[float | None, AnswerPattern | None]:
         """
         Extract numerical answer from text.
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
         """
 
+        match answer_type:
+            case AnswerType.TEXTUAL:
+                method = cls.extract_answer_textual
+            case AnswerType.CODE:
+                method = cls.extract_answer_code
+            case _:
+                raise ValueError(f"Unknown answer type: {answer_type}")
+
         text = cls.trim_response(text)
 
+        try:
+            res = method(text)
+        except AnswerExtractionError:
+            logger.warning(f"Could not extract answer from model response:\n{text}")
+            logger.warning(f"Extraction error stack:\n{traceback.format_exc()}")
+            return None, None
+        else:
+            return res
+
+    @classmethod
+    def extract_answer_textual(cls, text) -> tuple[float | int, AnswerPattern]:
         for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
             match = pattern.search(text)
             if match:
@@ -53,9 +85,28 @@ class AnswerExtractor:
         if numbers:
             return float(numbers[-1][0]), AnswerPattern.LAST_NUMBER
 
-        logger.warning(f"Could not extract answer from text: '{text}'")
+        raise AnswerExtractionError(f"Could not locate numerical answer")
 
-        return None, None
+    @classmethod
+    def extract_answer_code(cls, text) -> tuple[float | int, None]:
+        match = cls.FUNCTION_PATTERN.match(text)
+        if not match:
+            raise AnswerExtractionError("Failed to find valid function definition in text")
+
+        func_def = match.group()
+        logger.debug(f"Matched function definition:\n{func_def}")
+        loc = {}
+        try:
+            exec(f"{match.group()}\nret = {match.group('func_name')}()", locals(), loc)
+        except SyntaxError:
+            raise AnswerExtractionError(f"Extracted function definition has invalid syntax")
+        except Exception:
+            raise AnswerExtractionError(f"Failed to obtain numerical answer by running extracted function")
+
+        res = loc['ret']
+        if not isinstance(res, (int, float)):
+            raise AnswerExtractionError(f"The result returned by the extracted function ({res}) is not a number")
+        return res, None
 
     @classmethod
     def trim_response(cls, text: str) -> str:
