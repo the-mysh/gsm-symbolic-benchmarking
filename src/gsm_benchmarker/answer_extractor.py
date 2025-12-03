@@ -27,7 +27,7 @@ class AnswerExtractor:
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
     }
 
-    FUNCTION_PATTERN = re.compile(r"(\.*\n)?def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n+)+")
+    FUNCTION_PATTERN = re.compile(r"def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n+)+")
 
     STOP_TOKENS = (
         # from paper
@@ -79,7 +79,7 @@ class AnswerExtractor:
     def extract_answer_code(cls, text: str) -> tuple[float | int, None]:
         text = cls.trim_response(text)
 
-        match = cls.FUNCTION_PATTERN.match(text)
+        match = cls.FUNCTION_PATTERN.search(text)
         if not match:
             raise AnswerExtractionError("Failed to find valid function definition in text")
 
