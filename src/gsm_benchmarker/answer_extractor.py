@@ -18,6 +18,19 @@ class AnswerExtractionError(RuntimeError):
     pass
 
 
+# builtins and imports we can let the generated code use
+SAFE_BUILTINS = {
+    'sum': sum, 'len': len, 'list': list, 'dict': dict, 'tuple': tuple,
+    'print': print, # Keep print for debugging, but be cautious
+    'int': int, 'float': float, 'str': str, 'range': range,
+    # Add any necessary mathematical built-ins
+}
+
+SAFE_IMPORTS = {
+    'math': __import__('math')
+}
+
+
 class AnswerExtractor:
     _number_pattern = r'\s*(?P<number>(-?\d+(?:\.\d+)?))'
 
@@ -28,7 +41,13 @@ class AnswerExtractor:
     }
 
     FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n*)+", flags=re.MULTILINE)
-    IMPORT_PATTERN = re.compile(r'^import \w+', flags=re.MULTILINE)
+    FORBIDDEN_ITEMS = [
+        re.compile(r"open\(.*\)"),
+        re.compile(r"eval\(.*\)"),
+        re.compile(r"exec\(.*\)"),
+        re.compile(r"__import__\(.*\)"),
+        re.compile(r"[gs]etattr\(.*\)")
+    ]
 
     STOP_TOKENS = (
         # from paper
@@ -78,6 +97,13 @@ class AnswerExtractor:
         raise AnswerExtractionError(f"Could not locate numerical answer")
 
     @classmethod
+    def check_extracted_func(cls, func_def: str):
+        for s in cls.FORBIDDEN_ITEMS:
+            if (m := s.search(func_def)) is not None:
+                raise AnswerExtractionError(
+                    f"Potentially dangerous string found in the extracted function: {m.group()}")
+
+    @classmethod
     def extract_function_definition(cls, text: str) -> tuple[str, str]:
         text = cls.trim_response(text)
 
@@ -87,19 +113,18 @@ class AnswerExtractor:
 
         func_def = match.group()
 
-        imports = '\n'.join(cls.IMPORT_PATTERN.findall(text))
-        full_func_def = (imports + '\n\n' + func_def) if imports else func_def
-
-        return full_func_def, match.group('func_name')
+        return func_def, match.group('func_name')
 
     @classmethod
     def extract_answer_code(cls, text: str) -> tuple[float | int, None]:
-        full_func_def, func_name = cls.extract_function_definition(text)
+        func_def, func_name = cls.extract_function_definition(text)
+        cls.check_extracted_func(func_def)
 
+        scope = {'__builtins__': SAFE_BUILTINS.copy(), **SAFE_IMPORTS}
         loc = {}
-        code = f"{full_func_def}\nret = {func_name}()"
+        code = f"{func_def}\nret = {func_name}()"
         try:
-            exec(code, loc, loc)
+            exec(code, scope, loc)
         except SyntaxError:
             raise AnswerExtractionError(f"Extracted function definition has invalid syntax")
         except Exception as exc:
