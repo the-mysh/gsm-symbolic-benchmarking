@@ -27,7 +27,8 @@ class AnswerExtractor:
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
     }
 
-    FUNCTION_PATTERN = re.compile(r"def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n*)+")
+    FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n*)+", flags=re.MULTILINE)
+    IMPORT_PATTERN = re.compile(r'^import \w+', flags=re.MULTILINE)
 
     STOP_TOKENS = (
         # from paper
@@ -77,7 +78,7 @@ class AnswerExtractor:
         raise AnswerExtractionError(f"Could not locate numerical answer")
 
     @classmethod
-    def extract_answer_code(cls, text: str) -> tuple[float | int, None]:
+    def extract_function_definition(cls, text: str) -> tuple[str, str]:
         text = cls.trim_response(text)
 
         match = cls.FUNCTION_PATTERN.search(text)
@@ -85,10 +86,20 @@ class AnswerExtractor:
             raise AnswerExtractionError("Failed to find valid function definition in text")
 
         func_def = match.group()
-        logger.debug(f"Matched function definition:\n{func_def}")
+
+        imports = '\n'.join(cls.IMPORT_PATTERN.findall(text))
+        full_func_def = (imports + '\n\n' + func_def) if imports else func_def
+
+        return full_func_def, match.group('func_name')
+
+    @classmethod
+    def extract_answer_code(cls, text: str) -> tuple[float | int, None]:
+        full_func_def, func_name = cls.extract_function_definition(text)
+
         loc = {}
+        code = f"{full_func_def}\nret = {func_name}()"
         try:
-            exec(f"{match.group()}\nret = {match.group('func_name')}()", locals(), loc)
+            exec(code, loc, loc)
         except SyntaxError:
             raise AnswerExtractionError(f"Extracted function definition has invalid syntax")
         except Exception as exc:
