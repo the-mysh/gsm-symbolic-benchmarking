@@ -27,11 +27,12 @@ class AnswerExtractor:
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
     }
 
-    FUNCTION_PATTERN = re.compile(r"def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n+)+")
+    FUNCTION_PATTERN = re.compile(r"def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n*)+")
 
     STOP_TOKENS = (
         # from paper
         "Q:",  # model moves on to generating a next question
+        "Question:",  # same as above
         "</s>",
         "<|endoftext|>",
 
@@ -90,12 +91,13 @@ class AnswerExtractor:
             exec(f"{match.group()}\nret = {match.group('func_name')}()", locals(), loc)
         except SyntaxError:
             raise AnswerExtractionError(f"Extracted function definition has invalid syntax")
-        except Exception:
-            raise AnswerExtractionError(f"Failed to obtain numerical answer by running extracted function")
+        except Exception as exc:
+            raise AnswerExtractionError(f"Failed to obtain numerical answer by running extracted function: {exc}")
 
         res = loc['ret']
         if not isinstance(res, (int, float)):
-            raise AnswerExtractionError(f"The result returned by the extracted function ({res}) is not a number")
+            raise AnswerExtractionError(f"The result returned by the extracted function "
+                                        f"({res}, type: {type(res).__name__}) is not a number")
         return res, None
 
     @classmethod

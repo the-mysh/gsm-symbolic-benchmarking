@@ -5,7 +5,7 @@ from gsm_benchmarker.results_analyser import MultiModelResultsAnalyser
 
 
 def get_babbler_counts(mm: MultiModelResultsAnalyser) -> pd.DataFrame:
-    babbler_examples = mm.full_data[mm.full_data.full_response.apply(lambda r: 'Q:' in r)]
+    babbler_examples = mm.full_data[mm.full_data.full_response.apply(lambda r: 'Q:' in r or 'Question:' in r)]
 
     babbler_counts = babbler_examples["model"].value_counts()
     babbler_counts.name = "babbler count"
