@@ -23,7 +23,7 @@ class AnswerExtractor:
 
     ANSWER_PATTERNS = {
         AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern),
-        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is\s*\$?' + _number_pattern),
+        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is:?\s*\$?' + _number_pattern),
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
     }
 
