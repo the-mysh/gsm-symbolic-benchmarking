@@ -39,3 +39,28 @@ def plot_babblers_by_family(b):
     ax.set_ylim(lims)
 
     return fig
+
+
+def compare_babblers(b1, b2, title1, title2):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+    for i, c in enumerate(('accuracy', 'babbler percentage')):
+        ax = axes[i]
+        ax.set_title(f"{c.capitalize()}, %")
+
+        for family in b2.family.unique():
+            bb2 =  b2[b2['family'] == family]
+            bb1 = b1[b1['family'] == family]
+            bb1 = bb1[bb1.index.isin(bb2.index)]
+            ax.scatter(100*bb1[c], 100*bb2[c], marker='d', label=family)
+
+        m = 1
+        lims = (-m, 100+m)
+        ax.set_xlim(lims)
+        ax.set_ylim(lims)
+
+        ax.set_aspect('equal')
+        ax.axline([0, 0], [1, 1], c='k', lw=1, linestyle='--')
+        ax.legend(fancybox=True, framealpha=0.5, frameon=True, title='Family')
+        ax.set_xlabel(title1)
+        ax.set_ylabel(title2)
