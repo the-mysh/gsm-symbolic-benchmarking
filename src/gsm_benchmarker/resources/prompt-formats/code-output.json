@@ -1,9 +1,0 @@
-{
-  "n_shots": 8,
-  "shot_intro": "",
-  "question_format": "Question: {question}\n\nAnswer:\n",
-  "answer_format": "{code}",
-  "intro": "Here are some example problems with answers:",
-  "target_intro": "Based on the examples above, please solve the following problem, making sure your answer is formatted as valid Python code:",
-  "code_type_answer": true
-}
