@@ -20,14 +20,23 @@ class AnswerExtractionError(RuntimeError):
 
 # builtins and imports we can let the generated code use
 SAFE_BUILTINS = {
-    'sum': sum, 'len': len, 'list': list, 'dict': dict, 'tuple': tuple,
-    'print': print, # Keep print for debugging, but be cautious
-    'int': int, 'float': float, 'str': str, 'range': range,
-    # Add any necessary mathematical built-ins
+    'int': int, 'float': float, 'str': str, 'bool': bool, 'complex': complex,
+    'list': list, 'dict': dict, 'tuple': tuple, 'set': set,
+    'len': len, 'range': range, 'enumerate': enumerate, 'zip': zip,
+    'all': all, 'any': any, 'reversed': reversed, 'sorted': sorted, 'filter': filter, 'map': map, 'slice': slice,
+    'round': round, 'min': min, 'max': max, 'abs': abs, 'sum': sum, 'pow': pow, 'divmod': divmod,
+    'print': print
 }
 
 SAFE_IMPORTS = {
-    'math': __import__('math')
+    'numbers': __import__('number'),
+    'math': __import__('math'),
+    'cmath': __import__('cmath'),
+    'decimal': __import__('decimal'),
+    'fractions': __import__('fractions'),
+    'random': __import__('random'),
+    'typing': __import__('typing'),
+    'array': __import__('array')
 }
 
 
