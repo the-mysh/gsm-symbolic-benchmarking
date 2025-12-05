@@ -1,6 +1,7 @@
 import re
 import logging
 from enum import Enum, auto
+from typing import Any
 
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,8 @@ class ErrorType(Enum):
     SYNTAX_ERROR = auto()  # function definition extracted, but has invalid syntax
     NAME_ERROR = auto()  # name error encountered when running the function
     FORBIDDEN_STRING = auto()  # one of the potentially dangerous strings (e.g. 'eval') found in function
-    NOT_A_NUMBER = auto()  # for code answers - when the return value of a function is not a number
+    NONE_RETURNED = auto()  # for code answers - when function returns None
+    NOT_A_NUMBER = auto()  # for code answers - when the return value of a function is not a number (and not None)
     UNCLASSIFIED = auto()  # all others
 
 
@@ -138,6 +140,21 @@ class AnswerExtractor:
             logger.warning("Failed to find valid function definition in text")
             return None, ErrorType.NO_FUNCTION
 
+        res, answer_pattern_or_error_type = cls.run_extracted_function(func_def, func_name=func_name)
+
+        if isinstance(answer_pattern_or_error_type, AnswerPattern) and not isinstance(res, (int, float)):
+            if res is None:
+                logger.warning("The function did not return any value")
+                return None, ErrorType.NONE_RETURNED
+            else:
+                logger.warning(f"The result returned by the extracted function "
+                               f"({res}, type: {type(res).__name__}) is not a number")
+                return None, ErrorType.NOT_A_NUMBER
+
+        return res, answer_pattern_or_error_type
+
+    @classmethod
+    def run_extracted_function(cls, func_def: str, func_name: str = 'solution') -> tuple[Any, AnswerPattern | ErrorType]:
         if cls.check_extracted_func(func_def):
             return None, ErrorType.FORBIDDEN_STRING
 
@@ -157,12 +174,8 @@ class AnswerExtractor:
             return None, ErrorType.UNCLASSIFIED
 
         res = loc['ret']
-
-        if not isinstance(res, (int, float)):
-            logger.warning(f"The result returned by the extracted function "
-                           f"({res}, type: {type(res).__name__}) is not a number")
-            return None, ErrorType.NOT_A_NUMBER
         return res, AnswerPattern.CODE
+
 
     @classmethod
     def trim_response(cls, text: str) -> str:
