@@ -1,7 +1,6 @@
 import re
 import logging
 from enum import Enum, auto
-import traceback
 
 
 logger = logging.getLogger(__name__)
@@ -12,10 +11,20 @@ class AnswerPattern(Enum):
     GSM_SYMBOLIC = auto()
     EQUAL_SIGN = auto()
     LAST_NUMBER = auto()
+    CODE = auto()
 
 
 class AnswerExtractionError(RuntimeError):
     pass
+
+
+class ErrorType(Enum):
+    NO_NUMBER = auto()  # for textual answers - when a number could not be extracted
+    NO_FUNCTION = auto()  # failed to extract function definition
+    SYNTAX = auto()  # function definition extracted, but has invalid syntax
+    FORBIDDEN_STRING = auto()  # one of the potentially dangerous strings (e.g. 'eval') found in function
+    NOT_A_NUMBER = auto()  # for code answers - when the return value of a function is not a number
+    UNCLASSIFIED = auto()  # all others
 
 
 # builtins and imports we can let the generated code use
@@ -74,23 +83,19 @@ class AnswerExtractor:
     def __init__(self, code: bool = False):
         self._extraction_method = self.extract_answer_code if code else self.extract_answer_textual
 
-    def extract_answer(self, text: str) -> tuple[float | None, AnswerPattern | None]:
+    def extract_answer(self, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType | None]:
         """
         Extract numerical answer from text.
         Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
         """
 
-        try:
-            res = self._extraction_method(text)
-        except AnswerExtractionError:
-            logger.warning(f"Could not extract answer from model response:\n{text}")
-            logger.warning(f"Extraction error stack:\n{traceback.format_exc()}")
-            return None, None
-        else:
-            return res
+        res, answer_pattern_or_error_type = self._extraction_method(text)
+        if res is None:
+            logger.warning(f"-> Could not extract answer from model response:\n{text}")
+        return res, answer_pattern_or_error_type
 
     @classmethod
-    def extract_answer_textual(cls, text: str) -> tuple[float | int, AnswerPattern]:
+    def extract_answer_textual(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
         text = cls.trim_response(text)
 
         for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
@@ -103,14 +108,16 @@ class AnswerExtractor:
         if numbers:
             return float(numbers[-1][0]), AnswerPattern.LAST_NUMBER
 
-        raise AnswerExtractionError(f"Could not locate numerical answer")
+        logger.warning(f"Could not locate numerical answer")
+        return None, ErrorType.NO_NUMBER
 
     @classmethod
     def check_extracted_func(cls, func_def: str):
         for s in cls.FORBIDDEN_ITEMS:
             if (m := s.search(func_def)) is not None:
-                raise AnswerExtractionError(
-                    f"Potentially dangerous string found in the extracted function: {m.group()}")
+                logger.warning(f"Potentially dangerous string ('{m.group()}') found in the extracted function")
+                return True
+        return False
 
     @classmethod
     def extract_function_definition(cls, text: str) -> tuple[str, str]:
@@ -118,16 +125,20 @@ class AnswerExtractor:
 
         match = cls.FUNCTION_PATTERN.search(text)
         if not match:
-            raise AnswerExtractionError("Failed to find valid function definition in text")
+            return "", ""
 
-        func_def = match.group()
-
-        return func_def, match.group('func_name')
+        return match.group(), match.group('func_name')
 
     @classmethod
-    def extract_answer_code(cls, text: str) -> tuple[float | int, None]:
+    def extract_answer_code(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
         func_def, func_name = cls.extract_function_definition(text)
-        cls.check_extracted_func(func_def)
+
+        if not func_def:
+            logger.warning("Failed to find valid function definition in text")
+            return None, ErrorType.UNCLASSIFIED
+
+        if cls.check_extracted_func(func_def):
+            return None, ErrorType.FORBIDDEN_STRING
 
         scope = {'__builtins__': SAFE_BUILTINS.copy(), **SAFE_IMPORTS}
         loc = {}
@@ -135,15 +146,18 @@ class AnswerExtractor:
         try:
             exec(code, scope, loc)
         except SyntaxError:
-            raise AnswerExtractionError(f"Extracted function definition has invalid syntax")
+            logger.warning(f"Extracted function definition has invalid syntax")
+            return None, ErrorType.SYNTAX
         except Exception as exc:
-            raise AnswerExtractionError(f"Error when running extracted function: {exc.__class__.__name__}: {exc}")
+            logger.warning(f"Error when running extracted function: {exc.__class__.__name__}: {exc}")
+            return None, ErrorType.UNCLASSIFIED
 
         res = loc['ret']
         if not isinstance(res, (int, float)):
-            raise AnswerExtractionError(f"The result returned by the extracted function "
-                                        f"({res}, type: {type(res).__name__}) is not a number")
-        return res, None
+            logger.warning(f"The result returned by the extracted function "
+                           f"({res}, type: {type(res).__name__}) is not a number")
+            return None, ErrorType.NOT_A_NUMBER
+        return res, AnswerPattern.CODE
 
     @classmethod
     def trim_response(cls, text: str) -> str:
