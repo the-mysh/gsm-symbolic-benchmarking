@@ -29,7 +29,7 @@ SAFE_BUILTINS = {
 }
 
 SAFE_IMPORTS = {
-    'numbers': __import__('number'),
+    'numbers': __import__('numbers'),
     'math': __import__('math'),
     'cmath': __import__('cmath'),
     'decimal': __import__('decimal'),
@@ -137,7 +137,7 @@ class AnswerExtractor:
         except SyntaxError:
             raise AnswerExtractionError(f"Extracted function definition has invalid syntax")
         except Exception as exc:
-            raise AnswerExtractionError(f"Failed to obtain numerical answer by running extracted function: {exc}")
+            raise AnswerExtractionError(f"Error when running extracted function: {exc.__class__.__name__}: {exc}")
 
         res = loc['ret']
         if not isinstance(res, (int, float)):
