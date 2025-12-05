@@ -49,7 +49,7 @@ class AnswerExtractor:
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
     }
 
-    FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\n(( {4}.+)?\n*)+", flags=re.MULTILINE)
+    FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\n(( {4}.*)?\n*)+", flags=re.MULTILINE)
     FORBIDDEN_ITEMS = [
         re.compile(r"open\(.*\)"),
         re.compile(r"eval\(.*\)"),
