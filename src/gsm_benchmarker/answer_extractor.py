@@ -21,7 +21,8 @@ class AnswerExtractionError(RuntimeError):
 class ErrorType(Enum):
     NO_NUMBER = auto()  # for textual answers - when a number could not be extracted
     NO_FUNCTION = auto()  # failed to extract function definition
-    SYNTAX = auto()  # function definition extracted, but has invalid syntax
+    SYNTAX_ERROR = auto()  # function definition extracted, but has invalid syntax
+    NAME_ERROR = auto()  # name error encountered when running the function
     FORBIDDEN_STRING = auto()  # one of the potentially dangerous strings (e.g. 'eval') found in function
     NOT_A_NUMBER = auto()  # for code answers - when the return value of a function is not a number
     UNCLASSIFIED = auto()  # all others
@@ -135,7 +136,7 @@ class AnswerExtractor:
 
         if not func_def:
             logger.warning("Failed to find valid function definition in text")
-            return None, ErrorType.UNCLASSIFIED
+            return None, ErrorType.NO_FUNCTION
 
         if cls.check_extracted_func(func_def):
             return None, ErrorType.FORBIDDEN_STRING
@@ -145,14 +146,18 @@ class AnswerExtractor:
         code = f"{func_def}\nret = {func_name}()"
         try:
             exec(code, scope, loc)
-        except SyntaxError:
-            logger.warning(f"Extracted function definition has invalid syntax")
-            return None, ErrorType.SYNTAX
+        except SyntaxError as exc:
+            logger.warning(f"Extracted function definition has invalid syntax: {exc}")
+            return None, ErrorType.SYNTAX_ERROR
+        except NameError as exc:
+            logger.warning(f"NameError when running extracted function: {exc}")
+            return None, ErrorType.NAME_ERROR
         except Exception as exc:
             logger.warning(f"Error when running extracted function: {exc.__class__.__name__}: {exc}")
             return None, ErrorType.UNCLASSIFIED
 
         res = loc['ret']
+
         if not isinstance(res, (int, float)):
             logger.warning(f"The result returned by the extracted function "
                            f"({res}, type: {type(res).__name__}) is not a number")
