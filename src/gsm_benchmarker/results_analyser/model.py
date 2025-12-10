@@ -31,12 +31,27 @@ class ModelResultsAnalyser:
 
         data['babbling'] = data.full_response.apply(b)
 
-        # add 'result class' column - whether the answer was correct / incorrect / model failed to answer
+        # add 'result class' column - whether the answer was correct / correct+babbling / incorrect / failed to answer
         nan_idx = data.predicted_numerical_result.isna().to_numpy()
-        correct = data.correct.to_numpy()
-        data.loc[nan_idx, 'result_class'] = "FAILED"
-        data.loc[correct, 'result_class'] = "CORRECT"
-        data.loc[~nan_idx & ~correct, 'result_class'] = "INCORRECT"
+        babbling_idx = data.babbling.to_numpy()
+        correct_answer_idx = data.correct.to_numpy()
+
+        overall_correct = correct_answer_idx & ~nan_idx
+        overall_incorrect = ~overall_correct
+
+        strict_correct = overall_correct & ~babbling_idx
+        babbling_correct = overall_correct & babbling_idx
+
+        strict_incorrect = overall_incorrect & ~nan_idx
+        failed_incorrect = overall_incorrect & nan_idx
+
+        if strict_correct.sum() + babbling_correct.sum() + strict_incorrect.sum() + failed_incorrect.sum() != len(data):
+            logger.error("Can't assign result class")
+        else:
+            data.loc[failed_incorrect, 'result_class'] = "FAILED"
+            data.loc[strict_correct, 'result_class'] = "CORRECT"
+            data.loc[babbling_correct, 'result_class'] = "BABBLING"
+            data.loc[strict_incorrect, 'result_class'] = "INCORRECT"
 
         return data
 

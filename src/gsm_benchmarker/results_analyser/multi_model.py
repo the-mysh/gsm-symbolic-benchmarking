@@ -179,14 +179,14 @@ class MultiModelResultsAnalyser:
         fig, ax = plt.subplots(figsize=(12, 6))
 
         counts_df = self._full_data.groupby(['model', 'result_class']).size().unstack(fill_value=0)
-        counts_df = counts_df.reindex(columns=['CORRECT', 'INCORRECT', 'FAILED'], fill_value=0)
+        counts_df = counts_df.reindex(columns=['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED'], fill_value=0)
         counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         counts_df.plot(
             kind='bar',
             stacked=True,
             ax=ax,
-            color=['green', 'red', 'saddlebrown'] # Optional: set custom colors
+            color=['green', '#b8bd39', '#d15f26', 'saddlebrown'] # Optional: set custom colors
         )
 
         ax.set_title(title if title is not None else 'Result Class Counts by Model')
