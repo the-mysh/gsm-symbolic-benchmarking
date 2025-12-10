@@ -180,30 +180,39 @@ class MultiModelResultsAnalyser:
             ax.set_ylabel(title2)
 
     @staticmethod
-    def _plot_by_model(counts_df: pd.DataFrame, color=None, title: str = None, legend_loc: str | None = None,
-                       legend_title: str | None = None):
-        fig, ax = plt.subplots(figsize=(12, 6))
+    def _plot_by_model(counts_df: pd.DataFrame, color=None, title: str = None, legend_title=None):
+        fig, axes = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
 
         counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         counts_df.plot(
             kind='bar',
             stacked=True,
-            ax=ax,
-            color=color
+            ax=axes[0],
+            color=color,
+            legend=False
         )
+        axes[0].set_title("By model")
+        axes[0].set_xlabel('Model')
+        axes[0].set_ylabel('Count')
+        axes[0].tick_params(axis='x', rotation=45) # Rotate x-axis labels for better readability if model names are long
+        axes[0].legend(title=legend_title, fancybox=True, framealpha=0.7, frameon=True)
+
+        for label in axes[0].get_xticklabels():
+            label.set_ha('right')
+
+        counts_df.sum().plot(
+            kind='pie',
+            ax=axes[1],
+            colors=color,
+            textprops={'size': 'smaller'},
+        )
+        axes[1].set_title("Combined")
 
         if title is not None:
-            ax.set_title(title)
-        ax.set_xlabel('Model')
-        ax.set_ylabel('Count')
-        ax.tick_params(axis='x', rotation=45) # Rotate x-axis labels for better readability if model names are long
-        ax.legend(title=legend_title, fancybox=True, framealpha=0.8, loc=legend_loc, frameon=True)
+            fig.suptitle(title)
 
         fig.tight_layout() # Adjust layout to prevent labels from being cut off
-
-        for label in ax.get_xticklabels():
-            label.set_ha('right')
 
         return fig
 
@@ -215,9 +224,7 @@ class MultiModelResultsAnalyser:
         fig = self._plot_by_model(
             counts_df,
             color=['green', '#b8bd39', '#d15f26', 'saddlebrown'],
-            title=title or "Result class by model",
-            legend_loc='lower right',
-            legend_title="Result"
+            title=title or "Result class"
         )
 
         return fig
@@ -233,8 +240,7 @@ class MultiModelResultsAnalyser:
 
         fig = self._plot_by_model(
             counts_df,
-            title=title or "Error types by model",
-            legend_title="Error type"
+            title=title or "Error types"
         )
 
         return fig
