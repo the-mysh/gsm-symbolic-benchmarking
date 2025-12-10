@@ -13,11 +13,25 @@ class ModelResultsAnalyser:
 
         data = self._load_data(self._file_path)
         data = self._check_data(data)
+        data = self._enhance_data(data)
         self._data = data
 
     @staticmethod
     def _load_data(file_path: str | Path) -> pd.DataFrame:
         return pd.read_parquet(file_path)
+
+    @staticmethod
+    def _enhance_data(data):
+        """Insert additional information in the data."""
+
+        # add 'result class' column - whether the answer was correct / incorrect / model failed to answer
+        nan_idx = data.predicted_numerical_result.isna().to_numpy()
+        correct = data.correct.to_numpy()
+        data.loc[nan_idx, 'result_class'] = "FAILED"
+        data.loc[correct, 'result_class'] = "CORRECT"
+        data.loc[~nan_idx & ~correct, 'result_class'] = "INCORRECT"
+
+        return data
 
     @staticmethod
     def _check_data(data: pd.DataFrame):
@@ -30,7 +44,7 @@ class ModelResultsAnalyser:
                 raise ValueError("If multi-indexed, the results dataframe must have a 2 levels")
             data = data.reset_index().drop('set_number', axis=1).drop('question_number', axis=1)  # repeated
 
-        for c in ('id', 'original_id', 'instance', 'correct'):
+        for c in ('id', 'original_id', 'instance', 'correct', 'predicted_numerical_result'):
             if c not in data.columns:
                 raise ValueError(f"The results dataframe is missing a '{c}' column")
 
