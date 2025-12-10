@@ -108,7 +108,7 @@ class MultiModelResultsAnalyser:
         return df.to_dict(orient='index')[df.index[0]]
 
     def get_babbler_counts(self) -> pd.DataFrame:
-        babbler_examples = self.full_data[self.full_data.full_response.apply(lambda r: 'Q:' in r or 'Question:' in r)]
+        babbler_examples = self.full_data[self.full_data.babbling]
 
         babbler_counts = babbler_examples["model"].value_counts()
         babbler_counts.name = "babbler count"

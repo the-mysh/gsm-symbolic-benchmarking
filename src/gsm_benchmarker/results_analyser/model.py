@@ -24,6 +24,13 @@ class ModelResultsAnalyser:
     def _enhance_data(data):
         """Insert additional information in the data."""
 
+        # add 'babbling' column
+        def b(s: str) -> bool:
+            ss = s.lower()
+            return 'q:' in ss or 'question:' in ss
+
+        data['babbling'] = data.full_response.apply(b)
+
         # add 'result class' column - whether the answer was correct / incorrect / model failed to answer
         nan_idx = data.predicted_numerical_result.isna().to_numpy()
         correct = data.correct.to_numpy()
