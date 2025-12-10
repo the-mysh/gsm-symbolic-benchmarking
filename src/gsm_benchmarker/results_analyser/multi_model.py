@@ -48,7 +48,9 @@ class MultiModelResultsAnalyser:
             if load_full_data:
                 full_data_dict[model_name] = model_results.data
             s = model_results.get_total_accuracy_and_std()
-            summary_data_dict[model_name] = {'accuracy': s[0], 'std': s[1]}
+            s_strict = model_results.get_total_accuracy_and_std(strict=True)
+            summary_data_dict[model_name] = {'accuracy': s[0], 'std': s[1],
+                                             'strict_accuracy': s_strict[0], 'strict_std': s_strict[1]}
 
         return summary_data_dict, full_data_dict
 
@@ -125,16 +127,18 @@ class MultiModelResultsAnalyser:
 
         return b
 
-    def plot_babblers_by_family(self, b: pd.DataFrame | None = None):
+    def plot_babblers_by_family(self, b: pd.DataFrame | None = None, strict: bool = False):
         if b is None:
             b = self.get_babbler_counts()
 
+        acc_column = 'strict_accuracy' if strict else 'accuracy'
+
         fig, ax = plt.subplots()
-        ax.set_ylabel("accuracy, %")
+        ax.set_ylabel(f"{acc_column.replace('_', ' ')}, %")
         ax.set_xlabel("babbler factor, %")
         for family in b['family'].unique():
             bb =  b[b['family'] == family]
-            ax.scatter(100*bb['babbler percentage'], 100*bb['accuracy'], marker='d', label=family)
+            ax.scatter(100*bb['babbler percentage'], 100*bb[acc_column], marker='d', label=family)
         ax.legend(fancybox=True, framealpha=0.5, frameon=True, title='Family')
         ax.set_aspect('equal')
 
@@ -146,7 +150,7 @@ class MultiModelResultsAnalyser:
         return fig
 
     def compare_babblers(self, other: "MultiModelResultsAnalyser", title1: str, title2: str, b1=None, b2=None):
-        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
         if b1 is None:
             b1 = self.get_babbler_counts()
@@ -154,9 +158,9 @@ class MultiModelResultsAnalyser:
         if b2 is None:
             b2 = other.get_babbler_counts()
 
-        for i, c in enumerate(('accuracy', 'babbler percentage')):
+        for i, c in enumerate(('accuracy', 'strict_accuracy', 'babbler percentage')):
             ax = axes[i]
-            ax.set_title(f"{c.capitalize()}, %")
+            ax.set_title(f"{c.replace('_', ' ').capitalize()}, %")
 
             for family in b2.family.unique():
                 bb2 =  b2[b2['family'] == family]

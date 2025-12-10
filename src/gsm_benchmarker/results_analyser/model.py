@@ -76,20 +76,26 @@ class ModelResultsAnalyser:
     def data(self) -> pd.DataFrame:
         return self._data
 
-    @property
-    def correctness(self) -> pd.Series:
-        return self._data['correct']
+    def _get_accuracy_per(self, col: str, strict: bool = False):
+        if strict:
+            ok = self._data.correct & ~self._data.babbling
+        else:
+            ok = self._data.correct
 
-    def get_accuracy_per_instance(self) -> pd.Series:
-        return self._data.groupby('instance').correct.mean()
+        data = pd.DataFrame({col: self._data[col], 'ok': ok})
 
-    def get_accuracy_per_template_id(self) -> pd.Series:
-        return self._data.groupby('id').correct.mean()
+        return data.groupby(col).ok.mean()
 
-    def get_total_accuracy_and_std(self) -> tuple[float, float | None]:
+    def get_accuracy_per_instance(self, strict: bool = False) -> pd.Series:
+        return self._get_accuracy_per('instance', strict=strict)
+
+    def get_accuracy_per_template_id(self, strict: bool = False) -> pd.Series:
+        return self._get_accuracy_per('id', strict=strict)
+
+    def get_total_accuracy_and_std(self, strict: bool = False) -> tuple[float, float | None]:
         """Compute mean of accuracies per set and the corresponding standard deviation (if more than 1 set)."""
 
-        accuracies = self.get_accuracy_per_instance()
+        accuracies = self.get_accuracy_per_instance(strict=strict)
         mean_acc = float(accuracies.mean())
         std_acc = float(accuracies.std()) if len(accuracies) > 1 else None
         return mean_acc, std_acc
