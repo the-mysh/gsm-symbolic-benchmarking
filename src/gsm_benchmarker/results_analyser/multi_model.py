@@ -5,6 +5,7 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 from typing import Any
+import matplotlib.pyplot as plt
 
 from gsm_benchmarker.results_analyser.model import ModelResultsAnalyser
 
@@ -106,3 +107,29 @@ class MultiModelResultsAnalyser:
 
         return df.to_dict(orient='index')[df.index[0]]
 
+    def plot_result_class_by_model(self, title: str | None = None):
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        counts_df = self._full_data.groupby(['model', 'result_class']).size().unstack(fill_value=0)
+        counts_df = counts_df.reindex(columns=['CORRECT', 'INCORRECT', 'FAILED'], fill_value=0)
+        counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
+
+        counts_df.plot(
+            kind='bar',
+            stacked=True,
+            ax=ax,
+            color=['green', 'red', 'saddlebrown'] # Optional: set custom colors
+        )
+
+        ax.set_title(title if title is not None else 'Result Class Counts by Model')
+        ax.set_xlabel('Model')
+        ax.set_ylabel('Count')
+        ax.tick_params(axis='x', rotation=45) # Rotate x-axis labels for better readability if model names are long
+        ax.legend(title='Result', fancybox=True, framealpha=0.8, loc='lower right', frameon=True)
+
+        fig.tight_layout() # Adjust layout to prevent labels from being cut off
+
+        for label in ax.get_xticklabels():
+            label.set_ha('right')
+
+        return fig
