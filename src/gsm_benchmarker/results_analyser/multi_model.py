@@ -179,29 +179,62 @@ class MultiModelResultsAnalyser:
             ax.set_xlabel(title1)
             ax.set_ylabel(title2)
 
-    def plot_result_class_by_model(self, title: str | None = None):
+    @staticmethod
+    def _plot_by_model(counts_df: pd.DataFrame, color=None, title: str = None, legend_loc: str | None = None,
+                       legend_title: str | None = None):
         fig, ax = plt.subplots(figsize=(12, 6))
 
-        counts_df = self._full_data.groupby(['model', 'result_class']).size().unstack(fill_value=0)
-        counts_df = counts_df.reindex(columns=['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED'], fill_value=0)
         counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         counts_df.plot(
             kind='bar',
             stacked=True,
             ax=ax,
-            color=['green', '#b8bd39', '#d15f26', 'saddlebrown'] # Optional: set custom colors
+            color=color
         )
 
-        ax.set_title(title if title is not None else 'Result Class Counts by Model')
+        if title is not None:
+            ax.set_title(title)
         ax.set_xlabel('Model')
         ax.set_ylabel('Count')
         ax.tick_params(axis='x', rotation=45) # Rotate x-axis labels for better readability if model names are long
-        ax.legend(title='Result', fancybox=True, framealpha=0.8, loc='lower right', frameon=True)
+        ax.legend(title=legend_title, fancybox=True, framealpha=0.8, loc=legend_loc, frameon=True)
 
         fig.tight_layout() # Adjust layout to prevent labels from being cut off
 
         for label in ax.get_xticklabels():
             label.set_ha('right')
+
+        return fig
+
+    def plot_result_class_by_model(self, title: str | None = None):
+
+        counts_df = self._full_data.groupby(['model', 'result_class']).size().unstack(fill_value=0)
+        counts_df = counts_df.reindex(columns=['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED'], fill_value=0)
+
+        fig = self._plot_by_model(
+            counts_df,
+            color=['green', '#b8bd39', '#d15f26', 'saddlebrown'],
+            title=title or "Result class by model",
+            legend_loc='lower right',
+            legend_title="Result"
+        )
+
+        return fig
+
+    def get_failed_answer_cases(self):
+        return self._full_data[self.full_data.predicted_numerical_result.isna()]
+
+    def plot_error_types_by_model(self, title: str | None = None):
+
+        failed = self.get_failed_answer_cases()
+
+        counts_df = failed.groupby(['model', 'detected_result_pattern']).size().unstack(fill_value=0)
+
+        fig = self._plot_by_model(
+            counts_df,
+            title=title or "Error types by model",
+            legend_title="Error type"
+        )
 
         return fig
