@@ -15,9 +15,6 @@ class AnswerPattern(Enum):
     CODE = auto()
 
 
-class AnswerExtractionError(RuntimeError):
-    pass
-
 
 class ErrorType(Enum):
     NO_NUMBER = auto()  # for textual answers - when a number could not be extracted
