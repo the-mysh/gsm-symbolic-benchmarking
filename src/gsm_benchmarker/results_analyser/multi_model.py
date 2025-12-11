@@ -180,10 +180,9 @@ class MultiModelResultsAnalyser:
             ax.set_ylabel(title2)
 
     @staticmethod
-    def _plot_by_model(counts_df: pd.DataFrame, color=None, title: str = None, legend_title=None):
+    def _plot_bars(counts_df: pd.DataFrame, color=None, title: str = None, legend_title: str | None = None,
+                   category_name: str | None = None, rotate_labels: bool = True):
         fig, axes = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
-
-        counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         counts_df.plot(
             kind='bar',
@@ -192,14 +191,17 @@ class MultiModelResultsAnalyser:
             color=color,
             legend=False
         )
-        axes[0].set_title("By model")
-        axes[0].set_xlabel('Model')
+        if category_name:
+            axes[0].set_title(f"By {category_name}")
+            axes[0].set_xlabel(category_name.capitalize())
         axes[0].set_ylabel('Count')
-        axes[0].tick_params(axis='x', rotation=45) # Rotate x-axis labels for better readability if model names are long
         axes[0].legend(title=legend_title, fancybox=True, framealpha=0.7, frameon=True)
 
-        for label in axes[0].get_xticklabels():
-            label.set_ha('right')
+        axes[0].tick_params(axis='x', rotation=45 if rotate_labels else 0)
+
+        if rotate_labels:
+            for label in axes[0].get_xticklabels():
+                label.set_ha('right')
 
         counts_df.sum().plot(
             kind='pie',
@@ -220,11 +222,13 @@ class MultiModelResultsAnalyser:
 
         counts_df = self._full_data.groupby(['model', 'result_class']).size().unstack(fill_value=0)
         counts_df = counts_df.reindex(columns=['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED'], fill_value=0)
+        counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
-        fig = self._plot_by_model(
+        fig = self._plot_bars(
             counts_df,
             color=['green', '#b8bd39', '#d15f26', 'saddlebrown'],
-            title=title or "Result class"
+            title=title or "Result class",
+            category_name="model"
         )
 
         return fig
@@ -237,10 +241,31 @@ class MultiModelResultsAnalyser:
         failed = self.get_failed_answer_cases()
 
         counts_df = failed.groupby(['model', 'detected_result_pattern']).size().unstack(fill_value=0)
+        counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
-        fig = self._plot_by_model(
+        fig = self._plot_bars(
             counts_df,
-            title=title or "Error types"
+            title=title or "Error types",
+            category_name="model",
+        )
+
+        return fig
+
+    def plot_error_types_by_question_id(self, title: str | None = None, max_questions: int | None = None):
+        failed = self.get_failed_answer_cases()
+
+        counts_df = failed.groupby(['id', 'detected_result_pattern']).size().unstack(fill_value=0)
+        counts_df = counts_df.reindex(counts_df.sum(axis=1).sort_values(ascending=False).index)
+
+        if max_questions and len(counts_df) > max_questions:
+            counts_df = counts_df[:max_questions]
+            counts_df = counts_df.reindex(counts_df.index.tolist() + ["..."], fill_value=0)
+
+        fig = self._plot_bars(
+            counts_df,
+            title=title or "Error types",
+            category_name="question template id",
+            rotate_labels=False
         )
 
         return fig
