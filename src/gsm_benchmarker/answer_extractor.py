@@ -24,6 +24,9 @@ class ErrorType(Enum):
     FORBIDDEN_STRING = auto()  # one of the potentially dangerous strings (e.g. 'eval') found in function
     NONE_RETURNED = auto()  # for code answers - when function returns None
     NOT_A_NUMBER = auto()  # for code answers - when the return value of a function is not a number (and not None)
+    TYPE_VALUE_ERROR = auto()  # TypeError or ValueError
+    ZERO_DIVISION_ERROR = auto()
+    ATTRIBUTE_ERROR = auto()
     UNCLASSIFIED = auto()  # all others
 
 
@@ -166,6 +169,15 @@ class AnswerExtractor:
         except NameError as exc:
             logger.warning(f"NameError when running extracted function: {exc}")
             return None, ErrorType.NAME_ERROR
+        except AttributeError as exc:
+            logger.warning(f"AttributeError when running extracted function: {exc}")
+            return None, ErrorType.ATTRIBUTE_ERROR
+        except ZeroDivisionError as exc:
+            logger.warning(f"ZeroDivisionError when running extracted function: {exc}")
+            return None, ErrorType.ZERO_DIVISION_ERROR
+        except (TypeError, ValueError) as exc:
+            logger.warning(f"{exc.__class__.__name__} when running extracted function: {exc}")
+            return None, ErrorType.TYPE_VALUE_ERROR
         except Exception as exc:
             logger.warning(f"Error when running extracted function: {exc.__class__.__name__}: {exc}")
             return None, ErrorType.UNCLASSIFIED
