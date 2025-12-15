@@ -251,15 +251,20 @@ class MultiModelResultsAnalyser:
 
         return fig
 
-    def plot_error_types_by_question_id(self, title: str | None = None, max_questions: int | None = None):
+    def plot_error_types_by_question_id(self, title: str | None = None, max_questions: int | None = None,
+                                        highest: bool = True):
         failed = self.get_failed_answer_cases()
 
         counts_df = failed.groupby(['id', 'detected_result_pattern']).size().unstack(fill_value=0)
         counts_df = counts_df.reindex(counts_df.sum(axis=1).sort_values(ascending=False).index)
 
         if max_questions and len(counts_df) > max_questions:
-            counts_df = counts_df[:max_questions]
-            counts_df = counts_df.reindex(counts_df.index.tolist() + ["..."], fill_value=0)
+            if highest:
+                counts_df = counts_df[:max_questions]
+                counts_df = counts_df.reindex(counts_df.index.tolist() + ["..."], fill_value=0)
+            else:
+                counts_df = counts_df[-max_questions:]
+                counts_df = counts_df.reindex(["..."] + counts_df.index.tolist(), fill_value=0)
 
         fig = self._plot_bars(
             counts_df,
