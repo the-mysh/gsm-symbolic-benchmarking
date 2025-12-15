@@ -95,7 +95,7 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return data
 
-    def get_baseline_comparison_df(self, variant: str):
+    def get_baseline_comparison_df(self, variant: str, model: str | None = None):
         if variant not in self._variants:
             raise ValueError(f"No data for variant '{variant}'")
 
@@ -108,13 +108,18 @@ class MultiVariantMultiModelResultsAnalyser:
 
         variant_subset = self._variants[variant].full_data[['model', 'id', 'instance', 'correct', 'result_class']]
 
+        if model is not None:
+            baseline_subset = baseline_subset[baseline_subset.model == model]
+            variant_subset = variant_subset[variant_subset.model == model]
+
         merged = variant_subset.merge(baseline_subset, on=['model', 'id'], how='left')
 
         merged['diff_correct'] = merged['correct'].astype(int) - merged['baseline_correct'].astype(int)
 
         return merged
 
-    def _make_transition_matrix(self, data, order, column, margins_name='total'):
+    @staticmethod
+    def _make_transition_matrix(data, order, column, margins_name='total'):
         order = order + [margins_name]
 
         counts_matrix = pd.crosstab(
@@ -147,8 +152,8 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return percentages_matrix, labels_matrix
 
-    def plot_baseline_transition_matrices(self, variant: str, subtitle: str | None = None):
-        df = self.get_baseline_comparison_df(variant)
+    def plot_baseline_transition_matrices(self, variant: str, subtitle: str | None = None, model: str | None = None):
+        df = self.get_baseline_comparison_df(variant, model=model)
 
         correct_tm, correct_labels = self._make_transition_matrix(df, [True, False], 'correct')
 
@@ -175,6 +180,8 @@ class MultiVariantMultiModelResultsAnalyser:
         t = "Transition of results: baseline (GSM8K) -> template variations (GSM Symbolic)"
         if subtitle:
             t += ("\n" + subtitle)
+        if model is not None:
+            t += ((", " if subtitle else "\n") + model.replace("_", " "))
         fig.suptitle(t)
 
         return fig
