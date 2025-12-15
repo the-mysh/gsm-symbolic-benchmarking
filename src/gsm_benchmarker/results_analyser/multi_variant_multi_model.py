@@ -114,39 +114,56 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return merged
 
+    def _make_transition_matrix(self, data, order, column, margins_name='total'):
+        order = order + [margins_name]
+
+        counts_matrix = pd.crosstab(
+            data[f'baseline_{column}'],
+            data[column],
+            margins=True,
+            margins_name=margins_name,
+        ).reindex(
+            index=order,
+            columns=order,
+            fill_value=0
+        )
+
+        percentages_matrix = pd.crosstab(
+            data[f'baseline_{column}'],
+            data[column],
+            normalize='all',
+            margins=True,
+            margins_name=margins_name,
+        ).reindex(
+            index=order,
+            columns=order,
+            fill_value=0
+        )
+
+        labels_matrix = (
+                counts_matrix.astype(str) + "\n" +
+                percentages_matrix.map(lambda x: f"({x:.1%})")
+        )
+
+        return percentages_matrix, labels_matrix
+
     def plot_baseline_transition_matrices(self, variant: str, subtitle: str | None = None):
         df = self.get_baseline_comparison_df(variant)
 
-        correct_order = [True, False]
-        correct_transition_matrix = pd.crosstab(
-            df['baseline_correct'],
-            df['correct'],
-            normalize='all'
-        ).reindex(
-            index=correct_order,
-            columns=correct_order,
-            fill_value=0
-        )
+        correct_tm, correct_labels = self._make_transition_matrix(df, [True, False], 'correct')
 
-        rc_order = ['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED']
-        result_class_transition_matrix = pd.crosstab(
-            df['baseline_result_class'],
-            df['result_class'],
-            normalize='all'
-        ).reindex(
-            index=rc_order,
-            columns=rc_order,
-            fill_value=0
-        )
+        rc_tm, rc_labels = self._make_transition_matrix(
+            df, ['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED'], 'result_class')
+
 
         fig, axes = plt.subplots(1, 2, figsize=(15, 6))
 
-        for i, (title, matrix) in enumerate((
-                ('correctness', correct_transition_matrix),
-                ('result class', result_class_transition_matrix)
+        for i, (title, matrix, labels) in enumerate((
+                ('correctness', correct_tm, correct_labels),
+                ('result class', rc_tm, rc_labels)
         )):
             ax = axes[i]
-            sns.heatmap(matrix, annot=True, fmt=".1%", cmap="YlGnBu", ax=ax)
+            sns.heatmap(matrix, annot=labels, fmt="", cmap="YlGnBu", ax=ax)
             ax.set_title(title.capitalize())
             ax.set_ylabel("Baseline (from)")
             ax.set_xlabel("Template variations (to)")
