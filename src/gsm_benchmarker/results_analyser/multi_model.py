@@ -6,6 +6,7 @@ from pathlib import Path
 from tqdm import tqdm
 from typing import Any
 import matplotlib.pyplot as plt
+import numpy as np
 
 from gsm_benchmarker.results_analyser.model import ModelResultsAnalyser
 
@@ -181,7 +182,7 @@ class MultiModelResultsAnalyser:
 
     @staticmethod
     def _plot_bars(counts_df: pd.DataFrame, color=None, title: str = None, legend_title: str | None = None,
-                   category_name: str | None = None, rotate_labels: bool = True):
+                   category_name: str | None = None, rotate_labels: bool = True, percentage: bool = False):
         fig, axes = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
 
         counts_df.plot(
@@ -194,7 +195,7 @@ class MultiModelResultsAnalyser:
         if category_name:
             axes[0].set_title(f"By {category_name}")
             axes[0].set_xlabel(category_name.capitalize())
-        axes[0].set_ylabel('Count')
+        axes[0].set_ylabel('% all answers' if percentage else 'Count')
         axes[0].legend(title=legend_title, fancybox=True, framealpha=0.7, frameon=True)
 
         axes[0].tick_params(axis='x', rotation=45 if rotate_labels else 0)
@@ -236,23 +237,35 @@ class MultiModelResultsAnalyser:
     def get_failed_answer_cases(self):
         return self._full_data[self.full_data.predicted_numerical_result.isna()]
 
-    def plot_error_types_by_model(self, title: str | None = None):
+    def plot_error_types_by_model(self, title: str | None = None, percentage: bool = False):
 
         failed = self.get_failed_answer_cases()
 
         counts_df = failed.groupby(['model', 'detected_result_pattern']).size().unstack(fill_value=0)
+
+        if percentage:
+            counts_df = self._get_percentages(counts_df, 'model')
+
         counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         fig = self._plot_bars(
             counts_df,
             title=title or "Error types",
             category_name="model",
+            percentage=percentage
         )
 
         return fig
 
+    def _get_percentages(self, counts_df, index_col: str):
+        full_counts = self.full_data.groupby([index_col]).size()
+        full_counts = full_counts.reindex(counts_df.index, fill_value=0)
+        counts_df = counts_df / np.repeat(np.atleast_2d(full_counts.to_numpy()), counts_df.shape[1], axis=0).T * 100
+
+        return counts_df
+
     def plot_error_types_by_question_id(self, title: str | None = None, max_questions: int | None = None,
-                                        highest: bool = True):
+                                        highest: bool = True, percentage=False):
         failed = self.get_failed_answer_cases()
 
         counts_df = failed.groupby(['id', 'detected_result_pattern']).size().unstack(fill_value=0)
@@ -266,11 +279,15 @@ class MultiModelResultsAnalyser:
                 counts_df = counts_df[-max_questions:]
                 counts_df = counts_df.reindex(["..."] + counts_df.index.tolist(), fill_value=0)
 
+        if percentage:
+            counts_df = self._get_percentages(counts_df, 'id')
+
         fig = self._plot_bars(
             counts_df,
             title=title or "Error types",
             category_name="question template id",
-            rotate_labels=False
+            rotate_labels=False,
+            percentage=percentage
         )
 
         return fig
