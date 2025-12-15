@@ -26,6 +26,7 @@ dependencies = [
   "protobuf",
   "psutil",
   "python-dotenv",
+  "seaborn",
   "sentencepiece",
   "tiktoken",
   "torch>=2.7.0", # using 2.9.0+cu126
