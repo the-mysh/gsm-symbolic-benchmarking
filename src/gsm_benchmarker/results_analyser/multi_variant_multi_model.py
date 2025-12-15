@@ -169,7 +169,12 @@ class MultiVariantMultiModelResultsAnalyser:
             ax.set_xlabel("Template variations (to)")
             ax.set_aspect('equal')
 
+            for func in (ax.axhline, ax.axvline):
+                func(len(matrix) - 1, c='white', zorder=3, lw=8)
+
         t = "Transition of results: baseline (GSM8K) -> template variations (GSM Symbolic)"
         if subtitle:
             t += ("\n" + subtitle)
         fig.suptitle(t)
+
+        return fig
