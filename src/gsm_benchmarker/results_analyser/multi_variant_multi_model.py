@@ -164,24 +164,28 @@ class MultiVariantMultiModelResultsAnalyser:
         fig, axes = plt.subplots(1, 2, figsize=(15, 6))
 
         for i, (title, matrix, labels) in enumerate((
-                ('correctness', correct_tm, correct_labels),
+                ('numerical correctness', correct_tm, correct_labels),
                 ('result class', rc_tm, rc_labels)
         )):
             ax = axes[i]
             sns.heatmap(matrix, annot=labels, fmt="", cmap="YlGnBu", ax=ax)
             ax.set_title(title.capitalize())
-            ax.set_ylabel("Baseline (from)")
-            ax.set_xlabel("Template variations (to)")
+            ax.set_ylabel("GSM8K questions")
+            ax.set_xlabel("GSM-Symbolic template variations")
             ax.set_aspect('equal')
+            ax.xaxis.tick_top()                 # Move the ticks to the top
+            ax.xaxis.set_label_position('top')  # Move the axis label to the top
 
             for func in (ax.axhline, ax.axvline):
                 func(len(matrix) - 1, c='white', zorder=3, lw=8)
 
-        t = "Transition of results: baseline (GSM8K) -> template variations (GSM Symbolic)"
+        t = "Transition of results: original GSM8K questions -> GSM-Symbolic template variations"
         if subtitle:
             t += ("\n" + subtitle)
         if model is not None:
             t += ((", " if subtitle else "\n") + model.replace("_", " "))
         fig.suptitle(t)
+
+        fig.subplots_adjust(top=0.8, bottom=0.05)
 
         return fig
