@@ -53,12 +53,13 @@ SAFE_IMPORTS = {
 
 
 class AnswerExtractor:
-    _number_pattern = r'\s*(?P<number>(-?\d+(?:\.\d+)?))'
+    _number_pattern_str = r'\s*(?P<number>(-?\d+(?:\.\d+)?))'
+    _import_pattern = re.compile(r'\s*(from \w+ )?import \w+')
 
     ANSWER_PATTERNS = {
-        AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern),
-        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is:?\s*\$?' + _number_pattern),
-        AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern)
+        AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern_str),
+        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is:?\s*\$?' + _number_pattern_str),
+        AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern_str)
     }
 
     FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\n(( {4}.*)?\n*)+", flags=re.MULTILINE)
@@ -107,7 +108,7 @@ class AnswerExtractor:
                 return float(match.group('number')), pattern_enum
 
         # Last resort if none of the patterns work: find last number in text
-        numbers = re.findall(cls._number_pattern, text)
+        numbers = re.findall(cls._number_pattern_str, text)
         if numbers:
             return float(numbers[-1][0]), AnswerPattern.LAST_NUMBER
 
@@ -130,7 +131,14 @@ class AnswerExtractor:
         if not match:
             return "", ""
 
-        return match.group(), match.group('func_name')
+        # remove 'import' lines - use predefined imports in local env
+        lines = match.group().split('\n')
+        for i in range(len(lines)):
+            if cls._import_pattern.match(lines[i]):
+                lines[i] = ""
+        text = "\n".join(lines)
+
+        return text, match.group('func_name')
 
     @classmethod
     def extract_answer_code(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
