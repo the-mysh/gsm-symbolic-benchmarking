@@ -55,6 +55,9 @@ class MultiModelResultsAnalyser:
 
         return summary_data_dict, full_data_dict
 
+    def get_accuracies_per_model_and_template_id(self):
+        return self.full_data.groupby(['model', 'id'])[['correct', 'correct_strict']].mean()
+
     @staticmethod
     def _make_summary_df(summary_data_dict):
         data_df = pd.DataFrame(summary_data_dict)

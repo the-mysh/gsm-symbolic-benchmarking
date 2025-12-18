@@ -30,6 +30,7 @@ class ModelResultsAnalyser:
             return 'q:' in ss or 'question:' in ss
 
         data['babbling'] = data.full_response.apply(b)
+        data['correct_strict'] = data.correct.to_numpy() * ~data.babbling.to_numpy()
 
         # add 'result class' column - whether the answer was correct / correct+babbling / incorrect / failed to answer
         nan_idx = data.predicted_numerical_result.isna().to_numpy()

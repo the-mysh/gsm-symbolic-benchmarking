@@ -95,13 +95,27 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return data
 
-    def get_baseline_comparison_df(self, variant: str, model: str | None = None):
+    def _check_variant(self, variant: str):
         if variant not in self._variants:
             raise ValueError(f"No data for variant '{variant}'")
 
         if variant == self.BASELINE_VARIANT:
             raise ValueError(f"{self.BASELINE_VARIANT} is the baseline variant "
                              f"- choose a different variant to compare it to")
+
+    def get_accuracy_drop_df(self, variant: str):
+        self._check_variant(variant)
+
+        baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id()
+        variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id()
+
+        drop = baseline_accuracies - variant_accuracies
+        drop = drop.rename(columns={'correct': 'accuracy_drop', 'correct_strict': 'strict_accuracy_drop'})
+
+        return drop
+
+    def get_baseline_comparison_df(self, variant: str, model: str | None = None):
+        self._check_variant(variant)
 
         baseline_subset = self._variants[self.BASELINE_VARIANT].full_data[['model', 'id', 'correct', 'result_class']]
         baseline_subset = baseline_subset.rename(columns={'correct': 'baseline_correct', 'result_class': 'baseline_result_class'})
