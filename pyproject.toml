@@ -26,6 +26,7 @@ dependencies = [
   "protobuf",
   "psutil",
   "python-dotenv",
+  "scipy",
   "seaborn",
   "sentencepiece",
   "tiktoken",
