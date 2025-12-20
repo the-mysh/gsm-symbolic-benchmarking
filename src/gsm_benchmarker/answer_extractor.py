@@ -131,7 +131,12 @@ class AnswerExtractor:
 
     @classmethod
     def extract_answer_code(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
-        func_def, func_name = cls.extract_function_definition(text)
+        sig = "def solution():\n"
+
+        func_def, func_name = cls.extract_function_definition(sig + text)
+        if func_def == sig:
+            # might be old prompt format case; re-try without added signature line
+            func_def, func_name = cls.extract_function_definition(text)
 
         if not func_def:
             logger.warning("Failed to find valid function definition in text")

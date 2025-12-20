@@ -8,7 +8,7 @@ def solution():
 
     # to find: number of trees planted
 
-    # solution:
+    # calculations:
     trees_planted = trees_end - trees_start
     return trees_planted
 
@@ -23,7 +23,7 @@ def solution():
 
     # to find: total cars in the lot
 
-    # solution:
+    # calculations:
     cars_total = cars_start + cars_new
     return cars_total
 
@@ -39,7 +39,7 @@ def solution():
 
     # to find: total chocolates left
 
-    # solution:
+    # calculations:
     total_start = leah_start + sister_start
     left = total_start - eaten
     return left
@@ -55,7 +55,7 @@ def solution():
 
     # to find: number given to Denny
 
-    # solution:
+    # calculations:
     given_away = jason_start - jason_end
     return given_away
 
@@ -70,7 +70,7 @@ def solution():
 
     # to find: total toys Shawn has now
 
-    # solution:
+    # calculations:
     toys_received = 2 * toys_per_parent
     toys_end = toys_start + toys_received
     return toys_end
@@ -87,7 +87,7 @@ def solution():
 
     # to find: total computers now
 
-    # solution:
+    # calculations:
     added_total = days * per_day
     computers_end = computers_start + added_total
     return computers_end
@@ -104,7 +104,7 @@ def solution():
 
     # to find: golf balls left
 
-    # solution:
+    # calculations:
     lost_total = lost_tues + lost_wed
     balls_left = balls_start - lost_total
     return balls_left
@@ -121,7 +121,7 @@ def solution():
 
     # to find: money left
 
-    # solution:
+    # calculations:
     total_cost = count * cost_each
     money_left = money_start - total_cost
     return money_left

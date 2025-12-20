@@ -49,7 +49,9 @@ class GSMShotManager:
             raise RuntimeError(f"The number of functional solutions ({len(funcs)}) "
                                f"does not match the number of shots ({len(data_dict['samples'])})")
         for i in range(min(len(funcs), len(data_dict["samples"]))):
-            data_dict["samples"][i]["code"] = funcs[i]
+            code = funcs[i]
+            code = "\n".join(code.split("\n")[1:])  # remove 'def solution():' (added in prompt)
+            data_dict["samples"][i]["code"] = code
 
         return tuple(SingleShot(**s, sid=i+1) for i, s in enumerate(data_dict["samples"]))
 
