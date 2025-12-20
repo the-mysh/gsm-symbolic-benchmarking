@@ -62,7 +62,14 @@ class AnswerExtractor:
         AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern_str)
     }
 
-    FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\n(( {4}.*)?\n*)+", flags=re.MULTILINE)
+    FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\s*\n(?P<body>(?:\s+.*|\n)+)", flags=re.MULTILINE)
+
+    # code Block Extractor: Finds content inside ``` blocks (if any)
+    CODE_BLOCK_PATTERN = re.compile(r"```[a-z]*\s*\n(?P<content>.*?)```", flags=re.MULTILINE | re.IGNORECASE | re.DOTALL)
+
+    # alternative: find first indented line
+    IMPLICIT_BODY_PATTERN = re.compile(r"^(?P<indent>[ \t]+)(?P<rest>\S.*)", flags=re.MULTILINE)
+
     FORBIDDEN_ITEMS = [
         re.compile(r"open\(.*\)"),
         re.compile(r"eval\(.*\)"),
@@ -116,6 +123,20 @@ class AnswerExtractor:
     def extract_function_definition(cls, text: str) -> tuple[str, str]:
         text = cls.trim_response(text)
 
+        # isolate code from possible markdown block; skip chatty intros, if any
+        block_match = cls.CODE_BLOCK_PATTERN.search(text)
+        if block_match:
+            text = block_match.group("content")
+
+    # check if the model rewrote the 'def' line - pre-pend it if not
+        if "def solution" not in text:
+            body_match = cls.IMPLICIT_BODY_PATTERN.search(text)
+
+            if body_match:
+                text = text[body_match.start():]
+
+            text = "def solution():\n" + text
+
         match = cls.FUNCTION_PATTERN.search(text)
         if not match:
             return "", ""
@@ -131,12 +152,7 @@ class AnswerExtractor:
 
     @classmethod
     def extract_answer_code(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
-        sig = "def solution():\n"
-
-        func_def, func_name = cls.extract_function_definition(sig + text)
-        if func_def == sig:
-            # might be old prompt format case; re-try without added signature line
-            func_def, func_name = cls.extract_function_definition(text)
+        func_def, func_name = cls.extract_function_definition(text)
 
         if not func_def:
             logger.warning("Failed to find valid function definition in text")

@@ -51,3 +51,113 @@ def test_trim_response(resp, trimmed):
 ))
 def test_trim_response_no_trim(resp):
     assert AnswerExtractor.trim_response(resp) == resp
+
+
+def test_code_clean_explicit_definition():
+    """Test a perfect, standard output with explicit def."""
+    raw = """
+def solution():
+    # given
+    x = 1
+    return x
+"""
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+    assert "def solution():" in result
+    assert "return x" in result
+
+
+def test_implicit_definition_prepend():
+    """Test when model outputs only the body (common in few-shot)."""
+    # The model skips 'def solution():' and starts identifying variables
+    raw = """
+    # given
+    a = 10
+    # calculation
+    b = a * 2
+    return b
+"""
+
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+    assert result.startswith("def solution():")  # Should have prepended header
+    assert "b = a * 2" in result
+
+
+def test_implicit_definition_prepend_with_chatty_intro():
+    """Test when model outputs only the body (common in few-shot), but with a chatty intro."""
+
+    raw = """Sure! I can help with that. Based on the logic provided, here is the function:
+    
+    # given
+    a = 10
+    # calculation
+    b = a * 2
+    return b
+"""
+
+    m = AnswerExtractor.CODE_BLOCK_PATTERN.search(raw)
+    print(m.group('content') if m else "not found")
+
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+    assert result.startswith("def solution():")  # Should have prepended header
+    assert "b = a * 2" in result
+
+
+def test_markdown_stripping():
+    """Test removal of ```python and ``` blocks."""
+    raw = """
+Here is the answer:
+```python
+def solution():
+    x = 5
+    return x
+"""
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+    assert "```" not in result
+    assert "Here is the answer" not in result
+
+
+def test_internal_newlines():
+    """Test that empty lines inside the function don't break extraction."""
+    raw = """def solution(): 
+    x = 1
+    # calculation
+    y = x + 1
+
+    return y"""
+
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+    assert "return y" in result
+
+
+@pytest.mark.parametrize("indent", ["  ", "\t", "    "])
+def test_variable_indentation(indent): 
+    """Test that 2 spaces, 4 spaces, and tabs are all accepted."""
+    raw = f"""\ndef solution():\n{indent}# given\n{indent}x = 10\n{indent}return x """
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+
+
+def test_garbage_input(): 
+    """Test completely irrelevant input.""" 
+    raw = "I cannot answer this question as it violates safety policies." 
+    assert AnswerExtractor.extract_function_definition(raw)[0] == ""
+
+
+def test_nested_markdown_mess(): 
+    """Test messy markdown formatting often seen in smaller models."""
+    raw = """ Sure:
+
+    # given
+    a = 5
+    return a
+""" 
+    # This checks implicit def + markdown wrappers 
+    result, _ = AnswerExtractor.extract_function_definition(raw)
+    assert result  # not empty
+    assert "def solution():" in result 
+    assert "return a" in result
