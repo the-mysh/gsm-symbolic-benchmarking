@@ -3,6 +3,8 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 
+from gsm_benchmarker.answer_extractor import AnswerExtractor
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +28,7 @@ class ModelResultsAnalyser:
 
         # add 'babbling' column
         def b(s: str) -> bool:
-            ss = s.lower()
-            return 'q:' in ss or 'question:' in ss
+            return any(bt in s for bt in AnswerExtractor.BABBLER_TOKENS)
 
         data['babbling'] = data.full_response.apply(b)
         data['correct_strict'] = data.correct.to_numpy() * ~data.babbling.to_numpy()

@@ -24,7 +24,7 @@ Q: Q3?
 A: Let's think step by step. A3. The final answer is 39.
 
 Q: What about this one?
-A: Let's think step by step."""
+A: Let's think step by step. """
 
 
 def test_pc_with_target_intro(mock_shot_manager):
@@ -42,7 +42,7 @@ A: Let's think step by step. A2. The final answer is 25.
 Now please solve this problem:
 
 Q: What about this one?
-A: Let's think step by step."""
+A: Let's think step by step. """
 
 
 def test_alternative_pc(mock_shot_manager):

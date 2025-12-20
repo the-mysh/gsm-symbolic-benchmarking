@@ -71,18 +71,7 @@ class AnswerExtractor:
         re.compile(r"[gs]etattr\(.*\)")
     ]
 
-    STOP_TOKENS = (
-        # from paper
-        "Q:",  # model moves on to generating a next question
-        "Question:",  # same as above
-        "</s>",
-        "<|endoftext|>",
-
-        # other, suggested by Gemini
-        "**`<",  # OpenAI / Mistral / LLama3
-        "<end_of_turn>",  # Gemma
-        "[/INST]"  # Mistral Dialogic / Tool Use
-    )
+    BABBLER_TOKENS = ("Q:", "Question:")  # when model moves on to generating a next question
 
     def __init__(self, code: bool = False):
         self._extraction_method = self.extract_answer_code if code else self.extract_answer_textual
@@ -193,13 +182,12 @@ class AnswerExtractor:
         res = loc['ret']
         return res, AnswerPattern.CODE
 
-
     @classmethod
     def trim_response(cls, text: str) -> str:
-        """'Trim' model response to the appearance of an end-of-response token - if any."""
+        """'Trim' model response to the appearance of a babbler token - if any."""
 
-        for stop_token in cls.STOP_TOKENS:
-            idx = text.find(stop_token)
+        for bt in cls.BABBLER_TOKENS:
+            idx = text.find(bt)
             if idx >= 0:  # -1 if not found
                 return text[:idx]  # don't look for other stop tokens
 

@@ -39,11 +39,6 @@ def test_extract_answer_textual_no_pattern(resp, value, caplog):
 @pytest.mark.parametrize(("resp", "trimmed"), (
     ("some answer blah blah\n\nQ:", "some answer blah blah\n\n"),
     ("xyz!Q:ddd", "xyz!"),
-    ("abc </s> saaaa", "abc "),
-    ("response.<|endoftext|>", "response."),
-    ("some text = 3 \n **`<", "some text = 3 \n "),
-    ("blahblah<end_of_turn>\t\t\t", "blahblah"),
-    ("The final answer is 42.[/INST]", "The final answer is 42."),
 ))
 def test_trim_response(resp, trimmed):
     assert AnswerExtractor.trim_response(resp) == trimmed
