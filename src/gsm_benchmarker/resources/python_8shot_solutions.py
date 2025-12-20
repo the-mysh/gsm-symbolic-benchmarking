@@ -20,7 +20,7 @@ FUNCTIONS.append(solution)
 def solution():
     # given:
     cars_originally = 3  # number of cars originally in the parking lot
-    cars_arriving = 2  # number of cars arriving in teh parking loy
+    cars_arriving = 2  # number of cars arriving in teh parking lot
 
     # to find: total number of cars in the parking lot
 
@@ -60,7 +60,7 @@ def solution():
     # to find: number of lollipops Jason gave to Denny
 
     # solution:
-    # calculate the difference between lollipops Jason had originally had lollipops he has now
+    # calculate the difference between lollipops Jason had originally and lollipops he has now
     lollipops_given_to_denny = lollipops_jason_originally - lollipops_jason_now
     return lollipops_given_to_denny
 
@@ -126,11 +126,11 @@ FUNCTIONS.append(solution)
 
 def solution():
     # given:
-    dollars_originally = 23  # number of dollars Olivia had originally
+    dollars_originally = 23  # number of dollars Olivia had originally; note: do not use $ symbol
     bagels = 5  # number of bagels Olivia bought
-    price_per_bagel = 3  # number of dollars each bagel cost
+    price_per_bagel = 3  # number of dollars each bagel cost; note: do not use $ symbol
 
-    # to find: how many dollars Olivia has left?
+    # to find: number of dollars Olivia has left
 
     # solution:
     # first, calculate the total cost of the bagels
