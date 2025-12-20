@@ -1,0 +1,8 @@
+{
+  "n_shots": 8,
+  "shot_intro": "",
+  "question_format": "Q: {question}\nA: Let's think step by step. ",
+  "answer_format": "{solution} The final answer is: {result}.",
+  "intro": "As an expert problem solver, solve the following problem based on the examples provided. Here are the examples:",
+  "target_intro": "Now, solve this problem:"
+}
