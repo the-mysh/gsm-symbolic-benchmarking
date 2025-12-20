@@ -10,6 +10,8 @@ def solution():
 
     # calculations:
     trees_planted = trees_end - trees_start
+
+    # return:
     return trees_planted
 
 
@@ -25,6 +27,8 @@ def solution():
 
     # calculations:
     cars_total = cars_start + cars_new
+
+    # return:
     return cars_total
 
 
@@ -42,6 +46,8 @@ def solution():
     # calculations:
     total_start = leah_start + sister_start
     left = total_start - eaten
+
+    # return:
     return left
 
 
@@ -57,6 +63,8 @@ def solution():
 
     # calculations:
     given_away = jason_start - jason_end
+
+    # return:
     return given_away
 
 
@@ -73,6 +81,8 @@ def solution():
     # calculations:
     toys_received = 2 * toys_per_parent
     toys_end = toys_start + toys_received
+
+    # return:
     return toys_end
 
 
@@ -90,6 +100,8 @@ def solution():
     # calculations:
     added_total = days * per_day
     computers_end = computers_start + added_total
+
+    # return:
     return computers_end
 
 
@@ -107,6 +119,8 @@ def solution():
     # calculations:
     lost_total = lost_tues + lost_wed
     balls_left = balls_start - lost_total
+
+    # return:
     return balls_left
 
 
@@ -124,6 +138,8 @@ def solution():
     # calculations:
     total_cost = count * cost_each
     money_left = money_start - total_cost
+
+    # return:
     return money_left
 
 
