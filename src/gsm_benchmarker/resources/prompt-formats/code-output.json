@@ -1,9 +1,0 @@
-{
-  "n_shots": 8,
-  "shot_intro": "",
-  "question_format": "Q: {question}\nA: Let's think step by step.",
-  "answer_format": "\n{code}",
-  "intro": "As an expert problem solver, solve the following mathematical questions. Make sure your answer is a valid Python function, taking no arguments and returning the answer as an int or float.",
-  "target_intro": "",
-  "code_type_answer": true
-}
