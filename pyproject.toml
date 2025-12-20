@@ -29,6 +29,7 @@ dependencies = [
   "scipy",
   "seaborn",
   "sentencepiece",
+  "statsmodels",
   "tiktoken",
   "torch>=2.7.0", # using 2.9.0+cu126
   "tqdm",
