@@ -20,7 +20,7 @@ FUNCTIONS.append(solution)
 def solution():
     # given:
     cars_originally = 3  # number of cars originally in the parking lot
-    cars_arriving = 2  # number of cars arriving in teh parking lot
+    cars_arriving = 2  # number of cars arriving in the parking lot
 
     # to find: total number of cars in the parking lot
 

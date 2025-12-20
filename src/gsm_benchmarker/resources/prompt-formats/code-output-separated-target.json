@@ -4,6 +4,6 @@
   "question_format": "Q: {question}\n\nA:\n",
   "answer_format": "{code}",
   "intro": "Here are some example problems with answers:",
-  "target_intro": "Based on the examples above, please solve the problem below similarly. Make sure your answer is a valid Python function, taking no arguments and returning the answer as an int or float.",
+  "target_intro": "Based on the examples above, please solve the problem below similarly. Make sure your answer is a valid Python function.\nRules for the Python function:\n1. The function should take no arguments.\n2. The function should return the answer as an int or float.\n3. Do not use special characters like '$', '%', or '?' in variable values.\n4. Do not use colons ':' for ratios; use division '/' instead.\n5. If a value is unknown/to-be-calculated, do not list it in the 'given' section. Calculate it in the 'solution' section.\n6. Ensure all lines are valid executable Python code.",
   "code_type_answer": true
 }
