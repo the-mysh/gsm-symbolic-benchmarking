@@ -1,5 +1,7 @@
 from scipy import stats
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 
@@ -47,7 +49,7 @@ class PromptEffectAnalyser:
                 good_change = t_stat > 0 if want_increase[column] else t_stat < 0
                 rc['significant'] = significant
                 rc['success'] = significant and good_change
-                rc['failure'] = significant and good_change
+                rc['failure'] = significant and not good_change
 
                 r[column] = rc
 
@@ -60,4 +62,22 @@ class PromptEffectAnalyser:
         else:
             return combined[['significant', 'success', 'failure']].astype(int).groupby('param').sum()
 
+    def plot_core_stats(self, variant: str, **kwargs):
+        titles = {'babbling': 'Babbling factor', 'correct': 'Accuracy (standard)', 'correct_strict': 'Accuracy (discounted)'}
+        colors =['limegreen', 'indianred', 'lightsteelblue']
 
+        cs = self.compare_core_stats(variant, **kwargs, detailed_output=False)
+        n_models = len(self._experiment_mres.variants[variant].models)
+        cs['not significant'] = n_models - cs.significant
+        cs = cs.drop('significant', axis=1)
+
+        n_plots = len(cs)
+        fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4), gridspec_kw={'width_ratios': [2, 2, 2, 1]})
+        for param, ax in zip(cs.index, axes):
+            wedges, _, _ = ax.pie(cs.loc[param], colors=colors, autopct=lambda p: str(round(p*n_models/100)))
+            ax.set_title(titles.get(param, param))
+
+        axes[-1].axis('off')
+        axes[-1].legend(wedges, cs.columns, loc='center')
+
+        return fig, cs
