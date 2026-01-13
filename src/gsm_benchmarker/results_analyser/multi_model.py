@@ -55,6 +55,9 @@ class MultiModelResultsAnalyser:
 
         return summary_data_dict, full_data_dict
 
+    def get_core_stats(self):
+        return self.full_data.groupby(['model', 'instance'])[['correct', 'correct_strict', 'babbling']].mean()
+
     def get_accuracies_per_model_and_template_id(self):
         return self.full_data.groupby(['model', 'id'])[['correct', 'correct_strict']].mean()
 
