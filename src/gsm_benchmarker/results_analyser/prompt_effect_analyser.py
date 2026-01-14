@@ -101,7 +101,9 @@ class PromptEffectAnalyser:
                 'mean_gap_closure': 0.0,
                 'test_type': 'None (Identical)',
                 'p_value': 1.0,
-                'significant': False
+                'significant': False,
+                'success': False,
+                'failure': False
             }
 
         # check normality (Shapiro-Wilk)
@@ -118,11 +120,16 @@ class PromptEffectAnalyser:
             # 'wilcoxon' excludes zero-differences by default (correction=True)
             stat, p_val = stats.wilcoxon(base_data, exp_data, alternative='greater')
 
+        significant = p_val < alpha
+        good_change = stat > 0
+
         return {
             'mean_gap_closure': diffs.mean(),
             'test_type': test_name,
             'p_value': p_val,
-            'significant': p_val < alpha
+            'significant': significant,
+            'success': significant and good_change,
+            'failure': significant and not good_change
         }
 
     def analyze_accuracy_drops(self, variant: str, alpha=0.05):
