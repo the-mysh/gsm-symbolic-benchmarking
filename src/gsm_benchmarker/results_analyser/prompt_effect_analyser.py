@@ -4,7 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import logging
 from tqdm.auto import tqdm
-from statsmodels.stats.multitest import multipletests
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 
@@ -91,6 +90,41 @@ class PromptEffectAnalyser:
 
         return fig, cs
 
+    def _analyse_single_model_accuracy_drop(self, base_data: pd.Series, exp_data: pd.Series, alpha=0.05):
+        # calculate the 'gap closure' (difference of differences)
+        # we want to test if baseline drop > experiment drop, so: gap closure = baseline - experiment
+        diffs = base_data - exp_data
+
+        # edge case - no difference
+        if np.all(diffs == 0):
+            return {
+                'mean_gap_closure': 0.0,
+                'test_type': 'None (Identical)',
+                'p_value': 1.0,
+                'significant': False
+            }
+
+        # check normality (Shapiro-Wilk)
+        shapiro_stat, shapiro_p = stats.shapiro(diffs)
+        is_normal = shapiro_p > 0.05
+
+        # run the statistical test
+        # use 'greater' because we expect baseline drop > treatment drop
+        if is_normal:
+            test_name = 'Paired T-Test'
+            stat, p_val = stats.ttest_rel(base_data, exp_data, alternative='greater')
+        else:
+            test_name = 'Wilcoxon'
+            # 'wilcoxon' excludes zero-differences by default (correction=True)
+            stat, p_val = stats.wilcoxon(base_data, exp_data, alternative='greater')
+
+        return {
+            'mean_gap_closure': diffs.mean(),
+            'test_type': test_name,
+            'p_value': p_val,
+            'significant': p_val < alpha
+        }
+
     def analyze_accuracy_drops(self, variant: str, alpha=0.05):
         """Analyses whether the accuracy drop is significantly lower in the treatment group."""
 
@@ -100,61 +134,27 @@ class PromptEffectAnalyser:
         # Get list of unique models from the index level 0
         models = drops_base.index.get_level_values(0).unique()
 
-        col_name = 'accuracy_drop'
-
-        results = []
-
-        logger.debug(f"Processing {len(models)} models...\n")
+        res = {}
 
         for model in tqdm(models):
-            try:
-                base_data = drops_base.loc[model][col_name].sort_index()
-                exp_data = drops_experiment.loc[model][col_name].sort_index()
-            except KeyError:
-                logger.warning(f"Skipping {model}: data missing in one of the dataframes")
-                continue
+            model_res = {}
+            for col_name in drops_experiment.columns:
+                try:
+                    base_data = drops_base.loc[model][col_name].sort_index()
+                    exp_data = drops_experiment.loc[model][col_name].sort_index()
+                except KeyError:
+                    logger.warning(f"Skipping {model}: data missing in one of the dataframes")
+                    continue
 
-            # Check alignment
-            if not base_data.index.equals(exp_data.index):
-                logger.warning(f"Template IDs do not match for {model}.; skipping")
-                continue
+                # Check alignment
+                if not base_data.index.equals(exp_data.index):
+                    logger.warning(f"Template IDs do not match for {model}.; skipping")
+                    continue
 
-            # calculate the 'gap closure' (difference of differences)
-            # we want to test if baseline drop > experiment drop, so: gap closure = baseline - experiment 
-            diffs = base_data - exp_data
+                model_res[col_name] = self._analyse_single_model_accuracy_drop(base_data, exp_data, alpha=alpha)
 
-            # edge case - no difference
-            if np.all(diffs == 0):
-                results.append({
-                    'model': model,
-                    'mean_gap_closure': 0.0,
-                    'test_type': 'None (Identical)',
-                    'p_value': 1.0
-                })
-                continue
+            res[model] = pd.DataFrame(model_res).T
 
-            # check normality (Shapiro-Wilk)
-            shapiro_stat, shapiro_p = stats.shapiro(diffs)
-            is_normal = shapiro_p > 0.05
+        combined = pd.concat(res.values(), keys=res.keys(), names=['model', 'metric'])
 
-            # run the statistical test
-            # use 'greater' because we expect baseline drop > treatment drop
-            if is_normal:
-                test_name = 'Paired T-Test'
-                stat, p_val = stats.ttest_rel(base_data, exp_data, alternative='greater')
-            else:
-                test_name = 'Wilcoxon'
-                # 'wilcoxon' excludes zero-differences by default (correction=True)
-                stat, p_val = stats.wilcoxon(base_data, exp_data, alternative='greater')
-
-            results.append({
-                'model': model,
-                'mean_gap_closure': diffs.mean(),
-                'test_type': test_name,
-                'p_value': p_val
-            })
-
-        results_df = pd.DataFrame(results)
-        results_df['significant'] = results_df.p_value < alpha
-
-        return results_df
+        return combined
