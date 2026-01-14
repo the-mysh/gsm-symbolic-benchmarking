@@ -73,16 +73,22 @@ class PromptEffectAnalyser:
 
     def plot_core_stats(self, variant: str, title: str | None = None, **kwargs):
         titles = {'babbling': 'Babbling factor', 'correct': 'Accuracy (standard)', 'correct_strict': 'Accuracy (discounted)'}
-        colors =['limegreen', 'indianred', 'lightsteelblue']
 
         cs = self.compare_core_stats(variant, **kwargs, detailed_output=False)
         n_models = len(self._experiment_mres.variants[variant].models)
+
+        return self.plot_stats(cs, n_models=n_models, titles=titles,
+                               title=title or self._experiment_label + f" ('{variant}' variant)")
+
+    def plot_stats(self, cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None, title: str | None = None):
+        colors =['limegreen', 'indianred', 'lightsteelblue']
+
         cs['not significant'] = n_models - cs.significant
         cs = cs.drop('significant', axis=1)
         cs.rename(columns={'success': 'Improvement', 'failure': 'Deterioration', 'not significant': 'Change not significant'})
 
         n_plots = len(cs)
-        fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4), gridspec_kw={'width_ratios': [2, 2, 2, 1]})
+        fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4), gridspec_kw={'width_ratios': n_plots * [2] + [1]})
         for param, ax in zip(cs.index, axes):
             wedges, _, _ = ax.pie(cs.loc[param], colors=colors, autopct=lambda p: str(round(p*n_models/100)))
             ax.set_title(titles.get(param, param))
@@ -90,7 +96,8 @@ class PromptEffectAnalyser:
         axes[-1].axis('off')
         axes[-1].legend(wedges, cs.columns, loc='center')
 
-        fig.suptitle(title or self._experiment_label + f" ('{variant}' variant)")
+        if title:
+            fig.suptitle(title)
 
         return fig, cs
 
@@ -172,3 +179,17 @@ class PromptEffectAnalyser:
             return combined
         else:
             return self._summarise_output(combined, 'metric')
+
+    def plot_accuracy_drops_summary(self, variant: str, title: str | None = None, **kwargs):
+        titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
+
+        cs = self.analyze_accuracy_drops(variant, **kwargs, detailed_output=False)
+        n_models = len(self._experiment_mres.variants[variant].models)
+
+        fig, cs = self.plot_stats(
+            cs, n_models=n_models, titles=titles,
+            title=title or f"Accuracy drop (gap closure): {self._experiment_label}, '{variant}' variant")
+
+        fig.subplots_adjust(top=0.8)
+        return fig, cs
+
