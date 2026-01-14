@@ -62,7 +62,7 @@ class PromptEffectAnalyser:
         else:
             return combined[['significant', 'success', 'failure']].astype(int).groupby('param').sum()
 
-    def plot_core_stats(self, variant: str, **kwargs):
+    def plot_core_stats(self, variant: str, title: str | None = None, **kwargs):
         titles = {'babbling': 'Babbling factor', 'correct': 'Accuracy (standard)', 'correct_strict': 'Accuracy (discounted)'}
         colors =['limegreen', 'indianred', 'lightsteelblue']
 
@@ -70,6 +70,7 @@ class PromptEffectAnalyser:
         n_models = len(self._experiment_mres.variants[variant].models)
         cs['not significant'] = n_models - cs.significant
         cs = cs.drop('significant', axis=1)
+        cs.rename(columns={'success': 'Improvement', 'failure': 'Deterioration', 'not significant': 'Change not significant'})
 
         n_plots = len(cs)
         fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4), gridspec_kw={'width_ratios': [2, 2, 2, 1]})
@@ -79,5 +80,7 @@ class PromptEffectAnalyser:
 
         axes[-1].axis('off')
         axes[-1].legend(wedges, cs.columns, loc='center')
+
+        fig.suptitle(title or self._experiment_label + f" ('{variant}' variant)")
 
         return fig, cs
