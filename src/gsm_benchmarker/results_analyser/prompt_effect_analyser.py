@@ -180,6 +180,28 @@ class PromptEffectAnalyser:
         else:
             return self._summarise_output(combined, 'metric')
 
+    def plot_accuracy_drops_p_values(self, variant, **kwargs):
+        titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
+
+        cs = self.analyze_accuracy_drops(variant, **kwargs, detailed_output=True)
+        df_plot = cs.p_value.unstack(level='metric')
+        df_plot.rename(columns=titles, inplace=True)
+
+        fig, ax = plt.subplots(figsize=(12, 6))
+
+        ax = df_plot.plot(ax=ax, kind='bar')
+        ax.set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_plot.index], rotation=45, ha='right')
+        ax.axhline(0.05, ls='--', color='k', lw=0.5, label='alpha = 0.05')
+        ax.axhline(0.16, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
+
+        plt.title(f"P values for accuracy (gap closure): {self._experiment_label}, '{variant}' variant")
+        plt.xlabel('Model')
+        plt.ylabel('P value')
+        plt.legend(loc='upper right')
+        plt.tight_layout()
+
+        return fig
+
     def plot_accuracy_drops_summary(self, variant: str, title: str | None = None, **kwargs):
         titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
 
