@@ -65,7 +65,11 @@ class PromptEffectAnalyser:
         if detailed_output:
             return combined
         else:
-            return combined[['significant', 'success', 'failure']].astype(int).groupby('param').sum()
+            return self._summarise_output(combined, 'param')
+
+    @staticmethod
+    def _summarise_output(combined_df, column):
+        return combined_df[['significant', 'success', 'failure']].astype(int).groupby(column).sum()
 
     def plot_core_stats(self, variant: str, title: str | None = None, **kwargs):
         titles = {'babbling': 'Babbling factor', 'correct': 'Accuracy (standard)', 'correct_strict': 'Accuracy (discounted)'}
@@ -132,7 +136,7 @@ class PromptEffectAnalyser:
             'failure': significant and not good_change
         }
 
-    def analyze_accuracy_drops(self, variant: str, alpha=0.05):
+    def analyze_accuracy_drops(self, variant: str, alpha=0.05, detailed_output=False):
         """Analyses whether the accuracy drop is significantly lower in the treatment group."""
 
         drops_base = self._baseline_mres.get_accuracy_drop_df(variant)
@@ -164,4 +168,7 @@ class PromptEffectAnalyser:
 
         combined = pd.concat(res.values(), keys=res.keys(), names=['model', 'metric'])
 
-        return combined
+        if detailed_output:
+            return combined
+        else:
+            return self._summarise_output(combined, 'metric')
