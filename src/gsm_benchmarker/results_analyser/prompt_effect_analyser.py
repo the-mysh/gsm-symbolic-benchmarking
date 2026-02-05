@@ -78,23 +78,23 @@ class PromptEffectAnalyser:
         n_models = len(self._experiment_mres.variants[variant].models)
 
         return self.plot_stats(cs, n_models=n_models, titles=titles,
-                               title=title or self._experiment_label + f" ('{variant}' variant)")
+                               title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
 
     def plot_stats(self, cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None, title: str | None = None):
         colors =['limegreen', 'indianred', 'lightsteelblue']
 
         cs['not significant'] = n_models - cs.significant
         cs = cs.drop('significant', axis=1)
-        cs.rename(columns={'success': 'Improvement', 'failure': 'Deterioration', 'not significant': 'Change not significant'})
+        cs = cs.rename(columns={'success': 'Improvement', 'failure': 'Deterioration', 'not significant': 'Change not significant'})
 
         n_plots = len(cs)
-        fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4), gridspec_kw={'width_ratios': n_plots * [2] + [1]})
+        fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4))
         for param, ax in zip(cs.index, axes):
             wedges, _, _ = ax.pie(cs.loc[param], colors=colors, autopct=lambda p: str(round(p*n_models/100)))
             ax.set_title(titles.get(param, param))
 
         axes[-1].axis('off')
-        axes[-1].legend(wedges, cs.columns, loc='center')
+        axes[-1].legend(wedges, cs.columns, loc='center', title="No. if models which showed:")
 
         if title:
             fig.suptitle(title)
@@ -143,7 +143,7 @@ class PromptEffectAnalyser:
             'failure': significant and not good_change
         }
 
-    def analyze_accuracy_drops(self, variant: str, alpha=0.05, detailed_output=False):
+    def analyze_gap_closure(self, variant: str, alpha=0.05, detailed_output=False):
         """Analyses whether the accuracy drop is significantly lower in the treatment group."""
 
         drops_base = self._baseline_mres.get_accuracy_drop_df(variant)
@@ -180,37 +180,49 @@ class PromptEffectAnalyser:
         else:
             return self._summarise_output(combined, 'metric')
 
-    def plot_accuracy_drops_p_values(self, variant, **kwargs):
+    def plot_gap_closure_bars(self, variant, **kwargs):
         titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
 
-        cs = self.analyze_accuracy_drops(variant, **kwargs, detailed_output=True)
-        df_plot = cs.p_value.unstack(level='metric')
-        df_plot.rename(columns=titles, inplace=True)
+        cs = self.analyze_gap_closure(variant, **kwargs, detailed_output=True)
 
-        fig, ax = plt.subplots(figsize=(12, 6))
+        def prep_df(col):
+            df = cs[col].unstack(level='metric')
+            df.rename(columns=titles, inplace=True)
+            return df
 
-        ax = df_plot.plot(ax=ax, kind='bar')
-        ax.set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_plot.index], rotation=45, ha='right')
-        ax.axhline(0.05, ls='--', color='k', lw=0.5, label='alpha = 0.05')
-        ax.axhline(0.16, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
+        df_gap_closure = prep_df('mean_gap_closure')
+        df_p_values = prep_df('p_value')
 
-        plt.title(f"P values for accuracy (gap closure): {self._experiment_label}, '{variant}' variant")
-        plt.xlabel('Model')
-        plt.ylabel('P value')
-        plt.legend(loc='upper right')
-        plt.tight_layout()
+        fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
+
+        df_gap_closure.plot(ax=axes[0], kind='bar')
+        axes[0].set_ylabel("Mean gap closure")
+        axes[0].axhline(0, color='k', lw=0.5)
+
+        df_p_values.plot(ax=axes[1], kind='bar')
+        axes[1].set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_p_values.index], rotation=45, ha='right')
+        axes[1].axhline(0.05, ls='--', color='k', lw=0.5, label='alpha = 0.05')
+        axes[1].axhline(0.16, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
+        axes[1].set_xlabel('Model')
+        axes[1].set_ylabel('P value')
+
+        for ax in axes:
+            ax.legend(loc='upper right', frameon=True)
+
+        fig.suptitle(f"{self._experiment_label}: accuracy (gap closure) on variant '{variant}' vs 'GSM8K'")
+        fig.tight_layout()
 
         return fig
 
-    def plot_accuracy_drops_summary(self, variant: str, title: str | None = None, **kwargs):
+    def plot_gap_closure_summary(self, variant: str, title: str | None = None, **kwargs):
         titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
 
-        cs = self.analyze_accuracy_drops(variant, **kwargs, detailed_output=False)
+        cs = self.analyze_gap_closure(variant, **kwargs, detailed_output=False)
         n_models = len(self._experiment_mres.variants[variant].models)
 
         fig, cs = self.plot_stats(
             cs, n_models=n_models, titles=titles,
-            title=title or f"Accuracy drop (gap closure): {self._experiment_label}, '{variant}' variant")
+            title=title or f"{self._experiment_label}: accuracy drop (gap closure) on variant '{variant}' vs 'GSM8K'")
 
         fig.subplots_adjust(top=0.8)
         return fig, cs
