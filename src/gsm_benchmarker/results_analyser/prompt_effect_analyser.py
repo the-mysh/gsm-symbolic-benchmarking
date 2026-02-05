@@ -182,6 +182,7 @@ class PromptEffectAnalyser:
 
     def plot_gap_closure_bars(self, variant, **kwargs):
         titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
+        colours = ['lightblue', 'navy']
 
         cs = self.analyze_gap_closure(variant, **kwargs, detailed_output=True)
 
@@ -195,11 +196,11 @@ class PromptEffectAnalyser:
 
         fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
 
-        df_gap_closure.plot(ax=axes[0], kind='bar')
+        df_gap_closure.plot(ax=axes[0], kind='bar', color=colours)
         axes[0].set_ylabel("Mean gap closure")
         axes[0].axhline(0, color='k', lw=0.5)
 
-        df_p_values.plot(ax=axes[1], kind='bar')
+        df_p_values.plot(ax=axes[1], kind='bar', color=colours)
         axes[1].set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_p_values.index], rotation=45, ha='right')
         axes[1].axhline(0.05, ls='--', color='k', lw=0.5, label='alpha = 0.05')
         axes[1].axhline(0.16, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
