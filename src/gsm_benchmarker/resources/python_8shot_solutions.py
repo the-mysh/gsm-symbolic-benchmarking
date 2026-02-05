@@ -1,35 +1,18 @@
+
 FUNCTIONS = []
 
 
 def solution():
     # given:
-    trees_start = 15  # trees originally in the grove
-    trees_end = 21    # trees after planting
+    trees_now = 15  # number of trees currently in the grove
+    trees_after_planting = 21  # number of trees in the grove after the workers are done planting today
 
-    # to find: number of trees planted
+    # to find: number of trees the grove workers will plant today
 
-    # calculations:
-    trees_planted = trees_end - trees_start
-
-    # return:
-    return trees_planted
-
-
-FUNCTIONS.append(solution)
-
-
-def solution():
-    # given:
-    cars_start = 3  # cars originally in the lot
-    cars_new = 2    # cars that arrived
-
-    # to find: total cars in the lot
-
-    # calculations:
-    cars_total = cars_start + cars_new
-
-    # return:
-    return cars_total
+    # solution:
+    # calculate the difference between trees after planting and trees originally
+    trees_to_plant_today = trees_after_planting - trees_now
+    return trees_to_plant_today
 
 
 FUNCTIONS.append(solution)
@@ -37,18 +20,15 @@ FUNCTIONS.append(solution)
 
 def solution():
     # given:
-    leah_start = 32    # chocolates Leah started with
-    sister_start = 42  # chocolates sister started with
-    eaten = 35         # total chocolates eaten
+    cars_before = 3  # number of cars originally in the parking lot
+    cars_arriving = 2  # number of cars arriving in teh parking loy
 
-    # to find: total chocolates left
+    # to find: total number of cars in the parking lot
 
-    # calculations:
-    total_start = leah_start + sister_start
-    left = total_start - eaten
-
-    # return:
-    return left
+    # solution:
+    # calculate the sum of cars originally in the parking lot and the arriving cars
+    cars_after = cars_before + cars_arriving
+    return cars_after
 
 
 FUNCTIONS.append(solution)
@@ -56,34 +36,18 @@ FUNCTIONS.append(solution)
 
 def solution():
     # given:
-    jason_start = 20  # lollipops Jason started with
-    jason_end = 12    # lollipops Jason has now
+    chocolates_leah_before = 32  # number of chocolates Leah originally had
+    chocolates_sister_before = 42  # number of chocolates Leah's sister originally had
+    chocolates_eaten = 35  # number of chocolates Leah and her sister ate
 
-    # to find: number given to Denny
+    # to find: total number of chocolates left
 
-    # calculations:
-    given_away = jason_start - jason_end
-
-    # return:
-    return given_away
-
-
-FUNCTIONS.append(solution)
-
-
-def solution():
-    # given:
-    toys_start = 5  # toys Shawn started with
-    toys_per_parent = 2  # toys received from each parent
-
-    # to find: total toys Shawn has now
-
-    # calculations:
-    toys_received = 2 * toys_per_parent
-    toys_end = toys_start + toys_received
-
-    # return:
-    return toys_end
+    # solution:
+    # first, calculate how many chocolates the sisters originally had in total
+    chocolates_total_before = chocolates_leah_before + chocolates_sister_before
+    # next, subtract the total number of chocolates they ate
+    chocolates_left = chocolates_total_before - chocolates_eaten
+    return chocolates_left
 
 
 FUNCTIONS.append(solution)
@@ -91,18 +55,15 @@ FUNCTIONS.append(solution)
 
 def solution():
     # given:
-    computers_start = 9  # computers originally in the room
-    per_day = 5          # computers installed each day
-    days = 4             # total days (monday to thursday)
+    lollipops_jason_before = 20  # number of lollipops Jason had originally
+    lollipops_jason_now = 12  # number of lollipops Jason has left
 
-    # to find: total computers now
+    # to find: number of lollipops Jason gave to Denny
 
-    # calculations:
-    added_total = days * per_day
-    computers_end = computers_start + added_total
-
-    # return:
-    return computers_end
+    # solution:
+    # calculate the difference between lollipops Jason had originally had lollipops he has now
+    lollipops_given_to_denny = lollipops_jason_before - lollipops_jason_now
+    return lollipops_given_to_denny
 
 
 FUNCTIONS.append(solution)
@@ -110,18 +71,17 @@ FUNCTIONS.append(solution)
 
 def solution():
     # given:
-    balls_start = 58  # golf balls Michael started with
-    lost_tues = 23    # lost on Tuesday
-    lost_wed = 2      # lost on Wednesday
+    shawn_toys_before = 5  # number of toys Shawn originally has
+    new_toys_from_each_parent = 2  # number of toys his mom and his dad each gave him for Christmas
 
-    # to find: golf balls left
+    # to find: total number of toys Shawn has now
 
-    # calculations:
-    lost_total = lost_tues + lost_wed
-    balls_left = balls_start - lost_total
-
-    # return:
-    return balls_left
+    # solution:
+    # first, calculate how many toys in total Shawn got for Christmas
+    new_toys_total = 2 * new_toys_from_each_parent
+    # next, calculate the sum of the number of toys Shawn originally had and the number of new toys he got
+    shawn_toys_now = shawn_toys_before + new_toys_total
+    return shawn_toys_now
 
 
 FUNCTIONS.append(solution)
@@ -129,19 +89,56 @@ FUNCTIONS.append(solution)
 
 def solution():
     # given:
-    money_start = 23  # money Olivia started with
-    count = 5         # number of bagels
-    cost_each = 3     # price per bagel
+    computers_before = 9  # number of computers originally in the server room
+    computers_installed_per_day = 5  # number of new computers installed each day
+    number_of_days = 4  # number of days from monday to thursday
 
-    # to find: money left
+    # to find: total number of computers in the server room now
 
-    # calculations:
-    total_cost = count * cost_each
-    money_left = money_start - total_cost
-
-    # return:
-    return money_left
+    # solution:
+    # first, calculate how many new computers were installed in total
+    computers_installed_total = number_of_days * computers_installed_per_day
+    # next, calculate sum of the number of computers originally in the room and the total number of new computers installed
+    computers_now = computers_before + computers_installed_total
+    return computers_now
 
 
 FUNCTIONS.append(solution)
 
+
+def solution():
+    # given:
+    golf_balls_before = 58  # number of golf balls Michael originally had
+    golf_balls_lost_tuesday = 23  # number of golf balls lost on tuesday
+    golf_balls_lost_wednesday = 2  # number of golf balls lost on wednesday
+
+    # to find: number of golf balls left at the end of wednesday
+
+    # solution:
+    # first, calculate the total number of golf balls Michael lost
+    golf_balls_lost_total = golf_balls_lost_tuesday + golf_balls_lost_wednesday
+    # next, calculate the difference between the original number of golf balls and the number of golf balls lost
+    golf_balls_left = golf_balls_before - golf_balls_lost_total
+    return golf_balls_left
+
+
+FUNCTIONS.append(solution)
+
+
+def solution():
+    # given:
+    dollars_before = 23  # number of dollars Olivia had originally
+    bagels = 5  # number of bagels Olivia bought
+    price_per_bagel = 3  # number of dollars each bagel cost
+
+    # to find: how many dollars Olivia has left?
+
+    # solution:
+    # first, calculate the total cost of the bagels
+    bagels_cost_total = bagels * price_per_bagel
+    # next, calculate the difference between Olivia's original money and what she paid for the bagels
+    dollars_left = dollars_before - bagels_cost_total
+    return dollars_left
+
+
+FUNCTIONS.append(solution)
