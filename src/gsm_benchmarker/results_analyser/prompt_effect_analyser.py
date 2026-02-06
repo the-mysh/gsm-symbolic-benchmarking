@@ -228,3 +228,19 @@ class PromptEffectAnalyser:
         fig.subplots_adjust(top=0.8)
         return fig, cs
 
+    def analyse_gap_significance(self):
+        def prep_frame(df, label):
+            df = df.set_index('model')
+            df.rename(columns={c: f"{label}_{c}" for c in df.columns}, inplace=True)
+            return df
+
+        res = {}
+        for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
+            baseline_gaps = self._baseline_mres.run_gap_analysis(metric=metric)
+            experiment_gaps = self._experiment_mres.run_gap_analysis(metric=metric)
+
+            res[metric_label] = prep_frame(baseline_gaps, 'baseline').join(prep_frame(experiment_gaps, 'experiment'))
+
+        df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
+        df_results = df_results.swaplevel().sort_index()
+        return df_results

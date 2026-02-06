@@ -1,6 +1,8 @@
 import os
 import logging
 import re
+import numpy as np
+from scipy import stats
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
@@ -131,6 +133,51 @@ class MultiVariantMultiModelResultsAnalyser:
         merged['diff_correct'] = merged['correct'].astype(int) - merged['baseline_correct'].astype(int)
 
         return merged
+
+    def run_gap_analysis(self, metric: str = 'correct', variant: str = 'main'):
+        """
+        Run one-tailed Wilcoxon signed-rank test (per model) to check whether accuracy drop is significant.
+        """
+
+        df_gsm8k = self._variants[self.BASELINE_VARIANT].full_data
+        df_variant = self._variants[variant].full_data
+
+        results = []
+
+        for model in df_gsm8k.model.unique():
+
+            # filter by model, aggregate by template id
+            scores_gsm8k = df_gsm8k[df_gsm8k.model == model].groupby('id')[metric].mean()
+            scores_variant = df_variant[df_variant.model == model].groupby('id')[metric].mean()
+
+            # pair the corresponding attempts by template id
+            # inner join - only compare ids present in both sets
+            paired = pd.concat([scores_gsm8k, scores_variant], axis=1, join='inner')
+            paired.columns = ['gsm8k', 'variant']
+
+            # 4. Calculate Stats
+            mean_gsm8k = paired['gsm8k'].mean()
+            mean_variant = paired['variant'].mean()
+            gap = mean_gsm8k - mean_variant
+
+            # one-sided Wilcoxon test
+            # H0: median(gsm8k - variant) <= 0
+            # H1: median(gsm8k - variant) > 0  (the drop is real)
+            try:
+                stat, p_value = stats.wilcoxon(
+                    x=paired['gsm8k'],
+                    y=paired['variant'],
+                    alternative='greater'
+                )
+            except ValueError as e:
+                # Handle edge case where all values are identical (zero gap everywhere)
+                logger.warning(f"Warning: Could not run test (likely identical data). Error: {e}")
+                p_value = 1.0
+                stat = np.nan
+
+            results.append({'model': model, 'p_value': p_value, 'gap': gap, 'stat': stat})
+
+        return pd.DataFrame(results)
 
     @staticmethod
     def _make_transition_matrix(data, order, column, margins_name='total'):
