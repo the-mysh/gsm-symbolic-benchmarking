@@ -163,15 +163,13 @@ class MultiVariantMultiModelResultsAnalyser:
             # one-sided Wilcoxon test
             # H0: median(gsm8k - variant) <= 0
             # H1: median(gsm8k - variant) > 0  (the drop is real)
-            try:
+            if gap:
                 stat, p_value = stats.wilcoxon(
                     x=paired['gsm8k'],
                     y=paired['variant'],
                     alternative='greater'
                 )
-            except ValueError as e:
-                # Handle edge case where all values are identical (zero gap everywhere)
-                logger.warning(f"Warning: Could not run test (likely identical data). Error: {e}")
+            else:
                 p_value = 1.0
                 stat = np.nan
 

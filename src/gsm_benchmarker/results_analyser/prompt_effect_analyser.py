@@ -180,37 +180,58 @@ class PromptEffectAnalyser:
         else:
             return self._summarise_output(combined, 'metric')
 
-    def plot_gap_closure_bars(self, variant, **kwargs):
-        titles = {'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'}
+    def plot_gap_closure_bars(self, variant, alpha: float = 0.05, projected_alpha: float | None = None, **kwargs):
+        cs = self.analyze_gap_closure(variant, **kwargs, detailed_output=True)
+        cs.rename(
+            index={'accuracy_drop': 'Standard accuracy', 'strict_accuracy_drop': 'Discounted accuracy'},
+            level='metric',
+            inplace=True
+        )
+
+        fig = self._plot_bars_and_p_bars(
+            cs, 'mean_gap_closure', 'p_value', alpha=alpha, projected_alpha=projected_alpha,
+            title=f"{self._experiment_label}: accuracy (gap closure) on variant '{variant}' vs 'GSM8K'"
+        )
+
+        return fig
+
+    @staticmethod
+    def _plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
+                              alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None):
         colours = ['lightblue', 'navy']
 
-        cs = self.analyze_gap_closure(variant, **kwargs, detailed_output=True)
+        def prep_data(col):
+            d = df[col].unstack(level='metric')
+            d = d[['Standard accuracy', 'Discounted accuracy']]
+            return d
 
-        def prep_df(col):
-            df = cs[col].unstack(level='metric')
-            df.rename(columns=titles, inplace=True)
-            return df
-
-        df_gap_closure = prep_df('mean_gap_closure')
-        df_p_values = prep_df('p_value')
+        df_gap_closure = prep_data(value_col)
+        df_p_values = prep_data(p_value_col)
 
         fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
 
         df_gap_closure.plot(ax=axes[0], kind='bar', color=colours)
-        axes[0].set_ylabel("Mean gap closure")
+        axes[0].set_ylabel(value_col.replace('_', ' ').capitalize())
         axes[0].axhline(0, color='k', lw=0.5)
 
         df_p_values.plot(ax=axes[1], kind='bar', color=colours)
         axes[1].set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_p_values.index], rotation=45, ha='right')
-        axes[1].axhline(0.05, ls='--', color='k', lw=0.5, label='alpha = 0.05')
-        axes[1].axhline(0.16, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
+        axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label='alpha = 0.05')
+
+        if projected_alpha is not None:
+            axes[1].axhline(projected_alpha, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
+
         axes[1].set_xlabel('Model')
         axes[1].set_ylabel('P value')
 
         for ax in axes:
             ax.legend(loc='upper right', frameon=True)
+            for container in ax.containers:
+                ax.bar_label(container, fmt="%.2f", fontsize=7)
 
-        fig.suptitle(f"{self._experiment_label}: accuracy (gap closure) on variant '{variant}' vs 'GSM8K'")
+        if title:
+            fig.suptitle(title)
+
         fig.tight_layout()
 
         return fig
@@ -228,7 +249,7 @@ class PromptEffectAnalyser:
         fig.subplots_adjust(top=0.8)
         return fig, cs
 
-    def analyse_gap_significance(self):
+    def analyse_gap_significance(self, variant: str ='main'):
         def prep_frame(df, label):
             df = df.set_index('model')
             df.rename(columns={c: f"{label}_{c}" for c in df.columns}, inplace=True)
@@ -236,11 +257,38 @@ class PromptEffectAnalyser:
 
         res = {}
         for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
-            baseline_gaps = self._baseline_mres.run_gap_analysis(metric=metric)
-            experiment_gaps = self._experiment_mres.run_gap_analysis(metric=metric)
+            baseline_gaps = self._baseline_mres.run_gap_analysis(metric=metric, variant=variant)
+            experiment_gaps = self._experiment_mres.run_gap_analysis(metric=metric, variant=variant)
 
             res[metric_label] = prep_frame(baseline_gaps, 'baseline').join(prep_frame(experiment_gaps, 'experiment'))
 
         df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
         df_results = df_results.swaplevel().sort_index()
         return df_results
+
+    def plot_gap_significance_bars(self, variant: str = 'main', alpha: float = 0.05, projected_alpha: float | None = None, **kwargs):
+        df = self.analyse_gap_significance(variant)
+        df.rename(
+            index={'standard': 'Standard accuracy', 'discounted': 'Discounted accuracy'},
+            level='metric',
+            inplace=True
+        )
+
+        fig1 = self._plot_bars_and_p_bars(
+            df, 'baseline_gap', 'baseline_p_value', alpha=alpha, projected_alpha=projected_alpha,
+            title=f"Baseline (GSM-Symbolic): accuracy drop on variant '{variant}' vs 'GSM8K'"
+        )
+
+        fig2 = self._plot_bars_and_p_bars(
+            df, 'experiment_gap', 'experiment_p_value', alpha=alpha, projected_alpha=projected_alpha,
+            title=f"{self._experiment_label}: accuracy drop on variant '{variant}' vs 'GSM8K'"
+        )
+
+        ymax = [max(fig1.axes[i].get_ylim()[1], fig2.axes[i].get_ylim()[1]) for i in range(2)]
+
+        for fig in (fig1, fig2):
+            fig.axes[0].set_ylabel('Accuracy drop')
+            for i, ym in enumerate(ymax):
+                fig.axes[i].set_ylim(fig.axes[i].get_ylim()[0], ym)
+
+        return fig1, fig2
