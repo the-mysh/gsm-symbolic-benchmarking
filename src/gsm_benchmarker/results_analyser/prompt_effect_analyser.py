@@ -197,8 +197,11 @@ class PromptEffectAnalyser:
 
     @staticmethod
     def _plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
-                              alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None):
-        colours = ['lightblue', 'navy']
+                              alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
+                              colours: list[str] | None = None):
+
+        if colours is None:
+            colours = ['lightblue', 'navy']
 
         def prep_data(col):
             d = df[col].unstack(level='metric')
@@ -292,3 +295,65 @@ class PromptEffectAnalyser:
                 fig.axes[i].set_ylim(fig.axes[i].get_ylim()[0], ym)
 
         return fig1, fig2
+
+    def run_variant_accuracy_analysis(self, metric: str = 'correct', variant: str = 'main'):
+        """
+        Run one-tailed Wilcoxon signed-rank test (per model) to check whether accuracy change betw experiment
+        and baseline on a given variant is significant.
+        """
+
+        df_baseline = self._baseline_mres.variants[variant].full_data
+        df_experiment = self._experiment_mres.variants[variant].full_data
+
+        results = []
+
+        for model in df_baseline.model.unique():
+            if model not in df_experiment.model.unique():
+                continue
+
+            # filter by model, aggregate by template id
+            scores_baseline = df_baseline[df_baseline.model == model].groupby('id')[metric].mean()
+            scores_experiment = df_experiment[df_experiment.model == model].groupby('id')[metric].mean()
+
+            median_diff = np.median(scores_experiment - scores_baseline)
+
+            if median_diff:
+                stat, p_value = stats.wilcoxon(scores_baseline, scores_experiment, alternative='two-sided')
+            else:
+                stat = 0
+                p_value = 1
+
+            results.append({'model': model, 'median_diff': median_diff, 'p_value': p_value, 'stat': stat})
+
+        df = pd.DataFrame(results)
+        df.set_index('model', inplace=True)
+        return df
+
+    def analyse_accuracy_change_significance(self, variant: str ='main'):
+        res = {}
+        for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
+            res[metric_label] = self.run_variant_accuracy_analysis(metric=metric, variant=variant)
+
+        df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
+        df_results = df_results.swaplevel().sort_index()
+        return df_results
+
+
+    def plot_accuracy_change_significance_bars(self, variant: str = 'main', alpha: float = 0.05, projected_alpha: float | None = None, **kwargs):
+
+        df = self.analyse_accuracy_change_significance(variant)
+        df.rename(
+            index={'standard': 'Standard accuracy', 'discounted': 'Discounted accuracy'},
+            level='metric',
+            inplace=True
+        )
+
+        fig = self._plot_bars_and_p_bars(
+            df, 'median_diff', 'p_value', alpha=alpha, projected_alpha=projected_alpha,
+            title=f"Change in accuracy from baseline (GSM8K) to {self._experiment_label}, variant '{variant}'",
+            colours=['lightgreen', 'seagreen']
+        )
+
+        fig.axes[0].set_ylabel('Accuracy change')
+
+        return fig
