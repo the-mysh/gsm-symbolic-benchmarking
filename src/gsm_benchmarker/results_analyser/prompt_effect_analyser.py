@@ -198,10 +198,13 @@ class PromptEffectAnalyser:
     @staticmethod
     def _plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
                               alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
-                              colours: list[str] | None = None):
+                              colours: list[str] | None = None, models: list[str] | None = None):
 
         if colours is None:
             colours = ['lightblue', 'navy']
+
+        if models is not None:
+            df = df[np.isin(df.index.get_level_values('model'), models)]
 
         def prep_data(col):
             d = df[col].unstack(level='metric')
@@ -269,7 +272,8 @@ class PromptEffectAnalyser:
         df_results = df_results.swaplevel().sort_index()
         return df_results
 
-    def plot_gap_significance_bars(self, variant: str = 'main', alpha: float = 0.05, projected_alpha: float | None = None, **kwargs):
+    def plot_gap_significance_bars(self, variant: str = 'main', alpha: float = 0.05,
+                                   projected_alpha: float | None = None, only_significant_models: bool = False):
         df = self.analyse_gap_significance(variant)
         df.rename(
             index={'standard': 'Standard accuracy', 'discounted': 'Discounted accuracy'},
@@ -282,9 +286,16 @@ class PromptEffectAnalyser:
             title=f"Baseline (GSM-Symbolic): accuracy drop on variant '{variant}' vs 'GSM8K'"
         )
 
+        if only_significant_models:
+            significant_df = df[df.baseline_p_value < (projected_alpha if projected_alpha is not None else alpha)]
+            significant_models = list(significant_df.index.get_level_values('model').unique())
+        else:
+            significant_models = None
+
         fig2 = self._plot_bars_and_p_bars(
             df, 'experiment_gap', 'experiment_p_value', alpha=alpha, projected_alpha=projected_alpha,
-            title=f"{self._experiment_label}: accuracy drop on variant '{variant}' vs 'GSM8K'"
+            title=f"{self._experiment_label}: accuracy drop on variant '{variant}' vs 'GSM8K'",
+            models=significant_models
         )
 
         ymax = [max(fig1.axes[i].get_ylim()[1], fig2.axes[i].get_ylim()[1]) for i in range(2)]
@@ -351,7 +362,7 @@ class PromptEffectAnalyser:
         fig = self._plot_bars_and_p_bars(
             df, 'median_diff', 'p_value', alpha=alpha, projected_alpha=projected_alpha,
             title=f"Change in accuracy from baseline (GSM8K) to {self._experiment_label}, variant '{variant}'",
-            colours=['lightgreen', 'seagreen']
+            colours=['lightgreen', 'seagreen'], **kwargs
         )
 
         fig.axes[0].set_ylabel('Accuracy change')
