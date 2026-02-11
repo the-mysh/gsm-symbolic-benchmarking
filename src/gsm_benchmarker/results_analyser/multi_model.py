@@ -229,7 +229,6 @@ class MultiModelResultsAnalyser:
 
         counts_df = self._full_data.groupby(['model', 'result_class']).size().unstack(fill_value=0)
         counts_df = counts_df.reindex(columns=['CORRECT', 'BABBLING', 'INCORRECT', 'FAILED'], fill_value=0)
-        counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         fig = self._plot_bars(
             counts_df,
@@ -251,8 +250,6 @@ class MultiModelResultsAnalyser:
 
         if percentage:
             counts_df = self._get_percentages(counts_df, 'model')
-
-        counts_df.index = ['_'.join(m.split('_')[1:]) for m in counts_df.index]
 
         fig = self._plot_bars(
             counts_df,
