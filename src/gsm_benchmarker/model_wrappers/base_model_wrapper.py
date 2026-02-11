@@ -1,5 +1,5 @@
-from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.models_config_parser import SingleModelConfig
+from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.model_wrappers.models_config_parser import SingleModelConfig
 import logging
 
 

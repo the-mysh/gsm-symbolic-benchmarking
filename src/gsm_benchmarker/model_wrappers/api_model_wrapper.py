@@ -1,7 +1,7 @@
 import logging
 from typing import Callable
 
-from gsm_benchmarker.models_config_parser import SingleModelConfig, APIType
+from gsm_benchmarker.model_wrappers.models_config_parser import SingleModelConfig, APIType
 
 
 logger = logging.getLogger(__name__)
@@ -25,8 +25,8 @@ except ImportError:
     logger.warning("google-genai package not installed; Gemini family models will not be available")
     anthropic = None
 
-from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
+from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.model_wrappers.base_model_wrapper import BaseModelWrapper
 
 
 class APIModelWrapper(BaseModelWrapper):

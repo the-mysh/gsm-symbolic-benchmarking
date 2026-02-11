@@ -9,15 +9,13 @@ from datetime import datetime
 from datasets import Dataset
 from time import time
 
-from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.answer_extractor import AnswerExtractor
-from gsm_benchmarker.models_config_parser import SingleModelConfig
-from gsm_benchmarker.shot_manager import GSMShotManager
+from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor
+from gsm_benchmarker.model_wrappers.models_config_parser import SingleModelConfig
+from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly, remove_intermediate_results_folder
-from gsm_benchmarker.api_model_wrapper import APIModelWrapper
-from gsm_benchmarker.hf_model_wrapper import HFModelWrapper
-from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
-from gsm_benchmarker.prompt_config import PromptConfig
+from gsm_benchmarker.model_wrappers import APIModelWrapper, HFModelWrapper, BaseModelWrapper
+from gsm_benchmarker.input_data_management.prompt_config import PromptConfig
 
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ from enum import Enum, auto
 from typing import TypeVar
 
 from gsm_benchmarker.utils.path_ops import make_name_path_friendly
-from gsm_benchmarker.answer_extractor import AnswerExtractor
+from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor
 
 
 T = TypeVar("T")

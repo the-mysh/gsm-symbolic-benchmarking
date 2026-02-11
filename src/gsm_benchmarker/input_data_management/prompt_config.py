@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from gsm_benchmarker.shot_manager import GSMShotManager
+from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.resources_manager import load_resource_json, load_json_file
 
 

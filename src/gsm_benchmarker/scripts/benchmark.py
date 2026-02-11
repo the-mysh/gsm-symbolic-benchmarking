@@ -9,14 +9,14 @@ import socket
 from argparse import ArgumentParser, Namespace
 from typing import Any
 
-from gsm_benchmarker.dataset_wrapper import GSMSymbolicDataset
-from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.benchmark import BenchmarkRunner
-from gsm_benchmarker.models_config_parser import ModelsConfig
-from gsm_benchmarker.shot_manager import GSMShotManager
+from gsm_benchmarker.input_data_management.dataset_wrapper import GSMSymbolicDataset
+from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.benchmark.benchmark import BenchmarkRunner
+from gsm_benchmarker.model_wrappers.models_config_parser import ModelsConfig
+from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.logging_setup import install_colored_logger, setup_log_file_handler
 from gsm_benchmarker.utils.seeds import set_seed
-from gsm_benchmarker.prompt_config import PromptConfig
+from gsm_benchmarker.input_data_management.prompt_config import PromptConfig
 
 
 logger = logging.getLogger(__name__)

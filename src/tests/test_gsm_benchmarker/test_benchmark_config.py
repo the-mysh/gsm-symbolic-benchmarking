@@ -4,7 +4,7 @@ import pytest
 import logging
 from unittest.mock import patch
 
-from gsm_benchmarker.benchmark_config import BenchmarkConfig, _AUTO
+from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig, _AUTO
 from gsm_benchmarker.utils.resources_manager import load_resource_json
 
 
@@ -21,13 +21,13 @@ def mock_load_resource_json(machines_config):
     """
     Globally patch the external function to return our fixture data.
     """
-    with patch('gsm_benchmarker.benchmark_config.load_resource_json', return_value=machines_config) as mock:
+    with patch('gsm_benchmarker.benchmark.benchmark_config.load_resource_json', return_value=machines_config) as mock:
         yield mock
 
 
 # --- Tests for Initialization (__post_init__) ---
 
-@patch('gsm_benchmarker.benchmark_config.torch.cuda.is_available', return_value=True)
+@patch('gsm_benchmarker.benchmark.benchmark_config.torch.cuda.is_available', return_value=True)
 def test_post_init_with_gpu_available(mock_cuda_avail, caplog):
     """Test that gpu_index is set to 0 when CUDA is available and index is _AUTO."""
     caplog.set_level(logging.INFO)
@@ -36,7 +36,7 @@ def test_post_init_with_gpu_available(mock_cuda_avail, caplog):
     assert "Setting default gpu index: 0" in caplog.text
 
 
-@patch('gsm_benchmarker.benchmark_config.torch.cuda.is_available', return_value=False)
+@patch('gsm_benchmarker.benchmark.benchmark_config.torch.cuda.is_available', return_value=False)
 def test_post_init_with_no_gpu_available(mock_cuda_avail, caplog):
     """Test that gpu_index is set to None when CUDA is not available and index is _AUTO."""
     caplog.set_level(logging.INFO)
@@ -142,7 +142,7 @@ def test_for_machine_no_gpu_machine(machines_config, caplog):
     assert "Reading config for machine 'lima', of type 'no-gpu'" in caplog.text
 
 
-@patch('gsm_benchmarker.benchmark_config.torch.cuda.is_available', return_value=True)
+@patch('gsm_benchmarker.benchmark.benchmark_config.torch.cuda.is_available', return_value=True)
 def test_for_machine_single_gpu_machine_auto_index(mock_cuda_avail, caplog):
     """Test configuration generation for a single GPU machine with _AUTO index."""
     caplog.set_level(logging.DEBUG)

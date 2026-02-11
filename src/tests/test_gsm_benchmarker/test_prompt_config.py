@@ -1,7 +1,7 @@
 import pytest
 
-from gsm_benchmarker.shot_manager import GSMShotManager
-from gsm_benchmarker.prompt_config import PromptConfig
+from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
+from gsm_benchmarker.input_data_management.prompt_config import PromptConfig
 
 
 @pytest.fixture

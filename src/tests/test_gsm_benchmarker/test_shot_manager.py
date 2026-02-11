@@ -1,6 +1,6 @@
 import pytest
 
-from gsm_benchmarker.shot_manager import SingleShot, GSMShotManager
+from gsm_benchmarker.input_data_management.shot_manager import SingleShot, GSMShotManager
 
 
 def test_shots_init(shot_manager: GSMShotManager):

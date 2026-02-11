@@ -1,12 +1,11 @@
 import logging
-import os
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from huggingface_hub import scan_cache_dir
 import torch
 
-from gsm_benchmarker.benchmark_config import BenchmarkConfig
-from gsm_benchmarker.base_model_wrapper import BaseModelWrapper
-from gsm_benchmarker.models_config_parser import SingleModelConfig
+from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.model_wrappers.base_model_wrapper import BaseModelWrapper
+from gsm_benchmarker.model_wrappers.models_config_parser import SingleModelConfig
 
 logger = logging.getLogger(__name__)
 

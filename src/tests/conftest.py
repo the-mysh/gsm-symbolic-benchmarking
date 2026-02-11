@@ -1,6 +1,6 @@
 import pytest
 
-from gsm_benchmarker.shot_manager import GSMShotManager
+from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
 
 
 MOCK_8SHOT_DATA = {
@@ -33,7 +33,7 @@ def shot_manager():
 @pytest.fixture
 def mock_shot_manager(mocker):
     mocker.patch(
-        "gsm_benchmarker.shot_manager.load_resource_json",
+        "gsm_benchmarker.input_data_management.shot_manager.load_resource_json",
         return_value=MOCK_8SHOT_DATA
     )
 

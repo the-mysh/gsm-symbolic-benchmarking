@@ -3,7 +3,7 @@
 import logging
 import pytest
 
-from gsm_benchmarker.answer_extractor import AnswerExtractor, AnswerPattern
+from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor, AnswerPattern
 
 
 @pytest.mark.parametrize(("resp", "value", "pattern"), (

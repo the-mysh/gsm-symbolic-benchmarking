@@ -3,7 +3,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Any
 
-from gsm_benchmarker.answer_extractor import AnswerExtractor
+from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor
 
 
 logger = logging.getLogger(__name__)
