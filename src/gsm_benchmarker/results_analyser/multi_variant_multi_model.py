@@ -70,6 +70,7 @@ class MultiVariantMultiModelResultsAnalyser:
 
         comparative_data_dict = cls._fix_comparison_data(comparative_data_dict)
         df_comparison = concat(comparative_data_dict).reset_index()
+
         return df_summary, df_comparison, variants
 
     @staticmethod

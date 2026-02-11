@@ -44,14 +44,18 @@ class MultiModelResultsAnalyser:
                 continue
             model_results = ModelResultsAnalyser(item_path)
             model_name = ''.join(item_name.split('.')[:-1])
-            model_name = '.'.join(model_name.split('_')[1:])
+
+            parts = model_name.split('_')
+            family_name = parts[0]
+            model_name = '.'.join(parts[1:])
 
             if load_full_data:
                 full_data_dict[model_name] = model_results.data
             s = model_results.get_total_accuracy_and_std()
             s_strict = model_results.get_total_accuracy_and_std(strict=True)
             summary_data_dict[model_name] = {'accuracy': s[0], 'std': s[1],
-                                             'strict_accuracy': s_strict[0], 'strict_std': s_strict[1]}
+                                             'strict_accuracy': s_strict[0], 'strict_std': s_strict[1],
+                                             'family': family_name}
 
         return summary_data_dict, full_data_dict
 
@@ -125,10 +129,7 @@ class MultiModelResultsAnalyser:
         babbler_percentage = babbler_counts / self.full_data["model"].value_counts()
         babbler_percentage.name = "babbler percentage"
 
-        family = self.summary_data.index.to_series().apply(lambda v: v.split('_')[0])
-        family.name = 'family'
-
-        b = pd.concat((family, self.summary_data, babbler_counts, babbler_percentage), axis=1)
+        b = pd.concat((self.summary_data, babbler_counts, babbler_percentage), axis=1)
         b.fillna(0, inplace=True)
         b.sort_values(['babbler percentage', 'accuracy'], ascending=False)
 
@@ -143,8 +144,8 @@ class MultiModelResultsAnalyser:
         fig, ax = plt.subplots()
         ax.set_ylabel(f"{acc_column.replace('_', ' ')}, %")
         ax.set_xlabel("babbler factor, %")
-        for family in b['family'].unique():
-            bb =  b[b['family'] == family]
+        for family in b.family.unique():
+            bb =  b[b.family == family]
             ax.scatter(100*bb['babbler percentage'], 100*bb[acc_column], marker='d', label=family)
         ax.legend(fancybox=True, framealpha=0.5, frameon=True, title='Family')
         ax.set_aspect('equal')
