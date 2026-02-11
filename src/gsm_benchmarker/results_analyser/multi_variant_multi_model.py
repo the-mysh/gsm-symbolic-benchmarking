@@ -48,8 +48,8 @@ class MultiVariantMultiModelResultsAnalyser:
         comparative_data_dict = {}
         variants = {}
 
-        logger.debug("Loading per-model results")
-        for item_name in tqdm(os.listdir(dir_path), desc="Model"):
+        logger.debug("Loading results")
+        for item_name in tqdm(os.listdir(dir_path)):
             item_path = dir_path / item_name
             if not item_path.is_dir():
                 continue

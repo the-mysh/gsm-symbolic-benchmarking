@@ -3,7 +3,6 @@ import logging
 from functools import cached_property
 import pandas as pd
 from pathlib import Path
-from tqdm import tqdm
 from typing import Any
 import matplotlib.pyplot as plt
 import numpy as np
@@ -38,13 +37,14 @@ class MultiModelResultsAnalyser:
         summary_data_dict = {}
 
         logger.debug("Loading per-model results")
-        for item_name in tqdm(os.listdir(dir_path), desc="Model"):
+        for item_name in os.listdir(dir_path):
             item_path = dir_path / item_name
             if item_path.is_dir():
                 logger.warning(f"The algorithm is not meant for non-flat directories; found subfolder '{item_name}'")
                 continue
             model_results = ModelResultsAnalyser(item_path)
             model_name = ''.join(item_name.split('.')[:-1])
+            model_name = '.'.join(model_name.split('_')[1:])
 
             if load_full_data:
                 full_data_dict[model_name] = model_results.data

@@ -28,7 +28,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
     axes[0].axhline(0, color='k', lw=0.5)
 
     df_p_values.plot(ax=axes[1], kind='bar', color=colours)
-    axes[1].set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_p_values.index], rotation=45, ha='right')
+    axes[1].set_xticklabels(df_p_values.index, rotation=45, ha='right')
     axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label='alpha = 0.05')
 
     if projected_alpha is not None:
