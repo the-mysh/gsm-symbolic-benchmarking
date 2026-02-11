@@ -1,12 +1,11 @@
 from scipy import stats
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import logging
 from tqdm.auto import tqdm
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
-
+from gsm_benchmarker.results_analyser.plotting_utils import plot_stats, plot_bars_and_p_bars
 
 logger = logging.getLogger(__name__)
 
@@ -77,31 +76,11 @@ class PromptEffectAnalyser:
         cs = self.compare_core_stats(variant, **kwargs, detailed_output=False)
         n_models = len(self._experiment_mres.variants[variant].models)
 
-        return self.plot_stats(cs, n_models=n_models, titles=titles,
-                               title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
+        return plot_stats(cs, n_models=n_models, titles=titles,
+                          title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
 
-    def plot_stats(self, cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None, title: str | None = None):
-        colors =['limegreen', 'indianred', 'lightsteelblue']
-
-        cs['not significant'] = n_models - cs.significant
-        cs = cs.drop('significant', axis=1)
-        cs = cs.rename(columns={'success': 'Improvement', 'failure': 'Deterioration', 'not significant': 'Change not significant'})
-
-        n_plots = len(cs)
-        fig, axes = plt.subplots(1, n_plots + 1, figsize=(12, 4))
-        for param, ax in zip(cs.index, axes):
-            wedges, _, _ = ax.pie(cs.loc[param], colors=colors, autopct=lambda p: str(round(p*n_models/100)))
-            ax.set_title(titles.get(param, param))
-
-        axes[-1].axis('off')
-        axes[-1].legend(wedges, cs.columns, loc='center', title="No. if models which showed:")
-
-        if title:
-            fig.suptitle(title)
-
-        return fig, cs
-
-    def _analyse_single_model_accuracy_drop(self, base_data: pd.Series, exp_data: pd.Series, alpha=0.05):
+    @staticmethod
+    def _analyse_single_model_accuracy_drop(base_data: pd.Series, exp_data: pd.Series, alpha=0.05):
         # calculate the 'gap closure' (difference of differences)
         # we want to test if baseline drop > experiment drop, so: gap closure = baseline - experiment
         diffs = base_data - exp_data
@@ -188,57 +167,10 @@ class PromptEffectAnalyser:
             inplace=True
         )
 
-        fig = self._plot_bars_and_p_bars(
+        fig = plot_bars_and_p_bars(
             cs, 'mean_gap_closure', 'p_value', alpha=alpha, projected_alpha=projected_alpha,
             title=f"{self._experiment_label}: accuracy (gap closure) on variant '{variant}' vs 'GSM8K'"
         )
-
-        return fig
-
-    @staticmethod
-    def _plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
-                              alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
-                              colours: list[str] | None = None, models: list[str] | None = None):
-
-        if colours is None:
-            colours = ['lightblue', 'navy']
-
-        if models is not None:
-            df = df[np.isin(df.index.get_level_values('model'), models)]
-
-        def prep_data(col):
-            d = df[col].unstack(level='metric')
-            d = d[['Standard accuracy', 'Discounted accuracy']]
-            return d
-
-        df_gap_closure = prep_data(value_col)
-        df_p_values = prep_data(p_value_col)
-
-        fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
-
-        df_gap_closure.plot(ax=axes[0], kind='bar', color=colours)
-        axes[0].set_ylabel(value_col.replace('_', ' ').capitalize())
-        axes[0].axhline(0, color='k', lw=0.5)
-
-        df_p_values.plot(ax=axes[1], kind='bar', color=colours)
-        axes[1].set_xticklabels(['_'.join(s.split('_')[1:]) for s in df_p_values.index], rotation=45, ha='right')
-        axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label='alpha = 0.05')
-
-        if projected_alpha is not None:
-            axes[1].axhline(projected_alpha, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
-
-        axes[1].set_xlabel('Model')
-        axes[1].set_ylabel('P value')
-
-        for ax in axes:
-            ax.legend(loc='upper right', frameon=True)
-            for container in ax.containers:
-                ax.bar_label(container, fmt="%.2f", fontsize=7)
-
-        if title:
-            fig.suptitle(title)
-
-        fig.tight_layout()
 
         return fig
 
@@ -248,7 +180,7 @@ class PromptEffectAnalyser:
         cs = self.analyze_gap_closure(variant, **kwargs, detailed_output=False)
         n_models = len(self._experiment_mres.variants[variant].models)
 
-        fig, cs = self.plot_stats(
+        fig, cs = plot_stats(
             cs, n_models=n_models, titles=titles,
             title=title or f"{self._experiment_label}: accuracy drop (gap closure) on variant '{variant}' vs 'GSM8K'")
 
@@ -281,7 +213,7 @@ class PromptEffectAnalyser:
             inplace=True
         )
 
-        fig1 = self._plot_bars_and_p_bars(
+        fig1 = plot_bars_and_p_bars(
             df, 'baseline_gap', 'baseline_p_value', alpha=alpha, projected_alpha=projected_alpha,
             title=f"Baseline (GSM-Symbolic): accuracy drop on variant '{variant}' vs 'GSM8K'"
         )
@@ -292,7 +224,7 @@ class PromptEffectAnalyser:
         else:
             significant_models = None
 
-        fig2 = self._plot_bars_and_p_bars(
+        fig2 = plot_bars_and_p_bars(
             df, 'experiment_gap', 'experiment_p_value', alpha=alpha, projected_alpha=projected_alpha,
             title=f"{self._experiment_label}: accuracy drop on variant '{variant}' vs 'GSM8K'",
             models=significant_models
@@ -305,7 +237,7 @@ class PromptEffectAnalyser:
             for i, ym in enumerate(ymax):
                 fig.axes[i].set_ylim(fig.axes[i].get_ylim()[0], ym)
 
-        return fig1, fig2
+        return fig1, fig2, df
 
     def run_variant_accuracy_analysis(self, metric: str = 'correct', variant: str = 'main'):
         """
@@ -349,7 +281,6 @@ class PromptEffectAnalyser:
         df_results = df_results.swaplevel().sort_index()
         return df_results
 
-
     def plot_accuracy_change_significance_bars(self, variant: str = 'main', alpha: float = 0.05, projected_alpha: float | None = None, **kwargs):
 
         df = self.analyse_accuracy_change_significance(variant)
@@ -359,7 +290,7 @@ class PromptEffectAnalyser:
             inplace=True
         )
 
-        fig = self._plot_bars_and_p_bars(
+        fig = plot_bars_and_p_bars(
             df, 'median_diff', 'p_value', alpha=alpha, projected_alpha=projected_alpha,
             title=f"Change in accuracy from baseline (GSM8K) to {self._experiment_label}, variant '{variant}'",
             colours=['lightgreen', 'seagreen'], **kwargs
@@ -367,4 +298,4 @@ class PromptEffectAnalyser:
 
         fig.axes[0].set_ylabel('Accuracy change')
 
-        return fig
+        return fig, df
