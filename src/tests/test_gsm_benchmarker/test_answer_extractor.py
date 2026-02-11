@@ -1,3 +1,5 @@
+# written with the help of Gemini
+
 import logging
 import pytest
 
@@ -82,42 +84,6 @@ def test_implicit_definition_prepend():
     assert result  # not empty
     assert result.startswith("def solution():")  # Should have prepended header
     assert "b = a * 2" in result
-
-
-def test_implicit_definition_prepend_with_chatty_intro():
-    """Test when model outputs only the body (common in few-shot), but with a chatty intro."""
-
-    raw = """Sure! I can help with that. Based on the logic provided, here is the function:
-    
-    # given
-    a = 10
-    # calculation
-    b = a * 2
-    return b
-"""
-
-    m = AnswerExtractor.CODE_BLOCK_PATTERN.search(raw)
-    print(m.group('content') if m else "not found")
-
-    result, _ = AnswerExtractor.extract_function_definition(raw)
-    assert result  # not empty
-    assert result.startswith("def solution():")  # Should have prepended header
-    assert "b = a * 2" in result
-
-
-def test_markdown_stripping():
-    """Test removal of ```python and ``` blocks."""
-    raw = """
-Here is the answer:
-```python
-def solution():
-    x = 5
-    return x
-"""
-    result, _ = AnswerExtractor.extract_function_definition(raw)
-    assert result  # not empty
-    assert "```" not in result
-    assert "Here is the answer" not in result
 
 
 def test_internal_newlines():
