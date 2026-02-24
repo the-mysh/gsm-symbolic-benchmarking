@@ -16,6 +16,17 @@ $ uv sync
 
 Note [uv dependency caching policy](https://docs.astral.sh/uv/concepts/cache/#dependency-caching).
 
+The `pymer4` package, needed for statistical significance assessment with GLMM, depends on R with a few libraries.
+For the specific use case of R version 3.6.3 (which is all I have on my shared system), run the [R setup script](./setup.R):
+```commandline
+$ Rscript setup.R
+```
+**Important:** Whenever the installer prompts you to choose whether to update installed packages - ignore the updates 
+(enter empty line).
+
+**Note:** things might be much easier to set up if you use conda instead of uv (if you have the option). 
+
+
 To install the current package in the environment:
 
 ```commandline
