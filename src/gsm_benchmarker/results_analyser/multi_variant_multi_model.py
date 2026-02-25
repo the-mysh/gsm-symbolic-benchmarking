@@ -250,11 +250,23 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return fig
 
-    def get_question_difficulty(self):
-        """Compute a question difficulty score: proportion of models that got each question wrong ([0, 1])."""
+    def get_question_difficulty(self, model: str | None = None):
+        """
+        Compute a question difficulty score: proportion of models that got each question wrong ([0, 1]).
+
+        If 'model' is provided, skip this model's results when calculating difficulty (leave-one-out model)
+        to avoid circularity.
+        """
 
         df = self._variants[self.BASELINE_VARIANT].full_data
+
+        if model is not None:
+            if model not in df.model.unique():
+                logger.warning(f"'{model}' does not match any model; the results will be calculated for all models")
+            else:
+                df = df[df.model != model]
 
         difficulty = df.groupby('id')['correct'].mean().rename('difficulty')
         difficulty = 1 - difficulty  # invert results - highest difficulty gets highest score (lowest % solved)
         return difficulty
+
