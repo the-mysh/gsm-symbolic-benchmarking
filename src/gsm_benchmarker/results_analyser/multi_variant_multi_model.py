@@ -8,6 +8,17 @@ from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from statsmodels.stats.multitest import multipletests
+
+from rpy2.rinterface_lib.embedded import RRuntimeError
+import rpy2.robjects as ro
+from rpy2.robjects import pandas2ri
+from rpy2.robjects.conversion import localconverter
+
+# Set pandas converter as the global default for rpy2
+ro.conversion.set_conversion(pandas2ri.converter + ro.default_converter)
+
+from pymer4.models import glmer  # needs to go after the converter setting
 
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import plot_question_success_rate_matrix
@@ -298,3 +309,89 @@ class MultiVariantMultiModelResultsAnalyser:
         ax.set_xlabel("Overall question difficulty")
         ax.set_ylabel("Question count")
         return fig
+
+    @classmethod
+    def _fit_glmm(cls, df):
+        glmm_model = glmer(
+            'correct ~ is_variant + difficulty + (1 | id)',
+            data=df,
+            family='binomial'
+        )
+
+        try:
+            glmm_model.fit(verbose=False)  # fitting works, only getting stats fails
+        except RRuntimeError:
+            pass
+
+        if glmm_model.r_model is None:
+            raise RuntimeError(f"GLMM fitting failed")
+
+        # Assign the model to an R variable first
+        ro.globalenv['r_model'] = glmm_model.r_model
+
+        # Then extract coefficients as a DataFrame
+        with localconverter(ro.default_converter + pandas2ri.converter):
+            coefs_df = ro.r('as.data.frame(coef(summary(r_model)))')
+
+        res = dict(
+            estimate=coefs_df.loc['is_variant', 'Estimate'],
+            p_value=coefs_df.loc['is_variant', 'Pr(>|z|)'],
+            std_err=coefs_df.loc['is_variant', 'Std. Error'],
+        )
+
+        return res
+
+    def _prep_df_for_glmm(self, variant: str):
+        def prep_df(df_variant):
+            res = self.variants[df_variant].full_data
+            res = res[['model', 'id', 'correct']][:]
+            res['is_variant'] = [int(df_variant != 'GSM8K')] * len(res)
+            res['correct'] = res['correct'].astype(int)
+            return res
+
+        df = pd.concat([prep_df(self.BASELINE_VARIANT), prep_df(variant)]).reset_index(drop=True)
+        return df
+
+    def analyse_variant_effect_glmm(self, variant: str):
+        df = self._prep_df_for_glmm(variant)
+        glmm_results = []
+
+        for model_name, group_df in df.groupby('model'):
+            difficulty = self.get_question_difficulty(model=model_name)
+            group_df = group_df.merge(difficulty.reset_index(), on='id', how='left')
+
+            try:
+                res = self._fit_glmm(group_df)
+            except RuntimeError as err:
+                logger.warning(f"{model_name}: {err}")
+                continue
+
+            glmm_results.append({
+                'model': model_name,
+                **res,
+            })
+
+        glmm_results_df = pd.DataFrame(glmm_results)
+        self._enrich_glmm_summary(glmm_results_df)
+        return glmm_results_df
+
+    def _enrich_glmm_summary(self, glmm_results_df: pd.DataFrame):
+        model_accuracy_drops = self.get_accuracy_drop_df('main').groupby('model').mean().reset_index()
+        glmm_results_df['accuracy_drop'] = model_accuracy_drops.accuracy_drop
+
+        glmm_results_df['odds_ratio'] = np.exp(glmm_results_df['estimate'])
+
+        glmm_results_df['drop'] = glmm_results_df.estimate < 0
+
+        # 95% Confidence Intervals in log-odds and odds ratios
+        glmm_results_df['ci_lower_log'] = glmm_results_df['estimate'] - 1.96 * glmm_results_df['std_err']
+        glmm_results_df['ci_upper_log'] = glmm_results_df['estimate'] + 1.96 * glmm_results_df['std_err']
+        glmm_results_df['ci_lower_or'] = np.exp(glmm_results_df['ci_lower_log'])
+        glmm_results_df['ci_upper_or'] = np.exp(glmm_results_df['ci_upper_log'])
+
+        # apply Benjamini-Hochberg procedure - controls the false discovery rate (multiple comparisons correction)
+        rejected, p_corrected, _, _ = multipletests(glmm_results_df['p_value'], method='fdr_bh')
+        glmm_results_df['p_value_corrected'] = p_corrected
+
+        return glmm_results_df
+
