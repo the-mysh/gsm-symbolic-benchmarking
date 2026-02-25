@@ -384,10 +384,10 @@ class MultiVariantMultiModelResultsAnalyser:
         glmm_results_df['drop'] = glmm_results_df.estimate < 0
 
         # 95% Confidence Intervals in log-odds and odds ratios
-        glmm_results_df['ci_lower_log'] = glmm_results_df['estimate'] - 1.96 * glmm_results_df['std_err']
-        glmm_results_df['ci_upper_log'] = glmm_results_df['estimate'] + 1.96 * glmm_results_df['std_err']
-        glmm_results_df['ci_lower_or'] = np.exp(glmm_results_df['ci_lower_log'])
-        glmm_results_df['ci_upper_or'] = np.exp(glmm_results_df['ci_upper_log'])
+        ci_lower_log = glmm_results_df['estimate'] - 1.96 * glmm_results_df['std_err']
+        ci_upper_log = glmm_results_df['estimate'] + 1.96 * glmm_results_df['std_err']
+        glmm_results_df['ci_lower_or'] = np.exp(ci_lower_log)
+        glmm_results_df['ci_upper_or'] = np.exp(ci_upper_log)
 
         # apply Benjamini-Hochberg procedure - controls the false discovery rate (multiple comparisons correction)
         rejected, p_corrected, _, _ = multipletests(glmm_results_df['p_value'], method='fdr_bh')

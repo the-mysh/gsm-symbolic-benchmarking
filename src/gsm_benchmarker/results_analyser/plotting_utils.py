@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
 import seaborn as sns
+from matplotlib.lines import Line2D
+
 
 
 def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
@@ -114,5 +115,61 @@ def plot_question_success_rate_matrix(df):
         ax_top.set_ylim(0, 100)
 
     fig.suptitle("Leave-one-(model-)out question difficulty", fontsize=16, y=0.95)
+
+    return fig
+
+
+def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_models: bool = True):
+    p_thresholds = {
+        'strong': (0.01, 'brown', 'Strong drop (p < {})'),
+        'significant': (0.05, 'orange', 'Significant drop (p < {})'),
+        'potentially_significant': (projected_alpha, 'gold', 'Potentially significant drop (p < {})'),
+        'not_significant': (1, 'darkgray', f'Not significant')
+    }
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    if sort_models:
+        # Sort the dataframe so the best performing models (highest OR) are at the top
+        df_plot = df.sort_values('odds_ratio', ascending=True)
+    else:
+        df_plot = df.copy()
+
+    def get_color(p):
+        for name, (th, c, _) in p_thresholds.items():
+            if th is None:
+                continue
+            if p < th:
+                return c
+        return p_thresholds["not_significant"][0]
+
+    df_plot['color'] = df_plot['p_value'].apply(get_color)
+
+    # plot CIs and coloured dots
+    for i, row in df_plot.iterrows():
+        # draw CIs
+        ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
+                  color='darkgrey', linewidth=2, zorder=1)
+
+        # draw the dot using the dynamically assigned colour
+        ax.scatter(x=row['odds_ratio'], y=row['model'],
+                   color=row['color'], s=100, zorder=2, edgecolor='black', linewidth=0.5)
+
+    ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
+
+    ax.set_xlabel('Odds ratio')
+    ax.set_ylabel('Model')
+    ax.set_title('Effect of question templates on accuracy', pad=15)
+
+    # legend
+    legend_elements = [
+        Line2D(
+            [0], [0], marker='o', c='darkgrey', mec='black', mew=0.5, mfc=c, ms=10, label=desc.format(th)
+        ) for th, c, desc in p_thresholds.values() if th is not None
+    ]
+    ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
+
+    sns.despine(left=True, bottom=True)
+    plt.tight_layout()
 
     return fig
