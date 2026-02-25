@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
+from gsm_benchmarker.results_analyser.plotting_utils import plot_question_success_rate_matrix
 
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,10 @@ class MultiVariantMultiModelResultsAnalyser:
     @property
     def variants(self):
         return self._variants
+
+    @property
+    def models(self) -> list[str]:
+        return self._summary_data.index.tolist()
 
     @classmethod
     def match_variant_name(cls, name):
@@ -270,3 +275,26 @@ class MultiVariantMultiModelResultsAnalyser:
         difficulty = 1 - difficulty  # invert results - highest difficulty gets highest score (lowest % solved)
         return difficulty
 
+    def get_question_difficulty_per_model(self):
+        difficulties = {}
+
+        for model in self.models:
+            difficulties[model] = self.get_question_difficulty(model=model)
+
+        difficulties['OVERALL'] = self.get_question_difficulty()
+
+        difficulties_df = pd.DataFrame(difficulties).T
+        return difficulties_df
+
+    def plot_question_difficulty_per_model(self):
+        difficulties = self.get_question_difficulty_per_model()
+        return plot_question_success_rate_matrix(difficulties)
+
+    def plot_question_difficulty_histogram(self, model: str | None = None):
+        difficulties = self.get_question_difficulty(model=model)
+
+        fig, ax = plt.subplots()
+        ax.hist(difficulties, 21)
+        ax.set_xlabel("Overall question difficulty")
+        ax.set_ylabel("Question count")
+        return fig
