@@ -249,3 +249,12 @@ class MultiVariantMultiModelResultsAnalyser:
         fig.subplots_adjust(top=0.8, bottom=0.05)
 
         return fig
+
+    def get_question_difficulty(self):
+        """Compute a question difficulty score: proportion of models that got each question wrong ([0, 1])."""
+
+        df = self._variants[self.BASELINE_VARIANT].full_data
+
+        difficulty = df.groupby('id')['correct'].mean().rename('difficulty')
+        difficulty = 1 - difficulty  # invert results - highest difficulty gets highest score (lowest % solved)
+        return difficulty
