@@ -119,7 +119,7 @@ def plot_question_success_rate_matrix(df):
     return fig
 
 
-def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_models: bool = True):
+def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_order: list[str] | None = None):
     p_thresholds = {
         'strong': (0.01, 'brown', 'Strong drop (p < {})'),
         'significant': (0.05, 'orange', 'Significant drop (p < {})'),
@@ -129,11 +129,7 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_model
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey='all')
 
-    if sort_models:
-        # Sort the dataframe so the best performing models (highest OR) are at the top
-        df_plot = df.sort_values('odds_ratio', ascending=True)
-    else:
-        df_plot = df.copy()
+    df_plot = df.copy()
 
     def get_color(p):
         for name, (th, c, _) in p_thresholds.items():
@@ -147,6 +143,12 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_model
 
     for (ax, metric) in zip(axes, ('standard', 'discounted')):
         df_metric = df_plot.xs(metric, level='metric').reset_index()
+        if model_order is not None:
+            df_metric = df_metric.sort_values(
+                by='model',
+                key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
+            ).reset_index(drop=True)
+
         # plot CIs and coloured dots
         for i, row in df_metric.iterrows():
             # draw CIs
@@ -159,8 +161,9 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_model
 
         ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
-        ax.set_xlabel('Odds ratio')
+        ax.set_xlabel('Odds ratio (log scale)')
         ax.set_title(f"{metric.capitalize()} accuracy")
+        ax.set_xscale('log')
 
     # legend
     legend_elements = [
