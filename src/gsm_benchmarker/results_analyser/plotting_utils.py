@@ -119,7 +119,7 @@ def plot_question_success_rate_matrix(df):
     return fig
 
 
-def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_order: list[str] | None = None):
+def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_order: list[str] | None = None, log_scale: bool = False):
     p_thresholds = {
         'strong': (0.01, 'brown', 'Strong drop (p < {})'),
         'significant': (0.05, 'orange', 'Significant drop (p < {})'),
@@ -161,9 +161,11 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_orde
 
         ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
-        ax.set_xlabel('Odds ratio (log scale)')
+        if log_scale:
+            ax.set_xscale('log')
+
+        ax.set_xlabel('Odds ratio' +  (' (log scale)' if log_scale else ''))
         ax.set_title(f"{metric.capitalize()} accuracy")
-        ax.set_xscale('log')
 
     # legend
     legend_elements = [

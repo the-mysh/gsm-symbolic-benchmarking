@@ -320,11 +320,9 @@ class MultiVariantMultiModelResultsAnalyser:
 
         try:
             glmm_model.fit(verbose=False)  # fitting works, only getting stats fails
-        except RRuntimeError:
-            pass
-
-        if glmm_model.r_model is None:
-            raise RuntimeError(f"GLMM fitting failed")
+        except RRuntimeError as err:
+            if glmm_model.r_model is None:
+                raise RuntimeError(f"GLMM fitting failed: {err}")
 
         # Assign the model to an R variable first
         ro.globalenv['r_model'] = glmm_model.r_model
@@ -382,21 +380,22 @@ class MultiVariantMultiModelResultsAnalyser:
             })
 
         glmm_results_df = pd.DataFrame(glmm_results)
-        self._enrich_glmm_summary(glmm_results_df)
+        self._enrich_glmm_summary(glmm_results_df, metric=('strict_' if 'strict' in metric else '') + 'accuracy_drop')
         glmm_results_df = glmm_results_df.set_index('model')
         return glmm_results_df
 
-    def _enrich_glmm_summary(self, glmm_results_df: pd.DataFrame):
+    def _enrich_glmm_summary(self, glmm_results_df: pd.DataFrame, metric: str):
         model_accuracy_drops = self.get_accuracy_drop_df('main').groupby('model').mean().reset_index()
-        glmm_results_df['accuracy_drop'] = model_accuracy_drops.accuracy_drop
+        glmm_results_df['accuracy_drop'] = model_accuracy_drops[metric]
 
-        glmm_results_df['odds_ratio'] = np.exp(glmm_results_df['estimate'])
-
-        glmm_results_df['drop'] = glmm_results_df.estimate < 0
+        estimate = glmm_results_df.estimate
+        glmm_results_df['drop'] = estimate < 0
+        glmm_results_df['odds_ratio'] = np.exp(estimate)
 
         # 95% Confidence Intervals in log-odds and odds ratios
-        ci_lower_log = glmm_results_df['estimate'] - 1.96 * glmm_results_df['std_err']
-        ci_upper_log = glmm_results_df['estimate'] + 1.96 * glmm_results_df['std_err']
+        std_err_clipped = np.minimum(glmm_results_df['std_err'], estimate.abs().max())  # clip - for plotting
+        ci_lower_log = estimate - 1.96 * std_err_clipped
+        ci_upper_log = estimate + 1.96 * std_err_clipped
         glmm_results_df['ci_lower_or'] = np.exp(ci_lower_log)
         glmm_results_df['ci_upper_or'] = np.exp(ci_upper_log)
 
