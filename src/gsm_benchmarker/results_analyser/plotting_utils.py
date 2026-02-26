@@ -8,7 +8,8 @@ from matplotlib.lines import Line2D
 
 def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
                           alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
-                          colours: list[str] | None = None, models: list[str] | None = None):
+                          colours: list[str] | None = None, models: list[str] | None = None,
+                         model_order: list[str] | None = None):
 
     if colours is None:
         colours = ['lightblue', 'navy']
@@ -19,6 +20,13 @@ def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
     def prep_data(col):
         d = df[col].unstack(level='metric')
         d = d[['Standard accuracy', 'Discounted accuracy']]
+
+        if model_order:
+            d = d.reset_index().sort_values(
+                by='model',
+                key=lambda c: c.map({model: index for index, model in enumerate(model_order)})
+            ).reset_index(drop=True).set_index('model')
+
         return d
 
     df_gap_closure = prep_data(value_col)
@@ -132,12 +140,15 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_orde
     df_plot = df.copy()
 
     def get_color(p):
+        default = p_thresholds["not_significant"][1]
+        if np.isnan(p):
+            return default
         for name, (th, c, _) in p_thresholds.items():
             if th is None:
                 continue
             if p < th:
                 return c
-        return p_thresholds["not_significant"][0]
+        return default
 
     df_plot['color'] = df_plot['p_value'].apply(get_color)
 
@@ -151,6 +162,9 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_orde
 
         # plot CIs and coloured dots
         for i, row in df_metric.iterrows():
+            if np.isnan(row['odds_ratio']):
+                continue
+
             # draw CIs
             ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
                       color='darkgrey', linewidth=2, zorder=1)

@@ -371,8 +371,8 @@ class MultiVariantMultiModelResultsAnalyser:
             try:
                 res = self._fit_glmm(group_df)
             except RuntimeError as err:
-                logger.warning(f"{model_name}: {err}")
-                continue
+                logger.warning(f"{model_name}, {metric}: {err}")
+                res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan}
 
             glmm_results.append({
                 'model': model_name,
