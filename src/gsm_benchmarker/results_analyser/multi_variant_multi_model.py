@@ -313,7 +313,7 @@ class MultiVariantMultiModelResultsAnalyser:
     @classmethod
     def _fit_glmm(cls, df):
         glmm_model = glmer(
-            'correct ~ is_variant + difficulty + (1 | id)',
+            'is_correct ~ is_variant + difficulty + (1 | id)',
             data=df,
             family='binomial'
         )
@@ -341,19 +341,29 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return res
 
-    def _prep_df_for_glmm(self, variant: str):
+    def _prep_df_for_glmm(self, variant: str, metric: str):
         def prep_df(df_variant):
             res = self.variants[df_variant].full_data
-            res = res[['model', 'id', 'correct']][:]
+            res = res[['model', 'id', metric]][:]
             res['is_variant'] = [int(df_variant != 'GSM8K')] * len(res)
-            res['correct'] = res['correct'].astype(int)
+            res['is_correct'] = res[metric].astype(int)
+            res = res.drop(metric, axis=1)
             return res
 
         df = pd.concat([prep_df(self.BASELINE_VARIANT), prep_df(variant)]).reset_index(drop=True)
         return df
 
     def analyse_variant_effect_glmm(self, variant: str):
-        df = self._prep_df_for_glmm(variant)
+        res = {}
+        for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
+            res[metric_label] = self._analyse_metric_variant_effect_glmm(variant=variant, metric=metric)
+
+        df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
+        df_results = df_results.swaplevel().sort_index()
+        return df_results
+
+    def _analyse_metric_variant_effect_glmm(self, variant: str, metric: str):
+        df = self._prep_df_for_glmm(variant, metric=metric)
         glmm_results = []
 
         for model_name, group_df in df.groupby('model'):
@@ -373,6 +383,7 @@ class MultiVariantMultiModelResultsAnalyser:
 
         glmm_results_df = pd.DataFrame(glmm_results)
         self._enrich_glmm_summary(glmm_results_df)
+        glmm_results_df = glmm_results_df.set_index('model')
         return glmm_results_df
 
     def _enrich_glmm_summary(self, glmm_results_df: pd.DataFrame):

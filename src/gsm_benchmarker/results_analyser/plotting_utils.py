@@ -127,7 +127,7 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_model
         'not_significant': (1, 'darkgray', f'Not significant')
     }
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey='all')
 
     if sort_models:
         # Sort the dataframe so the best performing models (highest OR) are at the top
@@ -145,21 +145,22 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_model
 
     df_plot['color'] = df_plot['p_value'].apply(get_color)
 
-    # plot CIs and coloured dots
-    for i, row in df_plot.iterrows():
-        # draw CIs
-        ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
-                  color='darkgrey', linewidth=2, zorder=1)
+    for (ax, metric) in zip(axes, ('standard', 'discounted')):
+        df_metric = df_plot.xs(metric, level='metric').reset_index()
+        # plot CIs and coloured dots
+        for i, row in df_metric.iterrows():
+            # draw CIs
+            ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
+                      color='darkgrey', linewidth=2, zorder=1)
 
-        # draw the dot using the dynamically assigned colour
-        ax.scatter(x=row['odds_ratio'], y=row['model'],
-                   color=row['color'], s=100, zorder=2, edgecolor='black', linewidth=0.5)
+            # draw the dot using the dynamically assigned colour
+            ax.scatter(x=row['odds_ratio'], y=row['model'],
+                       color=row['color'], s=100, zorder=2, edgecolor='black', linewidth=0.5)
 
-    ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
+        ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
-    ax.set_xlabel('Odds ratio')
-    ax.set_ylabel('Model')
-    ax.set_title('Effect of question templates on accuracy', pad=15)
+        ax.set_xlabel('Odds ratio')
+        ax.set_title(f"{metric.capitalize()} accuracy")
 
     # legend
     legend_elements = [
@@ -167,7 +168,11 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, sort_model
             [0], [0], marker='o', c='darkgrey', mec='black', mew=0.5, mfc=c, ms=10, label=desc.format(th)
         ) for th, c, desc in p_thresholds.values() if th is not None
     ]
-    ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
+
+    axes[1].legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
+
+    axes[0].set_ylabel('Model')
+    fig.suptitle('Effect of question templates on accuracy')
 
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
