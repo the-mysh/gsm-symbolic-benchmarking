@@ -127,8 +127,8 @@ def plot_question_success_rate_matrix(df):
     return fig
 
 
-def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
-                            log_scale: bool = False, sort_models: bool = True, no_title: bool = False):
+def _prepare_odds_ratios_data(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
+                              sort_models: bool = False):
     p_thresholds = {
         'strong': (0.01, 'brown', 'Strong drop (p < {})'),
         'significant': (0.05, 'orange', 'Significant drop (p < {})'),
@@ -161,7 +161,16 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
             key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
         ).reset_index(drop=True)
 
-    fig, ax = plt.subplots(figsize=(10, max(len(df_plot)/4, 3)))
+    return df_plot, p_thresholds, model_order
+
+
+def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
+                            log_scale: bool = False, sort_models: bool = True, no_title: bool = False):
+
+    df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
+        df, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
+
+    fig, ax = plt.subplots(figsize=(10, max(len(df_plot)/5 + 1, 3)))
 
     # plot CIs and coloured dots
     for i, row in df_plot.iterrows():
