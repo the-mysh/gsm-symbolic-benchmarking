@@ -5,10 +5,16 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 
 
+def _sort_by_model(df, model_order: list[str]):
+    return df.sort_values(
+        by='model',
+        key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
+    ).reset_index(drop=True)
+
 
 def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
-                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
-                          colours: list[str] | None = None, models: list[str] | None = None,
+                         alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
+                         colours: list[str] | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None):
 
     if colours is None:
@@ -21,11 +27,8 @@ def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
         d = df[col].unstack(level='metric')
         d = d[['Standard accuracy', 'Discounted accuracy']]
 
-        if model_order:
-            d = d.reset_index().sort_values(
-                by='model',
-                key=lambda c: c.map({model: index for index, model in enumerate(model_order)})
-            ).reset_index(drop=True).set_index('model')
+        if model_order is not None:
+            d = _sort_by_model(d.reset_index(), model_order[::-1]).set_index('model')
 
         return d
 
@@ -167,19 +170,18 @@ def _prepare_odds_ratios_data(df, metric, projected_alpha: float | None = None, 
 
     if model_order is None:
         if sort_models:
-            model_order = df_plot.sort_values(by='odds_ratio', ascending=True).index.to_list()
+            model_order = df_plot.sort_values(by='odds_ratio', ascending=False).index.to_list()
+
+    df_plot = df_plot.reset_index()
 
     if model_order is not None:  # after sort_models check
-        df_plot = df_plot.reset_index().sort_values(
-            by='model',
-            key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
-        ).reset_index(drop=True)
+        df_plot = _sort_by_model(df_plot, model_order)
 
     return df_plot, p_thresholds, model_order
 
 
 def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
-                            log_scale: bool = False, sort_models: bool = True, no_title: bool = False):
+                            log_scale: bool = False, sort_models: bool = False, no_title: bool = False):
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
         df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
@@ -200,6 +202,8 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
             # mark that the errors are in fact bigger - clipped here
             ax.plot(row['ci_lower_or'], y, '<', c=ci_colour)
             ax.plot(row['ci_upper_or'], y, '>', c=ci_colour)
+        else:
+            ax.plot([row['ci_lower_or'], row['ci_upper_or']], [y, y], '|', c=ci_colour)
 
         # draw the dot using the dynamically assigned colour
         ax.scatter(x=row['odds_ratio'], y=y, color=row['color'], s=80, zorder=2, ec='black', lw=0.5)
