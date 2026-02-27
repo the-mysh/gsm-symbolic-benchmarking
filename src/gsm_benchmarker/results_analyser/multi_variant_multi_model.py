@@ -8,7 +8,6 @@ from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
-from statsmodels.stats.multitest import multipletests
 
 from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as ro
@@ -33,15 +32,11 @@ class MultiVariantMultiModelResultsAnalyser:
 
     def __init__(self, dir_path: str | Path):
         self._dir_path = Path(dir_path).resolve()
-        self._summary_data, self._comparison_data, self._variants = self._load_data(self._dir_path)
+        self._summary_data, self._variants = self._load_data(self._dir_path)
 
     @property
     def summary_data(self):
         return self._summary_data
-
-    @property
-    def comparison_data(self):
-        return self._comparison_data
 
     @property
     def variants(self):
@@ -59,9 +54,8 @@ class MultiVariantMultiModelResultsAnalyser:
         return match.group('variant')
 
     @classmethod
-    def _load_data(cls, dir_path: Path) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, MultiModelResultsAnalyser]]:
+    def _load_data(cls, dir_path: Path) -> tuple[pd.DataFrame, dict[str, MultiModelResultsAnalyser]]:
         summary_data_dict = {}
-        comparative_data_dict = {}
         variants = {}
 
         logger.debug("Loading results")
@@ -77,42 +71,13 @@ class MultiVariantMultiModelResultsAnalyser:
             idx_frame = multi_model_results.full_data[['model', 'id', 'instance']]
             s = multi_model_results.full_data['correct']
             s.index = pd.MultiIndex.from_frame(idx_frame)
-            comparative_data_dict[v] = s
 
         def concat(d: dict[str, pd.DataFrame | pd.Series]) -> pd.DataFrame:
             return pd.concat(d.values(), keys=d.keys(), axis=1)
 
         df_summary = concat(summary_data_dict)
 
-        comparative_data_dict = cls._fix_comparison_data(comparative_data_dict)
-        df_comparison = concat(comparative_data_dict).reset_index()
-
-        return df_summary, df_comparison, variants
-
-    @staticmethod
-    def _fix_comparison_data(data: dict) -> dict:
-        gsm8k_keys = [k for k in data.keys() if 'gsm8k' in k.lower()]
-        if not gsm8k_keys:
-            return data
-        if len(gsm8k_keys) > 1:
-            logger.warning("Multiple GSM8K columns detected")
-            return data
-
-        k = gsm8k_keys[0]
-        gsm = data.pop(k)
-        gsm = gsm.reset_index().drop('instance', axis=1)
-
-        all_instances = []
-        for dset in data.values():
-            all_instances.extend(dset.reset_index().instance.unique())
-        df_instances = pd.DataFrame({'instance': list(set(all_instances))})
-
-        gsm_new = gsm.merge(df_instances, how='cross')
-        gsm_new = gsm_new.set_index(['model', 'id', 'instance'])[['correct']]
-
-        data[k] = gsm_new
-
-        return data
+        return df_summary, variants
 
     def _check_variant(self, variant: str):
         if variant not in self._variants:
@@ -137,7 +102,8 @@ class MultiVariantMultiModelResultsAnalyser:
         self._check_variant(variant)
 
         baseline_subset = self._variants[self.BASELINE_VARIANT].full_data[['model', 'id', 'correct', 'result_class']]
-        baseline_subset = baseline_subset.rename(columns={'correct': 'baseline_correct', 'result_class': 'baseline_result_class'})
+        baseline_subset = baseline_subset.rename(
+            columns={'correct': 'baseline_correct', 'result_class': 'baseline_result_class'})
 
         variant_subset = self._variants[variant].full_data[['model', 'id', 'instance', 'correct', 'result_class']]
 
