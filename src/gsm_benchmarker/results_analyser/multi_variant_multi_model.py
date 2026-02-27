@@ -380,28 +380,11 @@ class MultiVariantMultiModelResultsAnalyser:
             })
 
         glmm_results_df = pd.DataFrame(glmm_results)
-        self._enrich_glmm_summary(glmm_results_df, metric=('strict_' if 'strict' in metric else '') + 'accuracy_drop')
+
+        # add plain accuracy drops
+        model_accuracy_drops = self.get_accuracy_drop_df('main').groupby('model').mean().reset_index()
+        m = ('strict_' if 'strict' in metric else '') + 'accuracy_drop'
+        glmm_results_df['accuracy_drop'] = model_accuracy_drops[m]
+
         glmm_results_df = glmm_results_df.set_index('model')
         return glmm_results_df
-
-    def _enrich_glmm_summary(self, glmm_results_df: pd.DataFrame, metric: str):
-        model_accuracy_drops = self.get_accuracy_drop_df('main').groupby('model').mean().reset_index()
-        glmm_results_df['accuracy_drop'] = model_accuracy_drops[metric]
-
-        estimate = glmm_results_df.estimate
-        glmm_results_df['drop'] = estimate < 0
-        glmm_results_df['odds_ratio'] = np.exp(estimate)
-
-        # 95% Confidence Intervals in log-odds and odds ratios
-        std_err_clipped = np.minimum(glmm_results_df['std_err'], estimate.abs().max())  # clip - for plotting
-        ci_lower_log = estimate - 1.96 * std_err_clipped
-        ci_upper_log = estimate + 1.96 * std_err_clipped
-        glmm_results_df['ci_lower_or'] = np.exp(ci_lower_log)
-        glmm_results_df['ci_upper_or'] = np.exp(ci_upper_log)
-
-        # apply Benjamini-Hochberg procedure - controls the false discovery rate (multiple comparisons correction)
-        rejected, p_corrected, _, _ = multipletests(glmm_results_df['p_value'], method='fdr_bh')
-        glmm_results_df['p_value_corrected'] = p_corrected
-
-        return glmm_results_df
-

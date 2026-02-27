@@ -151,6 +151,20 @@ def _prepare_odds_ratios_data(df, metric, projected_alpha: float | None = None, 
 
     df_plot['color'] = df_plot['p_value'].apply(get_color)
 
+    # compute odds ratios and 95% confidence intervals
+    estimate = df_plot.estimate
+    err = df_plot['std_err']
+    err_threshold = estimate.abs().max() * 0.5
+    df_plot['odds_ratio'] = np.exp(estimate)
+
+    std_err_clipped = np.minimum(err, err_threshold)  # clip for plotting
+    f = 1.96
+    ci_lower_log = estimate - f * std_err_clipped
+    ci_upper_log = estimate + f * std_err_clipped
+    df_plot['ci_lower_or'] = np.exp(ci_lower_log)
+    df_plot['ci_upper_or'] = np.exp(ci_upper_log)
+    df_plot['ci_clipped'] = np.where(err > err_threshold, True, False)
+
     if model_order is None:
         if sort_models:
             model_order = df_plot.sort_values(by='odds_ratio', ascending=True).index.to_list()
@@ -168,22 +182,27 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
                             log_scale: bool = False, sort_models: bool = True, no_title: bool = False):
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
-        df, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
+        df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
 
-    fig, ax = plt.subplots(figsize=(10, max(len(df_plot)/5 + 1, 3)))
+    fig, ax = plt.subplots(figsize=(10, max(len(df_plot)/5 + 2, 3)))
+    ci_colour = 'darkgrey'
 
     # plot CIs and coloured dots
     for i, row in df_plot.iterrows():
         if np.isnan(row['odds_ratio']):
             continue
 
+        y = row['model']
+
         # draw CIs
-        ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
-                  color='darkgrey', linewidth=2, zorder=1)
+        ax.hlines(y, xmin=row['ci_lower_or'], xmax=row['ci_upper_or'], color=ci_colour, lw=2)
+        if row["ci_clipped"]:
+            # mark that the errors are in fact bigger - clipped here
+            ax.plot(row['ci_lower_or'], y, '<', c=ci_colour)
+            ax.plot(row['ci_upper_or'], y, '>', c=ci_colour)
 
         # draw the dot using the dynamically assigned colour
-        ax.scatter(x=row['odds_ratio'], y=row['model'],
-                   color=row['color'], s=100, zorder=2, edgecolor='black', linewidth=0.5)
+        ax.scatter(x=row['odds_ratio'], y=y, color=row['color'], s=80, zorder=2, ec='black', lw=0.5)
 
     ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
