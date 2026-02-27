@@ -40,10 +40,10 @@ def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
 
     df_p_values.plot(ax=axes[1], kind='bar', color=colours)
     axes[1].set_xticklabels(df_p_values.index, rotation=45, ha='right')
-    axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label='alpha = 0.05')
+    axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label=f'alpha = {alpha:.2f}')
 
     if projected_alpha is not None:
-        axes[1].axhline(projected_alpha, ls=':', color='maroon', lw=0.5, label='equivalent alpha for full set')
+        axes[1].axhline(projected_alpha, ls=':', color='maroon', lw=0.5, label=f'projected alpha = {projected_alpha:.2f}')
 
     axes[1].set_xlabel('Model')
     axes[1].set_ylabel('P value')
@@ -127,7 +127,8 @@ def plot_question_success_rate_matrix(df):
     return fig
 
 
-def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_order: list[str] | None = None, log_scale: bool = False):
+def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
+                            log_scale: bool = False, sort_models: bool = True, no_title: bool = False):
     p_thresholds = {
         'strong': (0.01, 'brown', 'Strong drop (p < {})'),
         'significant': (0.05, 'orange', 'Significant drop (p < {})'),
@@ -135,9 +136,7 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_orde
         'not_significant': (1, 'darkgray', f'Not significant')
     }
 
-    fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharey='all')
-
-    df_plot = df.copy()
+    df_plot = df.xs(metric, level='metric').copy()
 
     def get_color(p):
         default = p_thresholds["not_significant"][1]
@@ -152,34 +151,37 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_orde
 
     df_plot['color'] = df_plot['p_value'].apply(get_color)
 
-    for (ax, metric) in zip(axes, ('standard', 'discounted')):
-        df_metric = df_plot.xs(metric, level='metric').reset_index()
-        if model_order is not None:
-            df_metric = df_metric.sort_values(
-                by='model',
-                key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
-            ).reset_index(drop=True)
+    if model_order is None:
+        if sort_models:
+            model_order = df_plot.sort_values(by='odds_ratio', ascending=True).index.to_list()
 
-        # plot CIs and coloured dots
-        for i, row in df_metric.iterrows():
-            if np.isnan(row['odds_ratio']):
-                continue
+    if model_order is not None:  # after sort_models check
+        df_plot = df_plot.reset_index().sort_values(
+            by='model',
+            key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
+        ).reset_index(drop=True)
 
-            # draw CIs
-            ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
-                      color='darkgrey', linewidth=2, zorder=1)
+    fig, ax = plt.subplots(figsize=(10, max(len(df_plot)/4, 3)))
 
-            # draw the dot using the dynamically assigned colour
-            ax.scatter(x=row['odds_ratio'], y=row['model'],
-                       color=row['color'], s=100, zorder=2, edgecolor='black', linewidth=0.5)
+    # plot CIs and coloured dots
+    for i, row in df_plot.iterrows():
+        if np.isnan(row['odds_ratio']):
+            continue
 
-        ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
+        # draw CIs
+        ax.hlines(y=row['model'], xmin=row['ci_lower_or'], xmax=row['ci_upper_or'],
+                  color='darkgrey', linewidth=2, zorder=1)
 
-        if log_scale:
-            ax.set_xscale('log')
+        # draw the dot using the dynamically assigned colour
+        ax.scatter(x=row['odds_ratio'], y=row['model'],
+                   color=row['color'], s=100, zorder=2, edgecolor='black', linewidth=0.5)
 
-        ax.set_xlabel('Odds ratio' +  (' (log scale)' if log_scale else ''))
-        ax.set_title(f"{metric.capitalize()} accuracy")
+    ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
+
+    if log_scale:
+        ax.set_xscale('log')
+
+    ax.set_xlabel('Odds ratio' +  (' (log scale)' if log_scale else ''))
 
     # legend
     legend_elements = [
@@ -188,12 +190,14 @@ def plot_models_odds_ratios(df, projected_alpha: float | None = None, model_orde
         ) for th, c, desc in p_thresholds.values() if th is not None
     ]
 
-    axes[1].legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
+    ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
 
-    axes[0].set_ylabel('Model')
-    fig.suptitle('Effect of question templates on accuracy')
+    ax.set_ylabel('Model')
+
+    if not no_title:
+        fig.suptitle(f'Effect of question templates on {metric} accuracy')
 
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
 
-    return fig
+    return fig, model_order
