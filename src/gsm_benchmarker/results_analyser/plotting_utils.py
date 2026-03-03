@@ -159,6 +159,7 @@ def _prepare_odds_ratios_data(df, metric, projected_alpha: float | None = None, 
     err = df_plot['std_err']
     err_threshold = estimate.abs().max() * 0.5
     df_plot['odds_ratio'] = np.exp(estimate)
+    df_plot['odds_ratio_plot'] = np.where(np.isnan(df_plot.odds_ratio), 1, df_plot.odds_ratio)
 
     std_err_clipped = np.minimum(err, err_threshold)  # clip for plotting
     f = 1.96
@@ -170,7 +171,7 @@ def _prepare_odds_ratios_data(df, metric, projected_alpha: float | None = None, 
 
     if model_order is None:
         if sort_models:
-            model_order = df_plot.sort_values(by='odds_ratio', ascending=False).index.to_list()
+            model_order = df_plot.sort_values(by='odds_ratio_plot', ascending=False).index.to_list()
 
     df_plot = df_plot.reset_index()
 
@@ -191,10 +192,11 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
 
     # plot CIs and coloured dots
     for i, row in df_plot.iterrows():
-        if np.isnan(row['odds_ratio']):
-            continue
-
         y = row['model']
+
+        if np.isnan(row['odds_ratio']):
+            ax.scatter(x=[1], y=[y], marker='x', color='k', lw=0.5, s=50)
+            continue
 
         # draw CIs
         ax.hlines(y, xmin=row['ci_lower_or'], xmax=row['ci_upper_or'], color=ci_colour, lw=2)
@@ -221,6 +223,9 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
             [0], [0], marker='o', c='darkgrey', mec='black', mew=0.5, mfc=c, ms=10, label=desc.format(th)
         ) for th, c, desc in p_thresholds.values() if th is not None
     ]
+    if np.isnan(df_plot.odds_ratio).any():
+        legend_elements.append(
+            Line2D([0], [0], marker='x', c='k', mec='black', mew=0.5, ms=8, lw=0, label="Could not compute"))
 
     ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
 
