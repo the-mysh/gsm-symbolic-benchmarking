@@ -23,6 +23,10 @@ from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalys
 from gsm_benchmarker.results_analyser.plotting_utils import plot_question_success_rate_matrix
 
 
+class GLMMFitError(RuntimeError):
+    pass
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -288,7 +292,7 @@ class MultiVariantMultiModelResultsAnalyser:
             glmm_model.fit(verbose=False)  # fitting works, only getting stats fails
         except RRuntimeError as err:
             if glmm_model.r_model is None:
-                raise RuntimeError(f"GLMM fitting failed: {err}")
+                raise GLMMFitError(f"GLMM fitting failed: {err}")
 
         # Assign the model to an R variable first
         ro.globalenv['r_model'] = glmm_model.r_model
@@ -317,26 +321,28 @@ class MultiVariantMultiModelResultsAnalyser:
         df = pd.concat([prep_df(self.BASELINE_VARIANT), prep_df(variant)]).reset_index(drop=True)
         return df
 
-    def analyse_variant_effect_glmm(self, variant: str):
+    def analyse_variant_effect_glmm(self, variant: str, models: list[str] | None = None):
         res = {}
         for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
-            res[metric_label] = self._analyse_metric_variant_effect_glmm(variant=variant, metric=metric)
+            res[metric_label] = self._analyse_metric_variant_effect_glmm(variant=variant, metric=metric, models=models)
 
         df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
         df_results = df_results.swaplevel().sort_index()
         return df_results
 
-    def _analyse_metric_variant_effect_glmm(self, variant: str, metric: str):
+    def _analyse_metric_variant_effect_glmm(self, variant: str, metric: str, models: list[str] | None = None):
         df = self._prep_df_for_glmm(variant, metric=metric)
         glmm_results = []
 
         for model_name, group_df in df.groupby('model'):
+            if models is not None and model_name not in models:
+                continue
             difficulty = self.get_question_difficulty(model=model_name)
             group_df = group_df.merge(difficulty.reset_index(), on='id', how='left')
 
             try:
                 res = self._fit_glmm(group_df)
-            except RuntimeError as err:
+            except GLMMFitError as err:
                 logger.warning(f"{model_name}, {metric}: {err}")
                 res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan}
 
@@ -346,6 +352,12 @@ class MultiVariantMultiModelResultsAnalyser:
             })
 
         glmm_results_df = pd.DataFrame(glmm_results)
+
+        if models is not None:
+            models_with_results = glmm_results_df.model.unique()
+            for requested_model_name in models:
+                if requested_model_name not in models_with_results:
+                    logger.warning(f"No data for model {requested_model_name}")
 
         # add plain accuracy drops
         model_accuracy_drops = self.get_accuracy_drop_df('main').groupby('model').mean().reset_index()
