@@ -20,12 +20,16 @@ def _sort_by_model(df, model_order: list[str]):
     ).reset_index(drop=True)
 
 
+def _get_fig_size(n_models):
+    return 10, max(n_models/5 + 2, 3)
+
+
 def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          colour: str | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None, ylabel0: str | None = None):
 
-    colour = colour or 'navy'
+    colour = colour or 'teal'
 
     df = df.xs(metric, level='metric')
 
@@ -36,33 +40,35 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
         d = df[col]
 
         if model_order is not None:
-            d = _sort_by_model(d.reset_index(), model_order[::-1]).set_index('model')
+            d = _sort_by_model(d.reset_index(), model_order).set_index('model')
 
         return d
 
     data_val = prep_data(value_col)
     df_p_values = prep_data(p_value_col)
 
-    fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
+    fig, axes = plt.subplots(1, 2, sharey='all', figsize=_get_fig_size(len(df)))
 
-    data_val.plot(ax=axes[0], kind='bar', color=colour)
-    axes[0].set_ylabel(ylabel0 if ylabel0 is not None else value_col.replace('_', ' ').capitalize())
-    axes[0].axhline(0, color='k', lw=0.5)
+    data_val.plot(ax=axes[0], kind='barh', color=colour, legend=False)
+    axes[0].set_xlabel(ylabel0 if ylabel0 is not None else value_col.replace('_', ' ').capitalize())
+    axes[0].axvline(0, color='k', lw=0.5)
 
-    df_p_values.plot(ax=axes[1], kind='bar', color=colour)
-    axes[1].set_xticklabels(df_p_values.index, rotation=45, ha='right')
-    axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label=f'alpha = {alpha:.2f}')
+    df_p_values.plot(ax=axes[1], kind='barh', color=colour, legend=False)
+    handles = [axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}')]
 
     if projected_alpha is not None:
-        axes[1].axhline(projected_alpha, ls=':', color='maroon', lw=0.5, label=f'projected alpha = {projected_alpha:.2f}')
+        l = axes[1].axvline(projected_alpha, ls=':', color='royalblue', lw=1,
+                            label=f'projected alpha = {projected_alpha:.2f}')
+        handles.append(l)
 
-    axes[1].set_xlabel('Model')
-    axes[1].set_ylabel('P value')
-    axes[1].legend(loc='upper right', frameon=True)
+    axes[0].set_ylabel('Model')
+    axes[1].set_xlabel('P value')
+    axes[1].legend(frameon=True, handles=handles, fontsize=8)
 
     for ax in axes:
+        ax.axvline(0, color='k', lw=1, zorder=1)
         for container in ax.containers:
-            ax.bar_label(container, fmt="%.2f", fontsize=7)
+            ax.bar_label(container, fmt="%.3f", fontsize=7)
 
     if title:
         fig.suptitle(title)
@@ -212,7 +218,7 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
         df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
 
-    fig, ax = plt.subplots(figsize=(10, max(len(df_plot)/5 + 2, 3)))
+    fig, ax = plt.subplots(figsize=_get_fig_size(len(df_plot)))
     ci_colour = 'darkgrey'
 
     # plot CIs and coloured dots
@@ -272,8 +278,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 
     figs = []
 
-    for metric in df.index.get_level_values('metric').unique():
-        print(f"{metric.capitalize()} accuracy")
+    for metric in df.index.get_level_values('metric').unique()[::-1]:
 
         fig_or, model_order = plot_models_odds_ratios(
             df, metric, log_scale=True, sort_models=True, **kwargs,
