@@ -3,6 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.lines import Line2D
+from typing import NamedTuple
+
+
+class SignificancePoint(NamedTuple):
+    threshold: float | None
+    is_drop: bool | None
+    colour: str
+    label: str
 
 
 def _sort_by_model(df, model_order: list[str]):
@@ -135,29 +143,46 @@ def plot_question_success_rate_matrix(df):
     return fig
 
 
-def _prepare_odds_ratios_data(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
-                              sort_models: bool = False):
+def _define_significance_points(projected_alpha: float | None):
+    pp = " (p < {})"
     p_thresholds = {
-        'strong': (0.01, 'brown', 'Strong drop (p < {})'),
-        'significant': (0.05, 'orange', 'Significant drop (p < {})'),
-        'potentially_significant': (projected_alpha, 'gold', 'Potentially significant drop (p < {})'),
-        'not_significant': (1, 'darkgray', f'Not significant')
+        'strong_drop': SignificancePoint(0.01, True, 'brown', f'Strong drop' + pp),
+        'significant_drop': SignificancePoint(0.05, True, 'sandybrown', 'Significant drop' + pp),
+        'potentially_significant_drop': SignificancePoint(
+            projected_alpha, True, 'khaki', 'Potentially significant drop' + pp),
+        'not_significant': SignificancePoint(1, None, 'darkgray', f'Not significant'),
+        'potentially_significant_rise': SignificancePoint(
+            projected_alpha, False, 'palegreen', 'Potentially significant rise' + pp),
+        'significant_rise': SignificancePoint(0.05, False, 'limegreen','Significant rise' + pp),
+        'strong_rise': SignificancePoint(0.01, False, 'darkgreen', 'Strong rise' + pp)
     }
+
+    return p_thresholds
+
+
+def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str, projected_alpha: float | None = None,
+                              model_order: list[str] | None = None, sort_models: bool = False
+                              ) -> tuple[pd.DataFrame, dict[str, SignificancePoint], list[str] | None]:
+
+    p_thresholds = _define_significance_points(projected_alpha)
 
     df_plot = df.xs(metric, level='metric').copy()
 
-    def get_color(p):
-        default = p_thresholds["not_significant"][1]
-        if np.isnan(p):
-            return default
-        for name, (th, c, _) in p_thresholds.items():
-            if th is None:
-                continue
-            if p < th:
-                return c
-        return default
+    def get_colour(row):
+        default_colour = p_thresholds["not_significant"].colour
+        p = row['p_value']
+        is_drop = bool(row['estimate'] < 0)
 
-    df_plot['color'] = df_plot['p_value'].apply(get_color)
+        if np.isnan(p):
+            return default_colour
+        for name, point in p_thresholds.items():
+            if point.threshold is None or point.is_drop is None:
+                continue
+            if p < point.threshold and is_drop is point.is_drop:
+                return point.colour
+        return default_colour
+
+    df_plot['colour'] = df_plot.apply(get_colour, axis=1)
 
     # compute odds ratios and 95% confidence intervals
     estimate = df_plot.estimate
@@ -213,7 +238,7 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
             ax.plot([row['ci_lower_or'], row['ci_upper_or']], [y, y], '|', c=ci_colour)
 
         # draw the dot using the dynamically assigned colour
-        ax.scatter(x=row['odds_ratio'], y=y, color=row['color'], s=80, zorder=2, ec='black', lw=0.5)
+        ax.scatter(x=row['odds_ratio'], y=y, color=row['colour'], s=80, zorder=2, ec='black', lw=0.5)
 
     ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
@@ -223,10 +248,12 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
     ax.set_xlabel('Odds ratio' +  (' (log scale)' if log_scale else ''))
 
     # legend
+    point_colours = df_plot.colour.unique()
     legend_elements = [
         Line2D(
-            [0], [0], marker='o', c='darkgrey', mec='black', mew=0.5, mfc=c, ms=10, label=desc.format(th)
-        ) for th, c, desc in p_thresholds.values() if th is not None
+            [0], [0], marker='o', c='darkgrey', mec='black', mew=0.5, ms=10,
+            mfc=point.colour, label=point.label.format(point.threshold)
+        ) for point in p_thresholds.values() if point.colour in point_colours
     ]
     if np.isnan(df_plot.odds_ratio).any():
         legend_elements.append(
