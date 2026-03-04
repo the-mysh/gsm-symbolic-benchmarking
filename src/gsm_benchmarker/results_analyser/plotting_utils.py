@@ -212,7 +212,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str, projected_alpha: fl
 
 
 def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
-                            log_scale: bool = False, sort_models: bool = False, no_title: bool = False):
+                            log_scale: bool = False, sort_models: bool = False, title: str | None = None):
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
         df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
@@ -263,10 +263,30 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
 
     ax.set_ylabel('Model')
 
-    if not no_title:
-        fig.suptitle(f'Effect of question templates on {metric} accuracy')
+    if title:
+        fig.suptitle(title)
 
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
 
     return fig, model_order
+
+
+def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, title: str | None = None,
+              bar_colours: list[str] | None = None, **kwargs):
+    fig_or_standard, model_order_standard = plot_models_odds_ratios(
+        df, 'standard', log_scale=True, sort_models=True, **kwargs,
+        title=f"{title} (standard accuracy)" if title else None
+    )
+    fig_or_discounted, model_order_discounted = plot_models_odds_ratios(
+        df, 'discounted', log_scale=True, sort_models=True, **kwargs,
+        title=f"{title} (discounted accuracy)" if title else None
+    )
+
+    fig_bars = plot_bars_and_p_bars(
+        df, bars_value_col, 'p_value', colours=bar_colours,
+        model_order=model_order_standard, ylabel0=bars_value_ylabel, **kwargs,
+        title=title
+    )
+
+    return fig_or_standard, fig_or_discounted, fig_bars
