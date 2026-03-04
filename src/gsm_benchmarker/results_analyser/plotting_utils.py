@@ -20,41 +20,36 @@ def _sort_by_model(df, model_order: list[str]):
     ).reset_index(drop=True)
 
 
-def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
+def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
-                         colours: list[str] | None = None, models: list[str] | None = None,
+                         colour: str | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None, ylabel0: str | None = None):
 
-    df = df.rename(
-        index={'standard': 'Standard accuracy', 'discounted': 'Discounted accuracy'},
-        level='metric'
-    )
+    colour = colour or 'navy'
 
-    if colours is None:
-        colours = ['lightblue', 'navy']
+    df = df.xs(metric, level='metric')
 
     if models is not None:
         df = df[np.isin(df.index.get_level_values('model'), models)]
 
     def prep_data(col):
-        d = df[col].unstack(level='metric')
-        d = d[['Standard accuracy', 'Discounted accuracy']]
+        d = df[col]
 
         if model_order is not None:
             d = _sort_by_model(d.reset_index(), model_order[::-1]).set_index('model')
 
         return d
 
-    df_gap_closure = prep_data(value_col)
+    data_val = prep_data(value_col)
     df_p_values = prep_data(p_value_col)
 
     fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
 
-    df_gap_closure.plot(ax=axes[0], kind='bar', color=colours)
+    data_val.plot(ax=axes[0], kind='bar', color=colour)
     axes[0].set_ylabel(ylabel0 if ylabel0 is not None else value_col.replace('_', ' ').capitalize())
     axes[0].axhline(0, color='k', lw=0.5)
 
-    df_p_values.plot(ax=axes[1], kind='bar', color=colours)
+    df_p_values.plot(ax=axes[1], kind='bar', color=colour)
     axes[1].set_xticklabels(df_p_values.index, rotation=45, ha='right')
     axes[1].axhline(alpha, ls='--', color='k', lw=0.5, label=f'alpha = {alpha:.2f}')
 
@@ -63,9 +58,9 @@ def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
 
     axes[1].set_xlabel('Model')
     axes[1].set_ylabel('P value')
+    axes[1].legend(loc='upper right', frameon=True)
 
     for ax in axes:
-        ax.legend(loc='upper right', frameon=True)
         for container in ax.containers:
             ax.bar_label(container, fmt="%.2f", fontsize=7)
 
@@ -272,21 +267,25 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
     return fig, model_order
 
 
-def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, title: str | None = None,
-              bar_colours: list[str] | None = None, **kwargs):
-    fig_or_standard, model_order_standard = plot_models_odds_ratios(
-        df, 'standard', log_scale=True, sort_models=True, **kwargs,
-        title=f"{title} (standard accuracy)" if title else None
-    )
-    fig_or_discounted, model_order_discounted = plot_models_odds_ratios(
-        df, 'discounted', log_scale=True, sort_models=True, **kwargs,
-        title=f"{title} (discounted accuracy)" if title else None
-    )
+def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None,
+              bar_colour: str | None = None, title: str | None = None, **kwargs):
 
-    fig_bars = plot_bars_and_p_bars(
-        df, bars_value_col, 'p_value', colours=bar_colours,
-        model_order=model_order_standard, ylabel0=bars_value_ylabel, **kwargs,
-        title=title
-    )
+    figs = []
 
-    return fig_or_standard, fig_or_discounted, fig_bars
+    for metric in df.index.get_level_values('metric').unique():
+        print(f"{metric.capitalize()} accuracy")
+
+        fig_or, model_order = plot_models_odds_ratios(
+            df, metric, log_scale=True, sort_models=True, **kwargs,
+            title=f"{title} - odds ratios\n{metric} accuracy" if title else None
+        )
+
+        fig_bars = plot_bars_and_p_bars(
+            df, metric, value_col=bars_value_col, p_value_col='p_value', colour=bar_colour,
+            model_order=model_order, ylabel0=bars_value_ylabel, **kwargs,
+            title=f"{title} - magnitude and significance\n{metric} accuracy" if title else None
+        )
+
+        figs.extend((fig_or, fig_bars))
+
+    return figs
