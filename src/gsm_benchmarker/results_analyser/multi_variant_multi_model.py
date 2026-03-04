@@ -9,23 +9,9 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from rpy2.rinterface_lib.embedded import RRuntimeError
-import rpy2.robjects as ro
-from rpy2.robjects import pandas2ri
-from rpy2.robjects.conversion import localconverter
-
-# Set pandas converter as the global default for rpy2
-ro.conversion.set_conversion(pandas2ri.converter + ro.default_converter)
-
-from pymer4.models import glmer  # needs to go after the converter setting
-
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import plot_question_success_rate_matrix
-
-
-class GLMMFitError(RuntimeError):
-    pass
-
+from gsm_benchmarker.results_analyser.common import GLMMRunner
 
 logger = logging.getLogger(__name__)
 
@@ -91,14 +77,14 @@ class MultiVariantMultiModelResultsAnalyser:
             raise ValueError(f"{self.BASELINE_VARIANT} is the baseline variant "
                              f"- choose a different variant to compare it to")
 
-    def get_accuracy_drop_df(self, variant: str):
+    def get_accuracy_drops(self, variant: str):
         self._check_variant(variant)
 
         baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id()
         variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id()
 
         drop = baseline_accuracies - variant_accuracies
-        drop = drop.rename(columns={'correct': 'accuracy_drop', 'correct_strict': 'strict_accuracy_drop'})
+        drop = drop.rename('accuracy_drop')
 
         return drop
 
@@ -280,89 +266,17 @@ class MultiVariantMultiModelResultsAnalyser:
         ax.set_ylabel("Question count")
         return fig
 
-    @classmethod
-    def _fit_glmm(cls, df):
-        glmm_model = glmer(
-            'is_correct ~ is_variant + difficulty + (1 | id)',
-            data=df,
-            family='binomial'
+    def analyse_variant_effect(self, variant: str, models: list[str] | None = None):
+        glmm_runner = GLMMRunner(label='is_variant', question_difficulties=self.get_question_difficulty_per_model())
+        glmm_results_df = glmm_runner.run(
+            ras={
+                0: self.variants[self.BASELINE_VARIANT],
+                1: self.variants[variant]
+            },
+            models=models
         )
-
-        try:
-            glmm_model.fit(verbose=False)  # fitting works, only getting stats fails
-        except RRuntimeError as err:
-            if glmm_model.r_model is None:
-                raise GLMMFitError(f"GLMM fitting failed: {err}")
-
-        # Assign the model to an R variable first
-        ro.globalenv['r_model'] = glmm_model.r_model
-
-        # Then extract coefficients as a DataFrame
-        with localconverter(ro.default_converter + pandas2ri.converter):
-            coefs_df = ro.r('as.data.frame(coef(summary(r_model)))')
-
-        res = dict(
-            estimate=coefs_df.loc['is_variant', 'Estimate'],
-            p_value=coefs_df.loc['is_variant', 'Pr(>|z|)'],
-            std_err=coefs_df.loc['is_variant', 'Std. Error'],
-        )
-
-        return res
-
-    def _prep_df_for_glmm(self, variant: str, metric: str):
-        def prep_df(df_variant):
-            res = self.variants[df_variant].full_data
-            res = res[['model', 'id', metric]][:]
-            res['is_variant'] = [int(df_variant != 'GSM8K')] * len(res)
-            res['is_correct'] = res[metric].astype(int)
-            res = res.drop(metric, axis=1)
-            return res
-
-        df = pd.concat([prep_df(self.BASELINE_VARIANT), prep_df(variant)]).reset_index(drop=True)
-        return df
-
-    def analyse_variant_effect_glmm(self, variant: str, models: list[str] | None = None):
-        res = {}
-        for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
-            res[metric_label] = self._analyse_metric_variant_effect_glmm(variant=variant, metric=metric, models=models)
-
-        df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
-        df_results = df_results.swaplevel().sort_index()
-        return df_results
-
-    def _analyse_metric_variant_effect_glmm(self, variant: str, metric: str, models: list[str] | None = None):
-        df = self._prep_df_for_glmm(variant, metric=metric)
-        glmm_results = []
-
-        for model_name, group_df in df.groupby('model'):
-            if models is not None and model_name not in models:
-                continue
-            difficulty = self.get_question_difficulty(model=model_name)
-            group_df = group_df.merge(difficulty.reset_index(), on='id', how='left')
-
-            try:
-                res = self._fit_glmm(group_df)
-            except GLMMFitError as err:
-                logger.warning(f"{model_name}, {metric}: {err}")
-                res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan}
-
-            glmm_results.append({
-                'model': model_name,
-                **res,
-            })
-
-        glmm_results_df = pd.DataFrame(glmm_results)
-
-        if models is not None:
-            models_with_results = glmm_results_df.model.unique()
-            for requested_model_name in models:
-                if requested_model_name not in models_with_results:
-                    logger.warning(f"No data for model {requested_model_name}")
 
         # add plain accuracy drops
-        model_accuracy_drops = self.get_accuracy_drop_df('main').groupby('model').mean().reset_index()
-        m = ('strict_' if 'strict' in metric else '') + 'accuracy_drop'
-        glmm_results_df['accuracy_drop'] = model_accuracy_drops[m]
+        glmm_results_df['accuracy_drop'] = self.get_accuracy_drops(variant).groupby(['model', 'metric']).mean()
 
-        glmm_results_df = glmm_results_df.set_index('model')
         return glmm_results_df

@@ -15,7 +15,12 @@ def _sort_by_model(df, model_order: list[str]):
 def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          colours: list[str] | None = None, models: list[str] | None = None,
-                         model_order: list[str] | None = None):
+                         model_order: list[str] | None = None, ylabel0: str | None = None):
+
+    df = df.rename(
+        index={'standard': 'Standard accuracy', 'discounted': 'Discounted accuracy'},
+        level='metric'
+    )
 
     if colours is None:
         colours = ['lightblue', 'navy']
@@ -38,7 +43,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, value_col: str, p_value_col: str,
     fig, axes = plt.subplots(2, 1, sharex='all', figsize=(12, 8))
 
     df_gap_closure.plot(ax=axes[0], kind='bar', color=colours)
-    axes[0].set_ylabel(value_col.replace('_', ' ').capitalize())
+    axes[0].set_ylabel(ylabel0 if ylabel0 is not None else value_col.replace('_', ' ').capitalize())
     axes[0].axhline(0, color='k', lw=0.5)
 
     df_p_values.plot(ax=axes[1], kind='bar', color=colours)
