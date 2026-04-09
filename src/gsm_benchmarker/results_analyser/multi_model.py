@@ -246,12 +246,18 @@ class MultiModelResultsAnalyser:
 
         return fig
 
-    def get_failed_answer_cases(self):
-        return self._full_data[self.full_data.predicted_numerical_result.isna()]
+    def get_failed_answer_cases(self, models: list[str] | None = None):
+        ret = self._full_data[self.full_data.predicted_numerical_result.isna()]
 
-    def plot_error_types_by_model(self, title: str | None = None, percentage: bool = False):
+        if models is not None:
+            ret = ret[ret.model.apply(lambda m: m in models)]
 
-        failed = self.get_failed_answer_cases()
+        return ret
+
+    def plot_error_types_by_model(
+            self, title: str | None = None, percentage: bool = False, models: list[str] | None = None):
+
+        failed = self.get_failed_answer_cases(models=models)
 
         counts_df = failed.groupby(['model', 'detected_result_pattern']).size().unstack(fill_value=0)
 
