@@ -13,7 +13,6 @@ from gsm_benchmarker.input_data_management.dataset_wrapper import GSMSymbolicDat
 from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.benchmark.benchmark import BenchmarkRunner
 from gsm_benchmarker.model_wrappers.models_config_parser import ModelsConfig
-from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.logging_setup import install_colored_logger, setup_log_file_handler
 from gsm_benchmarker.utils.seeds import set_seed
 from gsm_benchmarker.input_data_management.prompt_config import PromptConfig
@@ -146,7 +145,7 @@ def make_prompt_config(preset_name: str | None = None, file_path: str | None = N
     else:
         pc = PromptConfig.default()
 
-    logger.info(f"Example prompt according to loaded format:\n{pc("<Question here>", GSMShotManager())}")
+    logger.info(f"Example prompt according to loaded format:\n{pc("<Question here>")}")
 
     return pc
 

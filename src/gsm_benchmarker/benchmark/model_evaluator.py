@@ -28,7 +28,6 @@ class ModelEvaluator:
 
     def __init__(self, model_spec: SingleModelConfig, config: BenchmarkConfig,
                  prompt_config: PromptConfig | None = None):
-        self.original_shots = GSMShotManager()
         self.model_wrapper = self._make_model_wrapper(model_spec, config)
         self.prompt_config = prompt_config or PromptConfig.default()
         self.answer_extractor = AnswerExtractor(code=self.prompt_config.code_type_answer)
@@ -51,9 +50,9 @@ class ModelEvaluator:
         return make_name_path_friendly(self.model_name)
 
     def create_prompt(self, question: str) -> str:
-        """Create 8-shot CoT prompt following paper's format"""
+        """Create 8-shot CoT prompt following paper's format (and possibly other specs)."""
 
-        return self.prompt_config(question, self.original_shots)
+        return self.prompt_config(question)
 
     def evaluate_dataset(self, dataset: Dataset, leave_progressbar: bool = True) -> pd.DataFrame:
         """
