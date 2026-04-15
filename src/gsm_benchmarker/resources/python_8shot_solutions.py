@@ -1,5 +1,5 @@
 
-FUNCTIONS = []
+SOLUTIONS = []
 
 
 def solution():
@@ -15,7 +15,7 @@ def solution():
     return trees_to_plant_today
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -31,7 +31,7 @@ def solution():
     return cars_after
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -50,7 +50,7 @@ def solution():
     return chocolates_left
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -66,7 +66,7 @@ def solution():
     return lollipops_given_to_denny
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -84,7 +84,7 @@ def solution():
     return shawn_toys_now
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -103,7 +103,7 @@ def solution():
     return computers_now
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -122,7 +122,7 @@ def solution():
     return golf_balls_left
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)
 
 
 def solution():
@@ -141,4 +141,4 @@ def solution():
     return dollars_left
 
 
-FUNCTIONS.append(solution)
+SOLUTIONS.append(solution)

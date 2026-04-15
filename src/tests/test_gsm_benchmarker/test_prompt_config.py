@@ -5,12 +5,14 @@ from gsm_benchmarker.input_data_management.prompt_config import PromptConfig
 
 
 @pytest.fixture
-def default_pc():
-    return PromptConfig.default(n_shots=3)
+def default_pc(mock_shot_manager):
+    pc = PromptConfig.default(n_shots=3)
+    pc.shots = mock_shot_manager
+    return pc
 
 
 def test_default_pc(default_pc: PromptConfig, mock_shot_manager: GSMShotManager):
-    prompt = default_pc(question="What about this one?", shots=mock_shot_manager)
+    prompt = default_pc(question="What about this one?")
 
     assert prompt == """As an expert problem solver, solve step by step the following mathematical questions.
 
@@ -29,7 +31,8 @@ A: Let's think step by step. """
 
 def test_pc_with_target_intro(mock_shot_manager):
     pc = PromptConfig.default(n_shots=2, target_intro="Now please solve this problem:")
-    prompt = pc(question="What about this one?", shots=mock_shot_manager)
+    pc.shots = mock_shot_manager
+    prompt = pc(question="What about this one?")
 
     assert prompt == """As an expert problem solver, solve step by step the following mathematical questions.
 
@@ -54,7 +57,8 @@ def test_alternative_pc(mock_shot_manager):
         answer_format=" Answer: {solution} Final answer: {result}.",
         separator="\n"
     )
-    prompt = pc(question="QQ?", shots=mock_shot_manager)
+    pc.shots = mock_shot_manager
+    prompt = pc(question="QQ?")
 
     assert prompt == """Here are some example problems with answers:
 Question: Q1? Answer: A1. Final answer: 11.
@@ -65,7 +69,8 @@ Question: QQ?"""
 
 def test_pc_from_preset(mock_shot_manager):
     pc = PromptConfig.from_preset('separated-target', n_shots=1, shot_intro="Example {sid}:\n")
-    prompt = pc(question="QQ?", shots=mock_shot_manager)
+    pc.shots = mock_shot_manager
+    prompt = pc(question="QQ?")
 
     assert prompt == """Here are some example problems with answers:
 

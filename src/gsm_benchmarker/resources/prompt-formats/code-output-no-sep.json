@@ -1,8 +1,9 @@
 {
   "n_shots": 8,
   "question_format": "Q: {question}\n\nA:\ndef solution():",
-  "answer_format": "\n{code}",
+  "answer_format": "\n{solution}",
   "intro": "As an expert problem solver and Python developer, write Python functions returning numerical solutions to the following mathematical questions.",
   "target_intro": "",
-  "code_type_answer": true
+  "code_type_answer": true,
+  "solutions_file": "python_8shot_solutions.py"
 }

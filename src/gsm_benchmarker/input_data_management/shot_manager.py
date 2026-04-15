@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Iterator
+from pathlib import Path
 
-from gsm_benchmarker.utils.resources_manager import load_resource_json, load_8shot_functions
+from gsm_benchmarker.utils.resources_manager import load_resource_json, load_8shot_solutions
 
 
 @dataclass
@@ -9,23 +10,22 @@ class SingleShot:
     question: str
     solution: str
     result: str
-    code: str  # solution in the form of code
     sid: int  # shot id
 
     def compile(self, fmt_string: str) -> str:
         try:
-            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result, sid=self.sid, code=self.code)
+            s = fmt_string.format(question=self.question, solution=self.solution, result=self.result, sid=self.sid)
         except KeyError:
             raise ValueError(
                 f"The SingleShot format string may have the following fields: 'question', 'solution', 'result', "
-                f"'code', and 'sid' (shot id). "
+                f"'and 'sid' (shot id). "
                 f"Got:\n{fmt_string}")
         return s
 
 
 class GSMShotManager:
-    def __init__(self):
-        self._shots = self._load_data()
+    def __init__(self, solutions_file: str | None = None, code: bool = False):
+        self._shots = self._load_data(solutions_file, code=code)
 
     @property
     def shots(self) -> tuple[SingleShot, ...]:
@@ -41,17 +41,17 @@ class GSMShotManager:
         return self._shots[item]
 
     @staticmethod
-    def _load_data() -> tuple[SingleShot, ...]:
+    def _load_data(solutions_file: str | None = None, code: bool = False) -> tuple[SingleShot, ...]:
         data_dict = load_resource_json("standard-8-shots.json")
 
-        funcs = load_8shot_functions("python_8shot_solutions.py")
-        if len(funcs) < len(data_dict["samples"]):
-            raise RuntimeError(f"The number of functional solutions ({len(funcs)}) "
-                               f"does not match the number of shots ({len(data_dict['samples'])})")
-        for i in range(min(len(funcs), len(data_dict["samples"]))):
-            code = funcs[i]
-            code = "\n".join(code.split("\n")[1:])  # remove 'def solution():' (added in prompt)
-            data_dict["samples"][i]["code"] = code
+        if solutions_file:
+            # load alternative solutions
+            alternative_solutions = load_8shot_solutions(solutions_file, code=code)
+            if len(alternative_solutions) < len(data_dict["samples"]):
+                raise RuntimeError(f"The number of alternative solutions ({len(alternative_solutions)}) "
+                                   f"does not match the number of shots ({len(data_dict['samples'])})")
+            for i in range(min(len(alternative_solutions), len(data_dict["samples"]))):
+                data_dict["samples"][i]["solution"] = alternative_solutions[i]
 
         return tuple(SingleShot(**s, sid=i+1) for i, s in enumerate(data_dict["samples"]))
 
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     print(20*"=")
     print()
 
-    m2 = GSMShotManager()
-    f = "Question:\n{question}\n\nAnswer:\ndef solution():\n{code}"
+    m2 = GSMShotManager(solutions_file="python_8shot_solutions.py", code=True)
+    f = "Question:\n{question}\n\nAnswer:\ndef solution():\n{solution}"
     print(m2.compile(f, n_shots=2, separator="\n\n"))
 

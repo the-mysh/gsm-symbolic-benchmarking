@@ -27,7 +27,7 @@ def load_json_file(file_name: str | Path) -> dict[str, Any]:
     return data_dict
 
 
-def load_8shot_functions(file_name: str):
+def load_8shot_solutions(file_name: str, code: bool = False):
     target_file_path = str(_RESOURCES_PATH / file_name)
 
     # 1. Dynamic Import Setup
@@ -58,24 +58,34 @@ def load_8shot_functions(file_name: str):
         raise RuntimeError(f"Failed to load external module '{target_file_path}'")
 
     # 2. Extract and Inspect the Functions List
-    function_sources = []
+    validated_solutions = []
 
     if external_module:
         try:
             # Access the list of function objects directly from the imported module
-            function_list = external_module.FUNCTIONS
+            solution_list = external_module.SOLUTIONS
 
-            logger.debug(f"Found {len(function_list)} functions in the 'FUNCTIONS' list.")
+            logger.debug(f"Found {len(solution_list)} functions in the 'SOLUTIONS' list.")
 
-            for func in function_list:
-                # Check if the item is actually a function before inspecting
-                if inspect.isfunction(func):
-                    function_sources.append(inspect.getsource(func))  # add source code of the function to the list
+            for solution in solution_list:
+                if code:
+                    # Check if the item is actually a function before inspecting
+                    if inspect.isfunction(solution):
+                        # add source code of the function to the list
+                        solution_text = inspect.getsource(solution)
+
+                        # remove 'def solution():' (added in prompt)
+                        solution_text = "\n".join(solution_text.split("\n")[1:])
+
+                        validated_solutions.append(solution_text)
+                else:
+                    # add as-is
+                    validated_solutions.append(solution)
 
         except AttributeError:
-            raise RuntimeError(f"Error: The 'FUNCTIONS' list was not found in {module_name}.")
+            raise RuntimeError(f"Error: The 'SOLUTIONS' list was not found in {module_name}.")
 
         except TypeError as e:
             raise RuntimeError(f"Error getting source code: {e}")
 
-    return function_sources
+    return validated_solutions

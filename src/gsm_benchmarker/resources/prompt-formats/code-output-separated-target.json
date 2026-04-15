@@ -2,8 +2,9 @@
   "n_shots": 8,
   "shot_intro": "",
   "question_format": "Q: {question}\n\nA:\ndef solution():",
-  "answer_format": "\n{code}",
+  "answer_format": "\n{solution}",
   "intro": "Here are some example problems with answers:",
   "target_intro": "Based on the examples above, please solve the problem below similarly. Make sure your answer is a valid Python function, taking no arguments and returning the answer as an int or float.",
-  "code_type_answer": true
+  "code_type_answer": true,
+  "solutions_file": "python_8shot_solutions.py"
 }
