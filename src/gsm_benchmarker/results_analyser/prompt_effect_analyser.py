@@ -89,12 +89,22 @@ class PromptEffectAnalyser:
             question_difficulties=self._baseline_mres.get_question_difficulty_per_model()
         )
 
+        if models is None:
+            models = list(set(self._experiment_mres.models) + set(self._baseline_mres.models))
+
+        models_validated = []
+        for model in models:
+            if model not in self._experiment_mres.models or model not in self._baseline_mres.models:
+                logger.warning(f"No data for model {model}")
+            else:
+                models_validated.append(model)
+
         glmm_results_df = glmm_runner.run(
             ras={
                 0: self._baseline_mres.variants[variant],
                 1: self._experiment_mres.variants[variant]
             },
-            models=models
+            models=models_validated
         )
 
         # add plain accuracy change
