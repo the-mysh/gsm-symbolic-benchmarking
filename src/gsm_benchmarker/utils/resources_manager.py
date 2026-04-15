@@ -27,8 +27,8 @@ def load_json_file(file_name: str | Path) -> dict[str, Any]:
     return data_dict
 
 
-def load_8shot_solutions(file_name: str, code: bool = False):
-    target_file_path = str(_RESOURCES_PATH / file_name)
+def load_8shot_solutions(solutions_name: str, code: bool = False):
+    target_file_path = str(_RESOURCES_PATH / "solutions_8shot" / (solutions_name + ".py"))
 
     # 1. Dynamic Import Setup
     module_dir = os.path.dirname(target_file_path)

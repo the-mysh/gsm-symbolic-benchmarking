@@ -15,7 +15,7 @@ class PromptConfig:
     separator: str = "\n\n"
     shot_intro: str = ""
     code_type_answer: bool = False
-    solutions_file: str | None = None
+    solutions_name: str | None = None
 
     def __post_init__(self):
         if '{question}' not in self.question_format:
@@ -24,7 +24,7 @@ class PromptConfig:
         if '{solution}' not in self.answer_format:
             raise ValueError("answer_format must contain '{solution}' placeholder")
 
-        self.shots = GSMShotManager(self.solutions_file, code=self.code_type_answer)
+        self.shots = GSMShotManager(self.solutions_name, code=self.code_type_answer)
 
     @property
     def shot_format(self) -> str:
@@ -63,3 +63,16 @@ class PromptConfig:
     @classmethod
     def default(cls, **kwargs) -> "PromptConfig":
         return cls.from_preset("default", **kwargs)
+
+
+if __name__ == '__main__':
+    pc_default = PromptConfig.default(n_shots=3)
+    print("DEFAULT PROMPT\n")
+    print(pc_default("<Question here>"))
+
+    print("\n" + 20 * "=" + "\n")
+
+    pc_code = PromptConfig.from_preset('code-output-separated-target', n_shots=2)
+    print('CODE PROMPT\n')
+    print(pc_code("<Question here>"))
+

@@ -24,8 +24,8 @@ class SingleShot:
 
 
 class GSMShotManager:
-    def __init__(self, solutions_file: str | None = None, code: bool = False):
-        self._shots = self._load_data(solutions_file, code=code)
+    def __init__(self, solutions_name: str | None = None, code: bool = False):
+        self._shots = self._load_data(solutions_name, code=code)
 
     @property
     def shots(self) -> tuple[SingleShot, ...]:
@@ -69,7 +69,7 @@ if __name__ == '__main__':
     print(20*"=")
     print()
 
-    m2 = GSMShotManager(solutions_file="python_8shot_solutions.py", code=True)
+    m2 = GSMShotManager(solutions_name="python_functions", code=True)
     f = "Question:\n{question}\n\nAnswer:\ndef solution():\n{solution}"
     print(m2.compile(f, n_shots=2, separator="\n\n"))
 

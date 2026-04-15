@@ -5,5 +5,5 @@
   "intro": "As an expert problem solver and Python developer, write Python functions returning numerical solutions to the following mathematical questions.",
   "target_intro": "",
   "code_type_answer": true,
-  "solutions_file": "python_8shot_solutions.py"
+  "solutions_name": "python_functions"
 }
