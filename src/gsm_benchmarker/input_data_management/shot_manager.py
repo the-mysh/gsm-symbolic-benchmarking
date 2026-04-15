@@ -70,6 +70,6 @@ if __name__ == '__main__':
     print()
 
     m2 = GSMShotManager()
-    f = "Question:\n{question}\n\nAnswer:\n{code}"
+    f = "Question:\n{question}\n\nAnswer:\ndef solution():\n{code}"
     print(m2.compile(f, n_shots=2, separator="\n\n"))
 

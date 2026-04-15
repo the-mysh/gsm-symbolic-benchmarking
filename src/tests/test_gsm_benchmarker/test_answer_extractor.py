@@ -58,7 +58,6 @@ def test_trim_response_no_trim(resp):
 def test_code_clean_explicit_definition():
     """Test a perfect, standard output with explicit def."""
     raw = """
-def solution():
     # given
     x = 1
     return x

@@ -73,7 +73,7 @@ Example 1:
 Q: Q1?
 A: A1. The final answer is: 11.
 
-Based on the examples above, please solve the following problem:
+Based on the examples above, please solve the problem below similarly.
 
 Q: QQ?
-"""
+A:"""
