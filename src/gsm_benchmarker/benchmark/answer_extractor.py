@@ -128,7 +128,16 @@ class AnswerExtractor:
         for i in range(len(lines)):
             if cls._import_pattern.match(lines[i]):
                 lines[i] = ""
-        text = "\n".join(lines)
+
+        # discard post-function lines
+        clean_lines = [lines[0]]
+        for line in lines[1:]:
+            # If the line has content and DOES NOT start with whitespace, we've hit the end of the function.
+            if line.strip() and not line.startswith((' ', '\t')):
+                break
+            clean_lines.append(line)
+
+        text = "\n".join(clean_lines)
 
         return text, match.group('func_name')
 
