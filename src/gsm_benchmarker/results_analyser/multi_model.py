@@ -62,13 +62,16 @@ class MultiModelResultsAnalyser:
     def get_core_stats(self):
         return self.full_data.groupby(['model', 'instance'])[['correct', 'correct_strict', 'babbling']].mean()
 
-    def get_accuracies_per_model_and_template_id(self):
-        res = self.full_data.groupby(['model', 'id'])[['correct', 'correct_strict']].mean()
-        res = pd.concat(
-            [a.rename('accuracy') for a in (res.correct, res.correct_strict)],
-            keys=['standard', 'discounted'],
-            names=('metric', 'model', 'id')
-        ).swaplevel(0, 1).swaplevel(1, 2).sort_index()
+    def get_accuracies_per_model_and_template_id(self, metric: str | None = None):
+        if metric:
+            res = self.full_data.groupby(['model', 'id'])[metric].mean()
+        else:
+            res = self.full_data.groupby(['model', 'id'])[['correct', 'correct_strict']].mean()
+            res = pd.concat(
+                [a.rename('accuracy') for a in (res.correct, res.correct_strict)],
+                keys=['standard', 'discounted'],
+                names=('metric', 'model', 'id')
+            ).swaplevel(0, 1).swaplevel(1, 2).sort_index()
         return res
 
     @staticmethod

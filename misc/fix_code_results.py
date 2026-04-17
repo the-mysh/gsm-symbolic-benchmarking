@@ -31,26 +31,24 @@ for folder in os.listdir(P_CODE):
         m_se = m[m.detected_result_pattern == 'SYNTAX_ERROR']
         print(f"\tall errors    : {m.shape[0] - m.correct.sum()}")
         print(f"\tsyntax errors : {m_se.shape[0]}")
-        if not m_se.shape[0]:
-            continue
+        if m_se.shape[0]:
+            fixed = 0
+            for i in m_se.index:
+                row = m_se.loc[i]
+                result, result_type = AnswerExtractor.extract_answer_code(row.full_response)
+                if result is None:
+                    continue
+                fixed += 1
+                m.loc[i, "predicted_numerical_result"] = result
+                m.loc[i, "detected_result_pattern"] = result_type.name
+                m.loc[i, "correct"] = (result == m.loc[i, "numerical_result"])
 
-        fixed = 0
-        for i in m_se.index:
-            row = m_se.loc[i]
-            result, result_type = AnswerExtractor.extract_answer_code(row.full_response)
-            if result is None:
-                continue
-            fixed += 1
-            m.loc[i, "predicted_numerical_result"] = result
-            m.loc[i, "detected_result_pattern"] = result_type.name
-            m.loc[i, "correct"] = (result == m.loc[i, "numerical_result"])
-
-        all_fixed += fixed
+            all_fixed += fixed
+            print(f"\tfixed         : {fixed}")
+            print(f"\tall errors now: {m.shape[0] - m.correct.sum()}")
+            print("\n")
         m.to_parquet(p_code_corrected/folder/model_pq)
 
-        print(f"\tfixed         : {fixed}")
-        print(f"\tall errors now: {m.shape[0] - m.correct.sum()}")
-        print("\n")
 
 
 print(f"Fixed {all_fixed} answers")

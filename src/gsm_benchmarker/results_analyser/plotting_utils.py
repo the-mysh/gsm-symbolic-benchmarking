@@ -31,7 +31,8 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
     colour = colour or 'teal'
 
-    df = df.xs(metric, level='metric')
+    if metric is not None:
+        df = df.xs(metric, level='metric')
 
     if models is not None:
         df = df[np.isin(df.index.get_level_values('model'), models)]
@@ -161,13 +162,15 @@ def _define_significance_points(projected_alpha: float | None):
     return p_thresholds
 
 
-def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str, projected_alpha: float | None = None,
+def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, projected_alpha: float | None = None,
                               model_order: list[str] | None = None, sort_models: bool = False
                               ) -> tuple[pd.DataFrame, dict[str, SignificancePoint], list[str] | None]:
 
     p_thresholds = _define_significance_points(projected_alpha)
 
-    df_plot = df.xs(metric, level='metric').copy()
+    if metric is not None:
+        df = df.xs(metric, level='metric')
+    df_plot = df.copy()
 
     def get_colour(row):
         default_colour = p_thresholds["not_significant"].colour
@@ -212,7 +215,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str, projected_alpha: fl
     return df_plot, p_thresholds, model_order
 
 
-def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, model_order: list[str] | None = None,
+def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None, model_order: list[str] | None = None,
                             log_scale: bool = False, sort_models: bool = False, title: str | None = None):
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
@@ -273,24 +276,34 @@ def plot_models_odds_ratios(df, metric, projected_alpha: float | None = None, mo
     return fig, model_order
 
 
-def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None,
+def plot_for_metrics(func):
+    def wrapper(df: pd.DataFrame, *args, **kwargs):
+        figs = []
+
+        if 'metric' in df.index.names:
+            for metric in df.index.get_level_values('metric').unique()[::-1]:
+                figs.extend(func(df, *args, metric=metric, **kwargs))
+        else:
+            figs.extend(func(df, *args, metric=None, **kwargs))
+
+    return wrapper
+
+
+@plot_for_metrics
+def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, metric: str | None = None,
               bar_colour: str | None = None, title: str | None = None, **kwargs):
 
-    figs = []
+    metric_text = f"\n{metric} accuracy" if metric else ""
 
-    for metric in df.index.get_level_values('metric').unique()[::-1]:
+    fig_or, model_order = plot_models_odds_ratios(
+        df, metric, log_scale=True, sort_models=True, **kwargs,
+        title=f"{title} - odds ratios{metric_text}" if title else None
+    )
 
-        fig_or, model_order = plot_models_odds_ratios(
-            df, metric, log_scale=True, sort_models=True, **kwargs,
-            title=f"{title} - odds ratios\n{metric} accuracy" if title else None
-        )
+    fig_bars = plot_bars_and_p_bars(
+        df, metric, value_col=bars_value_col, p_value_col='p_value', colour=bar_colour,
+        model_order=model_order, ylabel0=bars_value_ylabel, **kwargs,
+        title=f"{title} - magnitude and significance{metric_text}" if title else None
+    )
 
-        fig_bars = plot_bars_and_p_bars(
-            df, metric, value_col=bars_value_col, p_value_col='p_value', colour=bar_colour,
-            model_order=model_order, ylabel0=bars_value_ylabel, **kwargs,
-            title=f"{title} - magnitude and significance\n{metric} accuracy" if title else None
-        )
-
-        figs.extend((fig_or, fig_bars))
-
-    return figs
+    return fig_or, fig_bars

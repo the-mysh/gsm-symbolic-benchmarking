@@ -77,11 +77,11 @@ class MultiVariantMultiModelResultsAnalyser:
             raise ValueError(f"{self.BASELINE_VARIANT} is the baseline variant "
                              f"- choose a different variant to compare it to")
 
-    def get_accuracy_drops(self, variant: str):
+    def get_accuracy_drops(self, variant: str, metric: str | None = None):
         self._check_variant(variant)
 
-        baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id()
-        variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id()
+        baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id(metric=metric)
+        variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
 
         drop = baseline_accuracies - variant_accuracies
         drop = drop.rename('accuracy_drop')
@@ -266,17 +266,43 @@ class MultiVariantMultiModelResultsAnalyser:
         ax.set_ylabel("Question count")
         return fig
 
-    def analyse_variant_effect(self, variant: str, models: list[str] | None = None):
+    def _validate_models(self, models: list[str], variant: str):
+        models_validated = []
+
+        baseline_models = self.variants[self.BASELINE_VARIANT].models
+        variant_models = self.variants[variant].models
+
+        for model in models:
+            if model not in baseline_models or model not in variant_models:
+                logger.warning(f"No data for model {model}")
+            else:
+                models_validated.append(model)
+
+        if not models_validated:
+            raise ValueError(f"No data for any of the models: {', '.join(models)}")
+
+        return models_validated
+
+    def analyse_variant_effect(self, variant: str, models: list[str] | None = None, metric: str | None = None):
+        if models is not None:
+            models = self._validate_models(models, variant)
+
         glmm_runner = GLMMRunner(label='is_variant', question_difficulties=self.get_question_difficulty_per_model())
         glmm_results_df = glmm_runner.run(
             ras={
                 0: self.variants[self.BASELINE_VARIANT],
                 1: self.variants[variant]
             },
-            models=models
+            models=models,
+            metric=metric
         )
 
         # add plain accuracy drops
-        glmm_results_df['accuracy_drop'] = self.get_accuracy_drops(variant).groupby(['model', 'metric']).mean()
+        if metric:
+            acc_drops = self.get_accuracy_drops(variant, metric=metric).groupby('model')
+        else:
+            acc_drops = self.get_accuracy_drops(variant).groupby(['model', 'metric'])
+
+        glmm_results_df['accuracy_drop'] = acc_drops.mean()
 
         return glmm_results_df

@@ -78,7 +78,8 @@ class PromptEffectAnalyser:
         return plot_stats(cs, n_models=n_models, titles=titles,
                           title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
 
-    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None):
+    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None
+                                             , metric: str | None = None):
         """
         Run two-tailed GLMM test (per model) to check whether accuracy change between experiment and baseline
         on a given variant is significant.
@@ -104,14 +105,16 @@ class PromptEffectAnalyser:
                 0: self._baseline_mres.variants[variant],
                 1: self._experiment_mres.variants[variant]
             },
-            models=models_validated
+            models=models_validated,
+            metric=metric
         )
 
         # add plain accuracy change
-        baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id()
-        experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id()
+        baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
+        experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
         acc_change = experiment_accuracies - baseline_accuracies
-        glmm_results_df['mean_diff'] = acc_change.groupby(['model', 'metric']).mean()
-        glmm_results_df['median_diff'] = acc_change.groupby(['model', 'metric']).median()
+        gb = ['model', 'metric'] if metric is None else ['model']
+        glmm_results_df['mean_diff'] = acc_change.groupby(gb).mean()
+        glmm_results_df['median_diff'] = acc_change.groupby(gb).median()
 
         return glmm_results_df

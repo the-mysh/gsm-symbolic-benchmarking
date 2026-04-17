@@ -23,15 +23,21 @@ class GLMMFitError(RuntimeError):
     pass
 
 
-def do_for_metrics(func):
-    def wrapper(*args, **kwargs):
-        res = {}
-        for metric, metric_label in (('correct', 'standard'), ('correct_strict', 'discounted')):
-            res[metric_label] = func(*args, metric=metric, **kwargs)
+METRIC_LABELS = {'correct': 'standard', 'correct_strict': 'discounted'}
 
-        df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
-        df_results = df_results.swaplevel().sort_index()
-        return df_results
+def do_for_metrics(func):
+    def wrapper(*args, metric: str | None = None, **kwargs):
+
+        if metric is None:
+            res = {}
+            for metric, metric_label in METRIC_LABELS.items():
+                res[metric_label] = func(*args, metric=metric, **kwargs)
+
+            df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
+            df_results = df_results.swaplevel().sort_index()
+            return df_results
+        else:
+            return func(*args, metric=metric, **kwargs)
     return wrapper
 
 
