@@ -110,11 +110,16 @@ class PromptEffectAnalyser:
         )
 
         # add plain accuracy change
-        baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
-        experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
-        acc_change = experiment_accuracies - baseline_accuracies
+        acc_change = self.get_raw_acc_change(variant=variant, metric=metric)
         gb = ['model', 'metric'] if metric is None else ['model']
         glmm_results_df['mean_diff'] = acc_change.groupby(gb).mean()
         glmm_results_df['median_diff'] = acc_change.groupby(gb).median()
 
         return glmm_results_df
+
+    def get_raw_acc_change(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
+        baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
+        experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
+        acc_change = experiment_accuracies - baseline_accuracies
+        acc_change.rename('acc_change', inplace=True)
+        return acc_change

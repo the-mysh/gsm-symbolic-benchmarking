@@ -310,3 +310,35 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
     )
 
     return fig_or, fig_bars
+
+
+@plot_for_metrics
+def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change', metric: str | None = None,
+                                 models: list[str] | None = None, color: str | None = None):
+    if metric is not None:
+        df = df.xs(metric, level='metric')
+
+    if models is not None:
+        df = df.loc[models]
+    df = df.reset_index()
+
+    new_col_name = col_name.replace('_', ' ').capitalize()
+    df.rename(columns={col_name: new_col_name}, inplace=True)
+
+    width = 0.1
+
+    # expand the range slightly and offset it by half the width to ensure 0 is centered
+    data_min = df[new_col_name].min()
+    data_max = df[new_col_name].max()
+    start = (np.floor(data_min / width) * width) - (width / 2)
+    end = (np.ceil(data_max / width) * width) + (width / 2)
+
+    # This creates a grid of histograms automatically
+    g = sns.displot(data=df, x=new_col_name, col='model', col_wrap=2, kde=True,
+                    binwidth=width, binrange=(start, end),
+                    edgecolor='white', color=color or 'rebeccapurple',
+                    facet_kws={'sharex': True, 'sharey': True},
+                    height=3, aspect=1.5)
+    g.refline(x=0, color='k', linestyle='--', lw=1)
+
+    return g,
