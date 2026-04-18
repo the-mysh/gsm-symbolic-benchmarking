@@ -1,0 +1,9 @@
+{
+  "n_shots": 8,
+  "question_format": "Q: {question}\nA: ",
+  "answer_format": "{solution}\nThe final answer is {result}.",
+  "intro": "As an expert problem solver, solve the following mathematical questions.",
+  "target_intro": "",
+  "solutions_name": "nonformalised",
+  "separator": "\n\n"
+}
