@@ -70,6 +70,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
         ax.axvline(0, color='k', lw=1, zorder=1)
         for container in ax.containers:
             ax.bar_label(container, fmt="%.3f", fontsize=7)
+        ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
     if title:
         fig.suptitle(title)
@@ -285,6 +286,8 @@ def plot_for_metrics(func):
                 figs.extend(func(df, *args, metric=metric, **kwargs))
         else:
             figs.extend(func(df, *args, metric=None, **kwargs))
+
+        return figs
 
     return wrapper
 
