@@ -77,16 +77,16 @@ class MultiVariantMultiModelResultsAnalyser:
             raise ValueError(f"{self.BASELINE_VARIANT} is the baseline variant "
                              f"- choose a different variant to compare it to")
 
-    def get_accuracy_drops(self, variant: str, metric: str | None = None):
+    def get_accuracy_change(self, variant: str, metric: str | None = None):
         self._check_variant(variant)
 
         baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id(metric=metric)
         variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
 
-        drop = baseline_accuracies - variant_accuracies
-        drop = drop.rename('accuracy_drop')
+        acc_change = variant_accuracies - baseline_accuracies
+        acc_change = acc_change.rename('accuracy_change')
 
-        return drop
+        return acc_change
 
     def get_baseline_comparison_df(self, variant: str, model: str | None = None):
         self._check_variant(variant)
@@ -299,10 +299,10 @@ class MultiVariantMultiModelResultsAnalyser:
 
         # add plain accuracy drops
         if metric:
-            acc_drops = self.get_accuracy_drops(variant, metric=metric).groupby('model')
+            acc_change = self.get_accuracy_change(variant, metric=metric).groupby('model')
         else:
-            acc_drops = self.get_accuracy_drops(variant).groupby(['model', 'metric'])
+            acc_change = self.get_accuracy_change(variant).groupby(['model', 'metric'])
 
-        glmm_results_df['accuracy_drop'] = acc_drops.mean()
+        glmm_results_df['accuracy_change'] = acc_change.mean()
 
         return glmm_results_df
