@@ -4,9 +4,46 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.lines import Line2D
 from matplotlib.colors import to_rgb, rgb_to_hsv, hsv_to_rgb, rgb2hex
-from matplotlib.legend import Legend
-
+from matplotlib.figure import Figure
+from pathlib import Path
 from typing import NamedTuple
+import logging
+
+
+logger = logging.getLogger(__name__)
+
+
+def save_plot(label):
+    def decorator(func):
+        def wrapper(*args, save_prefix: str | Path | None = None, save_ext: str = "png", **kwargs):
+            ret = func(*args, **kwargs)
+
+            if not isinstance(ret, tuple):
+                ret = (ret,)
+
+            figures, not_figures = [], []
+            for it in ret:
+                (not_figures, figures)[int(isinstance(it, Figure))].append(it)
+
+            idx_format = "_{}" if len(figures) > 1 else ""
+            sep = "_"
+            if isinstance(save_prefix, str) and save_prefix.endswith("/"):
+                sep = ""
+
+            for i, fig in enumerate(figures):
+                if save_prefix is not None:
+                    save_name = Path(f"{save_prefix}{sep}{label}{idx_format.format(i)}.{save_ext}").resolve()
+                    if isinstance(fig, Figure):
+                        fig.savefig(save_name)
+                        logger.debug(f"Figure saved as: {save_name}")
+                    else:
+                        raise RuntimeError(f"Cannot save figure image from {type(fig).__name__} object")
+
+            return tuple(not_figures) if not_figures else None
+
+        return wrapper
+
+    return decorator
 
 
 class Colour:
@@ -44,6 +81,7 @@ def _get_fig_size(n_models):
     return 10, max(n_models/5 + 2, 3)
 
 
+@save_plot("bars")
 def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          bar_colour: str | None = None, models: list[str] | None = None,
@@ -129,7 +167,8 @@ def plot_stats(cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None,
     return fig, cs
 
 
-def plot_question_success_rate_matrix(df):
+@save_plot("difficulty_matrix")
+def plot_question_success_rate_matrix(df, title: str | None = None):
     n_models, n_questions = df.shape
 
     # Calculate marginals & sort
@@ -168,9 +207,20 @@ def plot_question_success_rate_matrix(df):
         ax_top.grid(False)
         ax_top.set_ylim(0, 100)
 
-    fig.suptitle("Leave-one-(model-)out question difficulty", fontsize=16, y=0.95)
+    if title is not None:
+        fig.suptitle(title, fontsize=16, y=0.95)
 
     return fig
+
+
+@save_plot("question_difficulty_histogram")
+def plot_question_difficulty_histogram(difficulties, n_levels: int = 10, color: str | None = None):
+    g = sns.displot(data=difficulties, kde=False,
+                    binwidth=1 / n_levels, binrange=(0, 1),
+                    edgecolor='white', color=color or 'tab:blue')
+
+    return g.figure
+
 
 
 def _define_significance_points(projected_alpha: float | None):
@@ -243,6 +293,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
     return df_plot, p_thresholds, model_order
 
 
+@save_plot("odds_ratios")
 def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None,
                             model_order: list[str] | None = None, log_scale: bool = False, sort_models: bool = False,
                             title: str | None = None):
@@ -307,40 +358,46 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
 
 def plot_for_metrics(func):
     def wrapper(df: pd.DataFrame, *args, **kwargs):
-        figs = []
+        save_prefix_in_kwargs = 'save_prefix' in kwargs and kwargs['save_prefix'] is not None
+        save_prefix = kwargs.pop('save_prefix', None)
+
 
         if 'metric' in df.index.names:
+            ret = []
             for metric in df.index.get_level_values('metric').unique()[::-1]:
-                figs.extend(func(df, *args, metric=metric, **kwargs))
+                sp = {'save_prefix': f"{save_prefix}_{metric}"} if save_prefix_in_kwargs else {}
+                r = func(df, *args, metric=metric, **kwargs, **sp)
+                if r is not None:
+                    ret.extend(r) if isinstance(r, tuple) else ret.append(r)
         else:
-            figs.extend(func(df, *args, metric=None, **kwargs))
+            sp = {'save_prefix': save_prefix} if save_prefix_in_kwargs else {}
+            ret = func(df, *args, metric=None, **kwargs, **sp)
 
-        return figs
+        return ret
 
     return wrapper
 
 
 @plot_for_metrics
 def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, metric: str | None = None,
-              bar_colour: str | None = None, title: str | None = None, **kwargs):
+              bar_colour: str | None = None, title: str | None = None, save_prefix: str | Path | None = None, **kwargs):
 
     metric_text = f"\n{metric} accuracy" if metric else ""
 
-    fig_or, model_order = plot_models_odds_ratios(
-        df, metric, log_scale=True, sort_models=True, **kwargs,
-        title=f"{title} - odds ratios{metric_text}" if title else None
+    model_order, = plot_models_odds_ratios(
+        df, metric, log_scale=True, sort_models=True, save_prefix=save_prefix, **kwargs,
+        title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 
-    fig_bars = plot_bars_and_p_bars(
+    plot_bars_and_p_bars(
         df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
-        model_order=model_order, ylabel0=bars_value_ylabel, **kwargs,
-        title=f"{title} - magnitude and significance{metric_text}" if title else None
+        model_order=model_order, ylabel0=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
+        title=f"{title} - magnitude and significance{metric_text}" if title else None,
     )
-
-    return fig_or, fig_bars
 
 
 @plot_for_metrics
+@save_plot("acc_change_distribution")
 def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change', metric: str | None = None,
                                  models: list[str] | None = None, color: str | None = None):
     if metric is not None:
@@ -369,4 +426,4 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change',
                     height=3, aspect=1.5)
     g.refline(x=0, color='k', linestyle='--', lw=1)
 
-    return g,
+    return g.figure
