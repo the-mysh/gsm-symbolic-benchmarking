@@ -3,7 +3,27 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.lines import Line2D
+from matplotlib.colors import to_rgb, rgb_to_hsv, hsv_to_rgb, rgb2hex
+from matplotlib.legend import Legend
+
 from typing import NamedTuple
+
+
+class Colour:
+    def __init__(self, c: str):
+        self._value = to_rgb(c)
+
+    @property
+    def value(self):
+        return rgb2hex(self._value)
+
+    def lighten(self, factor: float = 0.5):
+        h, s, v = rgb_to_hsv(self._value)
+
+        v = v + factor * (1 - v)
+        s = factor * s
+
+        return rgb2hex(hsv_to_rgb([h, s, v]).tolist())
 
 
 class SignificancePoint(NamedTuple):
@@ -26,10 +46,10 @@ def _get_fig_size(n_models):
 
 def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
-                         colour: str | None = None, models: list[str] | None = None,
+                         bar_colour: str | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None, ylabel0: str | None = None):
 
-    colour = colour or 'teal'
+    bar_colour = bar_colour or 'teal'
 
     if metric is not None:
         df = df.xs(metric, level='metric')
@@ -50,11 +70,11 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
     fig, axes = plt.subplots(1, 2, sharey='all', figsize=_get_fig_size(len(df)))
 
-    data_val.plot(ax=axes[0], kind='barh', color=colour, legend=False)
+    data_val.plot(ax=axes[0], kind='barh', color=bar_colour, legend=False)
     axes[0].set_xlabel(ylabel0 if ylabel0 is not None else value_col.replace('_', ' ').capitalize())
     axes[0].axvline(0, color='k', lw=0.5)
 
-    df_p_values.plot(ax=axes[1], kind='barh', color=colour, legend=False)
+    df_p_values.plot(ax=axes[1], kind='barh', color=bar_colour, legend=False)
     handles = [axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}')]
 
     if projected_alpha is not None:
@@ -216,8 +236,9 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
     return df_plot, p_thresholds, model_order
 
 
-def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None, model_order: list[str] | None = None,
-                            log_scale: bool = False, sort_models: bool = False, title: str | None = None):
+def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None,
+                            model_order: list[str] | None = None, log_scale: bool = False, sort_models: bool = False,
+                            title: str | None = None):
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
         df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
@@ -304,7 +325,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
     )
 
     fig_bars = plot_bars_and_p_bars(
-        df, metric, value_col=bars_value_col, p_value_col='p_value', colour=bar_colour,
+        df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
         model_order=model_order, ylabel0=bars_value_ylabel, **kwargs,
         title=f"{title} - magnitude and significance{metric_text}" if title else None
     )

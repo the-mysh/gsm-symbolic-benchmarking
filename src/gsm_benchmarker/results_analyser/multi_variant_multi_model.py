@@ -257,14 +257,15 @@ class MultiVariantMultiModelResultsAnalyser:
         difficulties = self.get_question_difficulty_per_model()
         return plot_question_success_rate_matrix(difficulties)
 
-    def plot_question_difficulty_histogram(self, model: str | None = None):
+    def plot_question_difficulty_histogram(self, model: str | None = None, n_levels: int = 20,
+                                           color: str | None = None):
         difficulties = self.get_question_difficulty(model=model)
 
-        fig, ax = plt.subplots()
-        ax.hist(difficulties, 21)
-        ax.set_xlabel("Overall question difficulty")
-        ax.set_ylabel("Question count")
-        return fig
+        g = sns.displot(data=difficulties, kde=False,
+                        binwidth=1/n_levels, binrange=(0, 1),
+                        edgecolor='white', color=color or 'tab:blue')
+
+        return g
 
     def _validate_models(self, models: list[str], variant: str):
         models_validated = []
