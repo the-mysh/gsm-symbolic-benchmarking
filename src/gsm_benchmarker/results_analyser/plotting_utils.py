@@ -61,7 +61,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
         d = df[col]
 
         if model_order is not None:
-            d = _sort_by_model(d.reset_index(), model_order).set_index('model')
+            d = _sort_by_model(d.reset_index(), model_order).set_index('model')[col]
 
         return d
 
@@ -75,21 +75,28 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
     axes[0].axvline(0, color='k', lw=0.5)
 
     df_p_values.plot(ax=axes[1], kind='barh', color=bar_colour, legend=False)
-    handles = [axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}')]
 
-    if projected_alpha is not None:
-        l = axes[1].axvline(projected_alpha, ls=':', color='royalblue', lw=1,
-                            label=f'projected alpha = {projected_alpha:.2f}')
-        handles.append(l)
+    if df_p_values.max() >= 0.001 * alpha:
+        handles = [axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}')]
+
+        if projected_alpha is not None:
+            l = axes[1].axvline(projected_alpha, ls=':', color='royalblue', lw=1,
+                                label=f'projected alpha = {projected_alpha:.2f}')
+            handles.append(l)
+            axes[1].legend(frameon=True, handles=handles, fontsize=8)
 
     axes[0].set_ylabel('Model')
     axes[1].set_xlabel('P value')
-    axes[1].legend(frameon=True, handles=handles, fontsize=8)
 
     for ax in axes:
         ax.axvline(0, color='k', lw=1, zorder=1)
         for container in ax.containers:
-            ax.bar_label(container, fmt="%.3f", fontsize=7)
+            labels = [
+                f"{v:.3f}" if v >= 0.001 or v == 0 else f"{v:.1e}"
+                for v in container.datavalues
+            ]
+
+            ax.bar_label(container, labels=labels, fontsize=7)
         ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
     if title:
