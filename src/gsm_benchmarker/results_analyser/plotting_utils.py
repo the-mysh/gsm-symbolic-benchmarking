@@ -73,14 +73,14 @@ def _sort_by_model(df, model_order: list[str]):
 
 
 def _get_fig_size(n_models):
-    return 10, max(n_models/5 + 2, 3)
+    return 10, max(n_models/5 + 1.5, 2.5)
 
 
 @save_plot("bars")
 def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          bar_colour: str | None = None, models: list[str] | None = None,
-                         model_order: list[str] | None = None, ylabel0: str | None = None):
+                         model_order: list[str] | None = None, value_label: str | None = None):
 
     bar_colour = bar_colour or 'teal'
 
@@ -104,7 +104,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
     fig, axes = plt.subplots(1, 2, sharey='all', figsize=_get_fig_size(len(df)))
 
     data_val.plot(ax=axes[0], kind='barh', color=bar_colour, legend=False)
-    axes[0].set_xlabel(ylabel0 if ylabel0 is not None else value_col.replace('_', ' ').capitalize())
+    axes[0].set_xlabel(value_label if value_label is not None else value_col.replace('_', ' ').capitalize())
     axes[0].axvline(0, color='k', lw=0.5)
 
     df_p_values.plot(ax=axes[1], kind='barh', color=bar_colour, legend=False)
@@ -175,7 +175,7 @@ def plot_question_success_rate_matrix(df, title: str | None = None):
 
     with plt.style.context('seaborn-v0_8-whitegrid'):
         fig, (ax_top, ax_heatmap) = plt.subplots(
-            2, 1, figsize=(12, 10), gridspec_kw={'height_ratios': [1, 3]}, sharex='all')
+            2, 1, figsize=(12, 6), gridspec_kw={'height_ratios': [1, 3]}, sharex='all')
 
         # heatmap
         cmap = sns.color_palette("mako_r", as_cmap=True)
@@ -204,6 +204,8 @@ def plot_question_success_rate_matrix(df, title: str | None = None):
 
     if title is not None:
         fig.suptitle(title, fontsize=16, y=0.95)
+
+    fig.tight_layout()
 
     return fig
 
@@ -387,7 +389,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 
     f2 = plot_bars_and_p_bars(
         df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
-        model_order=model_order, ylabel0=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
+        model_order=model_order, value_label=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
         title=f"{title} - magnitude and significance{metric_text}" if title else None,
     )
 
@@ -396,7 +398,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 
 @plot_for_metrics
 @save_plot("acc_change_distribution")
-def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change', metric: str | None = None,
+def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change', label: str | None = None, metric: str | None = None,
                                  models: list[str] | None = None, color: str | None = None):
     if metric is not None:
         df = df.xs(metric, level='metric')
@@ -405,7 +407,7 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change',
         df = df.loc[models]
     df = df.reset_index()
 
-    new_col_name = col_name.replace('_', ' ').capitalize()
+    new_col_name = label or col_name.replace('_', ' ').capitalize()
     df.rename(columns={col_name: new_col_name}, inplace=True)
 
     width = 0.1
@@ -494,12 +496,12 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
                 bar.set_linewidth(0.8)
 
     ax1.set_xticks(x)
-    ax1.set_xticklabels(selected_models, rotation=15, ha='right')
+    ax1.set_xticklabels(selected_models, rotation=15)
     ax1.set_ylim(0, 1)
     ax1.set_ylabel(mean_ylabel)
 
     ax2.set_xticks(x)
-    ax2.set_xticklabels(selected_models, rotation=15, ha='right')
+    ax2.set_xticklabels(selected_models, rotation=15)
     ax2.set_ylabel(variant_ylabel)
     ax2.set_xlabel('Model')
 
