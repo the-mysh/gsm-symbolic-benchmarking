@@ -5,6 +5,7 @@ import seaborn as sns
 from matplotlib.lines import Line2D
 from matplotlib.colors import to_rgb, rgb_to_hsv, hsv_to_rgb, rgb2hex
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
 from pathlib import Path
 from typing import NamedTuple
 import logging
@@ -18,12 +19,9 @@ def save_plot(label):
         def wrapper(*args, save_prefix: str | Path | None = None, save_ext: str = "png", **kwargs):
             ret = func(*args, **kwargs)
 
-            if not isinstance(ret, tuple):
-                ret = (ret,)
-
-            figures, not_figures = [], []
-            for it in ret:
-                (not_figures, figures)[int(isinstance(it, Figure))].append(it)
+            # Normalize only for figure collection; preserve wrapped return type.
+            ret_items = ret if isinstance(ret, tuple) else (ret,)
+            figures = [r for r in ret_items if isinstance(r, Figure)]
 
             idx_format = "_{}" if len(figures) > 1 else ""
             sep = "_"
@@ -33,13 +31,10 @@ def save_plot(label):
             for i, fig in enumerate(figures):
                 if save_prefix is not None:
                     save_name = Path(f"{save_prefix}{sep}{label}{idx_format.format(i)}.{save_ext}").resolve()
-                    if isinstance(fig, Figure):
-                        fig.savefig(save_name)
-                        logger.debug(f"Figure saved as: {save_name}")
-                    else:
-                        raise RuntimeError(f"Cannot save figure image from {type(fig).__name__} object")
+                    fig.savefig(save_name)
+                    logger.debug(f"Figure saved as: {save_name}")
 
-            return tuple(not_figures) if not_figures else None
+            return ret
 
         return wrapper
 
@@ -217,10 +212,11 @@ def plot_question_success_rate_matrix(df, title: str | None = None):
 def plot_question_difficulty_histogram(difficulties, n_levels: int = 10, color: str | None = None):
     g = sns.displot(data=difficulties, kde=False,
                     binwidth=1 / n_levels, binrange=(0, 1),
-                    edgecolor='white', color=color or 'tab:blue')
+                    edgecolor='white', color=color or 'tab:blue',
+                    aspect=1.5
+                    )
 
     return g.figure
-
 
 
 def _define_significance_points(projected_alpha: float | None):
@@ -384,16 +380,18 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 
     metric_text = f"\n{metric} accuracy" if metric else ""
 
-    model_order, = plot_models_odds_ratios(
+    f1, model_order = plot_models_odds_ratios(
         df, metric, log_scale=True, sort_models=True, save_prefix=save_prefix, **kwargs,
         title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 
-    plot_bars_and_p_bars(
+    f2 = plot_bars_and_p_bars(
         df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
         model_order=model_order, ylabel0=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
         title=f"{title} - magnitude and significance{metric_text}" if title else None,
     )
+
+    return f1, f2
 
 
 @plot_for_metrics
@@ -427,3 +425,103 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change',
     g.refline(x=0, color='k', linestyle='--', lw=1)
 
     return g.figure
+
+
+@save_plot("prompts")
+def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[str], prompt_order: list[str],
+                                  prompt_labels: dict[str, str], prompt_colours: dict[str, str],
+                                  title: str | None = None, mean_ylabel: str = 'Mean accuracy',
+                                  variant_ylabel: str = 'Symbolic performance delta',
+                                  significance_threshold: float = 0.05):
+    required_cols = {'model', 'prompt', 'mean_accuracy', 'accuracy_change', 'p_value'}
+    missing = required_cols - set(plot_df.columns)
+    if missing:
+        raise ValueError(f"plot_df is missing required columns: {', '.join(sorted(missing))}")
+
+    plot_df = plot_df.copy()
+
+    acc_pivot = (
+        plot_df
+        .pivot(index='model', columns='prompt', values='mean_accuracy')
+        .reindex(selected_models)
+        .reindex(columns=prompt_order)
+    )
+    var_pivot = (
+        plot_df
+        .pivot(index='model', columns='prompt', values='accuracy_change')
+        .reindex(selected_models)
+        .reindex(columns=prompt_order)
+    )
+    sig_pivot = (
+        plot_df
+        .pivot(index='model', columns='prompt', values='p_value')
+        .reindex(selected_models)
+        .reindex(columns=prompt_order)
+    )
+
+    x = np.arange(len(selected_models))
+    bar_width = 0.18
+    offset_center = (len(prompt_order) - 1) / 2
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
+
+    for i, prompt_key in enumerate(prompt_order):
+        offsets = x + (i - offset_center) * bar_width
+        color = prompt_colours[prompt_key]
+
+        bars_acc = ax1.bar(
+            offsets,
+            acc_pivot[prompt_key].to_numpy(),
+            width=bar_width,
+            label=prompt_labels[prompt_key],
+            color=color,
+        )
+        ax1.bar_label(bars_acc, fmt='%.3f', fontsize=8, padding=2)
+
+        bars_var = ax2.bar(
+            offsets,
+            var_pivot[prompt_key].to_numpy(),
+            width=bar_width,
+            color=color,
+        )
+        ax2.bar_label(bars_var, fmt='%.3f', fontsize=8, padding=2)
+
+        pvals = sig_pivot[prompt_key].to_numpy()
+        for bar, p_value in zip(bars_var, pvals):
+            if np.isfinite(p_value) and p_value > significance_threshold:
+                bar.set_hatch('///')
+                bar.set_edgecolor('black')
+                bar.set_linewidth(0.8)
+
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(selected_models, rotation=15, ha='right')
+    ax1.set_ylim(0, 1)
+    ax1.set_ylabel(mean_ylabel)
+
+    ax2.set_xticks(x)
+    ax2.set_xticklabels(selected_models, rotation=15, ha='right')
+    ax2.set_ylabel(variant_ylabel)
+    ax2.set_xlabel('Model')
+
+    for ax in (ax1, ax2):
+        ax.axhline(0, color='black', linewidth=0.5)
+
+
+    prompt_handles, prompt_labels_for_legend = ax1.get_legend_handles_labels()
+    hatch_label = f'Not significant (p > {significance_threshold:.2f})'
+    hatch_patch = Patch(facecolor='white', edgecolor='black', hatch='///', label=hatch_label)
+    ax2.legend(
+        handles=prompt_handles + [hatch_patch],
+        labels=prompt_labels_for_legend + [hatch_label],
+        title='Prompt / significance',
+        frameon=True,
+        fontsize=8,
+    )
+
+    if title:
+        fig.suptitle(title, y=1.02)
+
+    fig.tight_layout()
+
+    return fig
+

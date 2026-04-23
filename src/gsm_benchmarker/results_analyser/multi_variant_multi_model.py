@@ -267,7 +267,7 @@ class MultiVariantMultiModelResultsAnalyser:
         if save_prefix is not None and model is not None:
             save_prefix = f"{save_prefix}_{model}"
 
-        plot_question_difficulty_histogram(difficulties, **kwargs, save_prefix=save_prefix)
+        return plot_question_difficulty_histogram(difficulties, **kwargs, save_prefix=save_prefix)
 
     def _validate_models(self, models: list[str], variant: str):
         models_validated = []
