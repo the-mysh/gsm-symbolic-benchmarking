@@ -245,8 +245,11 @@ class MultiVariantMultiModelResultsAnalyser:
     def get_question_difficulty_per_model(self):
         difficulties = {}
 
-        for model in self.models:
-            difficulties[model] = self.get_question_difficulty(model=model)
+        if len(self.models) == 1:
+            difficulties[self.models[0]] = self.get_question_difficulty()  # array of zeros if only one model present
+        else:
+            for model in self.models:
+                difficulties[model] = self.get_question_difficulty(model=model)
 
         difficulties['OVERALL'] = self.get_question_difficulty()
 
