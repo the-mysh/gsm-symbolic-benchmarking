@@ -482,9 +482,13 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change',
 def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[str], prompt_order: list[str],
                                   prompt_labels: dict[str, str], prompt_colours: dict[str, str],
                                   title: str | None = None, mean_ylabel: str = 'Mean accuracy',
+                                  prompt_effect_ylabel: str = 'Prompt performance delta',
                                   variant_ylabel: str = 'Symbolic performance delta',
                                   significance_threshold: float = 0.05):
-    required_cols = {'model', 'prompt', 'mean_accuracy', 'accuracy_change', 'p_value'}
+    required_cols = {
+        'model', 'prompt', 'mean_accuracy', 'prompt_accuracy_change',
+        'prompt_p_value', 'accuracy_change', 'p_value'
+    }
     missing = required_cols - set(plot_df.columns)
     if missing:
         raise ValueError(f"plot_df is missing required columns: {', '.join(sorted(missing))}")
@@ -503,6 +507,18 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
         .reindex(selected_models)
         .reindex(columns=prompt_order)
     )
+    pe_pivot = (
+        plot_df
+        .pivot(index='model', columns='prompt', values='prompt_accuracy_change')
+        .reindex(selected_models)
+        .reindex(columns=prompt_order)
+    )
+    pe_sig_pivot = (
+        plot_df
+        .pivot(index='model', columns='prompt', values='prompt_p_value')
+        .reindex(selected_models)
+        .reindex(columns=prompt_order)
+    )
     sig_pivot = (
         plot_df
         .pivot(index='model', columns='prompt', values='p_value')
@@ -514,28 +530,51 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
     bar_width = 0.18
     offset_center = (len(prompt_order) - 1) / 2
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 6), sharex=True)
+    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+
+    def _label_finite_bars(ax, bars):
+        labels = [f'{height:.3f}' if np.isfinite(height) else '' for height in bars.datavalues]
+        ax.bar_label(bars, labels=labels, fontsize=8, padding=2)
 
     for i, prompt_key in enumerate(prompt_order):
         offsets = x + (i - offset_center) * bar_width
-        color = prompt_colours[prompt_key]
+        base_color = prompt_colours[prompt_key]
+        prompt_colour = Colour(base_color)
+        mean_color = prompt_colour.lighten(0.7)
+        prompt_effect_color = prompt_colour.lighten(0.5)
+        variant_color = prompt_colour.value
 
         bars_acc = ax1.bar(
             offsets,
             acc_pivot[prompt_key].to_numpy(),
             width=bar_width,
             label=prompt_labels[prompt_key],
-            color=color,
+            color=mean_color,
         )
-        ax1.bar_label(bars_acc, fmt='%.3f', fontsize=8, padding=2)
+        _label_finite_bars(ax1, bars_acc)
 
-        bars_var = ax2.bar(
+        bars_pe = ax2.bar(
+            offsets,
+            pe_pivot[prompt_key].to_numpy(),
+            width=bar_width,
+            color=prompt_effect_color,
+        )
+        _label_finite_bars(ax2, bars_pe)
+
+        pe_pvals = pe_sig_pivot[prompt_key].to_numpy()
+        for bar, p_value in zip(bars_pe, pe_pvals):
+            if np.isfinite(p_value) and p_value > significance_threshold:
+                bar.set_hatch('///')
+                bar.set_edgecolor('black')
+                bar.set_linewidth(0.8)
+
+        bars_var = ax3.bar(
             offsets,
             var_pivot[prompt_key].to_numpy(),
             width=bar_width,
-            color=color,
+            color=variant_color,
         )
-        ax2.bar_label(bars_var, fmt='%.3f', fontsize=8, padding=2)
+        _label_finite_bars(ax3, bars_var)
 
         pvals = sig_pivot[prompt_key].to_numpy()
         for bar, p_value in zip(bars_var, pvals):
@@ -551,17 +590,21 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
 
     ax2.set_xticks(x)
     ax2.set_xticklabels(selected_models, rotation=15)
-    ax2.set_ylabel(variant_ylabel)
-    ax2.set_xlabel('Model')
+    ax2.set_ylabel(prompt_effect_ylabel)
 
-    for ax in (ax1, ax2):
+    ax3.set_xticks(x)
+    ax3.set_xticklabels(selected_models, rotation=15)
+    ax3.set_ylabel(variant_ylabel)
+    ax3.set_xlabel('Model')
+
+    for ax in (ax1, ax2, ax3):
         ax.axhline(0, color='black', linewidth=0.5)
 
 
     prompt_handles, prompt_labels_for_legend = ax1.get_legend_handles_labels()
     hatch_label = f'Not significant (p > {significance_threshold:.2f})'
     hatch_patch = Patch(facecolor='white', edgecolor='black', hatch='///', label=hatch_label)
-    ax2.legend(
+    ax3.legend(
         handles=prompt_handles + [hatch_patch],
         labels=prompt_labels_for_legend + [hatch_label],
         title='Prompt / significance',
