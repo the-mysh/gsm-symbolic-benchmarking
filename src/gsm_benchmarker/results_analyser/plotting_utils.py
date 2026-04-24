@@ -49,11 +49,27 @@ class Colour:
     def value(self):
         return rgb2hex(self._value)
 
+    @staticmethod
+    def _increase(value, factor):
+        return min(value + factor * (1 - value), 1)
+
+    @staticmethod
+    def _decrease(value, factor):
+        return max(value - factor * (1 - value), 0)
+
     def lighten(self, factor: float = 0.5):
         h, s, v = rgb_to_hsv(self._value)
 
-        v = v + factor * (1 - v)
-        s = factor * s
+        v = self._increase(v, factor)
+        s = self._decrease(s, factor)
+
+        return rgb2hex(hsv_to_rgb([h, s, v]).tolist())
+
+    def darken(self, factor: float = 0.5):
+        h, s, v = rgb_to_hsv(self._value)
+
+        v = self._decrease(v, factor)
+        s = self._increase(v, factor)
 
         return rgb2hex(hsv_to_rgb([h, s, v]).tolist())
 
@@ -211,12 +227,45 @@ def plot_question_success_rate_matrix(df, title: str | None = None):
 
 
 @save_plot("question_difficulty_histogram")
-def plot_question_difficulty_histogram(difficulties, n_levels: int = 10, color: str | None = None):
+def plot_question_difficulty_histogram(difficulties, n_levels: int = 10, color: str | None = None,
+                                       cumulative_color: str | None = None, add_cumulative: bool = True):
     g = sns.displot(data=difficulties, kde=False,
                     binwidth=1 / n_levels, binrange=(0, 1),
                     edgecolor='white', color=color or 'tab:blue',
                     aspect=1.5
                     )
+
+    ax = g.axes[0, 0]
+    ax.set_xlabel("Relative question difficulty")
+
+    if add_cumulative:
+        # Overlay cumulative counts as a background histogram using the same bins.
+        values = np.asarray(difficulties.dropna() if hasattr(difficulties, "dropna") else difficulties)
+        counts, edges = np.histogram(values, bins=n_levels, range=(0, 1))
+        cumulative_counts = np.cumsum(counts)
+
+        widths = np.diff(edges)
+        ax.bar(
+            edges[:-1],
+            cumulative_counts,
+            width=widths,
+            align='edge',
+            color=cumulative_color or 'darkorange',
+            alpha=0.2,
+            edgecolor='none',
+            zorder=1,
+            label='Accumulated question counts'
+        )
+
+        max_count = int(counts.max()) if counts.size else 0
+        max_cumulative = int(cumulative_counts.max()) if cumulative_counts.size else 0
+        ax.set_ylim(0, max(max_count, max_cumulative) * 1.05 if max(max_count, max_cumulative) > 0 else 1)
+
+        # Set label for the non-cumulative bars and create legend
+        # The histogram bars are in the first container
+        if ax.containers:
+            ax.containers[0].set_label('Question counts')
+        ax.legend()
 
     return g.figure
 
