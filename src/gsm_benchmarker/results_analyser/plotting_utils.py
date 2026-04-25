@@ -6,12 +6,21 @@ from matplotlib.lines import Line2D
 from matplotlib.colors import to_rgb, rgb_to_hsv, hsv_to_rgb, rgb2hex
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch
+import matplotlib.ticker as mtick
 from pathlib import Path
 from typing import NamedTuple
 import logging
 
 
+
 logger = logging.getLogger(__name__)
+
+
+VARIANT_COLOURS = {
+    'GSM8K': 'mediumslateblue',
+    'main': 'darksalmon'
+}
+
 
 
 def save_plot(label):
@@ -619,3 +628,53 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
 
     return fig
 
+
+@save_plot("number_counts")
+def plot_number_counts(raw_counts_df: pd.DataFrame, binned_counts_df: pd.DataFrame, cum_cap: float = 100):
+    plot_bin_positions = np.arange(len(binned_counts_df))
+    plot_bin_centers = plot_bin_positions + 0.5
+    variants = list(binned_counts_df.columns)
+    n_variants = len(variants)
+
+    fig, (ax_count, ax_cum) = plt.subplots(2, 1, figsize=(10, 7))
+    total_bar_width = 0.8
+    bar_width = total_bar_width / max(n_variants, 1)
+    bar_offset = (1.0 - total_bar_width) / 2.0
+    for idx, variant_name in enumerate(variants):
+        percentages = binned_counts_df[variant_name] / binned_counts_df[variant_name].sum() * 100
+        bar_positions = plot_bin_positions + bar_offset + idx * bar_width
+        color = VARIANT_COLOURS.get(variant_name, None)
+        ax_count.bar(
+            bar_positions,
+            percentages,
+            width=bar_width,
+            align='edge',
+            alpha=0.8,
+            edgecolor='white',
+            linewidth=0.8,
+            label=variant_name,
+            color=color,
+        )
+
+        raw_counts = raw_counts_df[variant_name]
+        raw_counts = raw_counts[raw_counts > 0]
+        cum_perc = raw_counts.cumsum() / raw_counts.sum() * 100
+        ax_cum.plot(cum_perc.index, cum_perc,
+                    marker='.', ms=4, lw=1.0, label=variant_name, color=color)
+
+    for ax in (ax_count, ax_cum):
+        ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100, decimals=0))
+        ax.legend(title='Dataset variant')
+
+    ax_count.set_xticks(plot_bin_centers)
+    ax_count.set_xticklabels(binned_counts_df.index)
+    ax_count.set_xlabel('Extracted number buckets')
+    ax_count.set_ylabel('Percent of variant total')
+
+    ax_cum.set_xlabel('Extracted numbers')
+    ax_cum.set_ylabel('Cumulative percent')
+    ax_cum.set_xlim(-5, cum_cap + 5)
+
+    fig.tight_layout()
+
+    return fig

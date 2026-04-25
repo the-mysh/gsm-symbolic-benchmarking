@@ -8,9 +8,11 @@ from pathlib import Path
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections import Counter
 
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
-from gsm_benchmarker.results_analyser.plotting_utils import plot_question_success_rate_matrix, plot_question_difficulty_histogram
+from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_success_rate_matrix,
+                                                             plot_question_difficulty_histogram, plot_number_counts)
 from gsm_benchmarker.results_analyser.common import GLMMRunner
 
 logger = logging.getLogger(__name__)
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 class MultiVariantMultiModelResultsAnalyser:
     VARIANT_NAME_PATTERN = re.compile(r"(?P<variant>\w+)_test")
+    NUMBER_PATTERN = re.compile(r'\d+(?:\.\d+)?')
     BASELINE_VARIANT = 'GSM8K'
 
     def __init__(self, dir_path: str | Path):
@@ -309,3 +312,51 @@ class MultiVariantMultiModelResultsAnalyser:
         glmm_results_df['accuracy_change'] = acc_change.mean()
 
         return glmm_results_df
+
+    def get_number_counts(self, model: str | None = None, bin_edges: list[int | float] | None = None):
+        """Obtain counts of all numbers appearing in the questions present in data (for a single model)."""
+
+        if bin_edges is None:
+            bin_edges = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000, float('inf')]
+
+        bin_labels = ['fractions']
+        for start, end in zip(bin_edges[:-1], bin_edges[1:]):
+            if np.isinf(end):
+                label = f"{start}+"
+            elif (end - start) == 1:
+                label = f"{start}"
+            else:
+                label = f'{start}-{end}'
+            bin_labels.append(label)
+
+        binned_counts_dict = {}
+        raw_counts_dict = {}
+        for variant_name in self.variants:
+            variant_df = self.variants[variant_name].full_data
+            model_df = variant_df.loc[variant_df['model'] == (model or self.models[0]), ['question']].copy()
+            extracted_numbers = model_df['question'].str.findall(self.NUMBER_PATTERN).explode().dropna().astype(float)
+            raw_counts_dict[variant_name] = Counter(extracted_numbers)
+
+            # put into bins, all fractions in a single separate bin
+            integer_mask = np.isclose(extracted_numbers, np.round(extracted_numbers))
+            integer_numbers = extracted_numbers[integer_mask]
+            fraction_count = int((~integer_mask).sum())
+            integer_binned = pd.cut(
+                integer_numbers,
+                bins=bin_edges,
+                labels=bin_labels[1:],
+                right=False,
+                include_lowest=True,
+            )
+            integer_counts = integer_binned.value_counts().reindex(bin_labels[1:], fill_value=0)
+            binned_counts = pd.Series([fraction_count] + integer_counts.values.tolist(), index=bin_labels, dtype=int)
+            binned_counts_dict[variant_name] = binned_counts
+
+        raw_counts_df = pd.DataFrame(raw_counts_dict).fillna(0).astype(int).sort_index()
+        binned_counts_df = pd.DataFrame(binned_counts_dict).fillna(0).astype(int)
+
+        return raw_counts_df, binned_counts_df
+
+    def plot_number_counts(self, model: str | None = None, bin_edges: list[int | float] | None = None, **kwargs):
+        raw_counts_df, binned_counts_df = self.get_number_counts(model=model, bin_edges=bin_edges)
+        return plot_number_counts(raw_counts_df, binned_counts_df, **kwargs)
