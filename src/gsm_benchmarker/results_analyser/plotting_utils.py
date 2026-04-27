@@ -456,7 +456,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 
 @plot_for_metrics
 @save_plot("acc_change_distribution")
-def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_change', label: str | None = None, metric: str | None = None,
+def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'mean_diff', label: str | None = None, metric: str | None = None,
                                  models: list[str] | None = None, color: str | None = None):
     if metric is not None:
         df = df.xs(metric, level='metric')
@@ -498,7 +498,7 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
                                   gsm8k_mean_ylabel: str = 'GSM8K mean accuracy'):
     required_cols = {
         'model', 'prompt', 'mean_accuracy', 'prompt_accuracy_change',
-        'prompt_p_value', 'accuracy_change', 'p_value'
+        'prompt_p_value', 'mean_diff', 'p_value'
     }
     if include_gsm8k_mean:
         required_cols.add('gsm8k_mean_accuracy')
@@ -524,7 +524,7 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
         )
     var_pivot = (
         plot_df
-        .pivot(index='model', columns='prompt', values='accuracy_change')
+        .pivot(index='model', columns='prompt', values='mean_diff')
         .reindex(selected_models)
         .reindex(columns=prompt_order)
     )

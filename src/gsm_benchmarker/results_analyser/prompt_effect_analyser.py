@@ -91,7 +91,7 @@ class PromptEffectAnalyser:
         )
 
         if models is None:
-            models = list(set(self._experiment_mres.models) + set(self._baseline_mres.models))
+            models = list(set(self._experiment_mres.models) | set(self._baseline_mres.models))
 
         models_validated = []
         for model in models:
@@ -110,16 +110,18 @@ class PromptEffectAnalyser:
         )
 
         # add plain accuracy change
-        acc_change = self.get_raw_acc_change(variant=variant, metric=metric)
-        gb = ['model', 'metric'] if metric is None else ['model']
-        glmm_results_df['mean_diff'] = acc_change.groupby(gb).mean()
-        glmm_results_df['median_diff'] = acc_change.groupby(gb).median()
+        glmm_results_df['mean_diff'] = self.get_mean_accuracy_change(metric=metric)
 
         return glmm_results_df
 
-    def get_raw_acc_change(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
+    def get_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
         baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
         experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
         acc_change = experiment_accuracies - baseline_accuracies
-        acc_change.rename('acc_change', inplace=True)
+        acc_change.rename('mean_diff', inplace=True)
         return acc_change
+
+    def get_mean_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.Series:
+        acc_change = self.get_accuracy_change(variant=variant, metric=metric)
+        gb = ['model', 'metric'] if metric is None else ['model']
+        return acc_change.groupby(gb).mean()

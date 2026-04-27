@@ -87,7 +87,7 @@ class MultiVariantMultiModelResultsAnalyser:
         variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
 
         acc_change = variant_accuracies - baseline_accuracies
-        acc_change = acc_change.rename('accuracy_change')
+        acc_change = acc_change.rename('mean_diff')
 
         return acc_change
 
@@ -304,14 +304,14 @@ class MultiVariantMultiModelResultsAnalyser:
         )
 
         # add plain accuracy drops
-        if metric:
-            acc_change = self.get_accuracy_change(variant, metric=metric).groupby('model')
-        else:
-            acc_change = self.get_accuracy_change(variant).groupby(['model', 'metric'])
-
-        glmm_results_df['accuracy_change'] = acc_change.mean()
+        glmm_results_df['mean_diff'] = self.get_mean_accuracy_change(metric=metric)
 
         return glmm_results_df
+
+    def get_mean_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.Series:
+        acc_change = self.get_accuracy_change(variant=variant, metric=metric)
+        gb = ['model', 'metric'] if metric is None else ['model']
+        return acc_change.groupby(gb).mean()
 
     def get_number_counts(self, model: str | None = None, bin_edges: list[int | float] | None = None):
         """Obtain counts of all numbers appearing in the questions present in data (for a single model)."""

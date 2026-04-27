@@ -63,10 +63,16 @@ class MultiModelResultsAnalyser:
         return self.full_data.groupby(['model', 'instance'])[['correct', 'correct_strict', 'babbling']].mean()
 
     def get_accuracies_per_model_and_template_id(self, metric: str | None = None):
+        return self.get_accuracies_grouped(['model', 'id'], metric=metric)
+
+    def get_accuracies_per_model(self, metric: str | None = None):
+        return self.get_accuracies_grouped('model', metric=metric)
+
+    def get_accuracies_grouped(self, groups: str | list[str], metric: str | None = None):
         if metric:
-            res = self.full_data.groupby(['model', 'id'])[metric].mean()
+            res = self.full_data.groupby(groups)[metric].mean()
         else:
-            res = self.full_data.groupby(['model', 'id'])[['correct', 'correct_strict']].mean()
+            res = self.full_data.groupby(groups)[['correct', 'correct_strict']].mean()
             res = pd.concat(
                 [a.rename('accuracy') for a in (res.correct, res.correct_strict)],
                 keys=['standard', 'discounted'],
