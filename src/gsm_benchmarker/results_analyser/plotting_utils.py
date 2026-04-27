@@ -493,11 +493,15 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
                                   title: str | None = None, mean_ylabel: str = 'Mean accuracy',
                                   prompt_effect_ylabel: str = 'Prompt performance delta',
                                   variant_ylabel: str = 'Symbolic performance delta',
-                                  significance_threshold: float = 0.05):
+                                  significance_threshold: float = 0.05,
+                                  include_gsm8k_mean: bool = False,
+                                  gsm8k_mean_ylabel: str = 'GSM8K mean accuracy'):
     required_cols = {
         'model', 'prompt', 'mean_accuracy', 'prompt_accuracy_change',
         'prompt_p_value', 'accuracy_change', 'p_value'
     }
+    if include_gsm8k_mean:
+        required_cols.add('gsm8k_mean_accuracy')
     missing = required_cols - set(plot_df.columns)
     if missing:
         raise ValueError(f"plot_df is missing required columns: {', '.join(sorted(missing))}")
@@ -510,6 +514,14 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
         .reindex(selected_models)
         .reindex(columns=prompt_order)
     )
+    gsm8k_acc_pivot = None
+    if include_gsm8k_mean:
+        gsm8k_acc_pivot = (
+            plot_df
+            .pivot(index='model', columns='prompt', values='gsm8k_mean_accuracy')
+            .reindex(selected_models)
+            .reindex(columns=prompt_order)
+        )
     var_pivot = (
         plot_df
         .pivot(index='model', columns='prompt', values='accuracy_change')
@@ -538,29 +550,54 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
     x = np.arange(len(selected_models))
     bar_width = 0.18
     offset_center = (len(prompt_order) - 1) / 2
+    ax0 = None
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+    if include_gsm8k_mean:
+        fig, (ax0, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
+    else:
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
 
     def _label_finite_bars(ax, bars):
         labels = [f'{height:.3f}' if np.isfinite(height) else '' for height in bars.datavalues]
         ax.bar_label(bars, labels=labels, fontsize=8, padding=2)
 
+    def _plot_mean_axis(ax, pivot, ylabel):
+        for i, prompt_key in enumerate(prompt_order):
+            offsets = x + (i - offset_center) * bar_width
+            base_color = prompt_colours[prompt_key]
+            prompt_colour = Colour(base_color)
+            mean_color = prompt_colour.lighten(0.7)
+
+            bars_acc = ax.bar(
+                offsets,
+                pivot[prompt_key].to_numpy(),
+                width=bar_width,
+                label=prompt_labels[prompt_key],
+                color=mean_color,
+            )
+            _label_finite_bars(ax, bars_acc)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(selected_models, rotation=15)
+        ax.set_ylim(0, 1)
+        ax.set_ylabel(ylabel)
+        ax.axhline(0, color='black', linewidth=0.5)
+        return ax.get_legend_handles_labels()
+
+    if include_gsm8k_mean:
+        prompt_handles, prompt_labels_for_legend = _plot_mean_axis(ax0, gsm8k_acc_pivot, gsm8k_mean_ylabel)
+        ax0.legend(handles=prompt_handles, labels=prompt_labels_for_legend, title='Prompt', frameon=True, fontsize=8)
+        _plot_mean_axis(ax1, acc_pivot, mean_ylabel)
+        ax1.legend(handles=prompt_handles, labels=prompt_labels_for_legend, title='Prompt', frameon=True, fontsize=8)
+    else:
+        prompt_handles, prompt_labels_for_legend = _plot_mean_axis(ax1, acc_pivot, mean_ylabel)
+
     for i, prompt_key in enumerate(prompt_order):
         offsets = x + (i - offset_center) * bar_width
         base_color = prompt_colours[prompt_key]
         prompt_colour = Colour(base_color)
-        mean_color = prompt_colour.lighten(0.7)
         prompt_effect_color = prompt_colour.lighten(0.5)
         variant_color = prompt_colour.value
-
-        bars_acc = ax1.bar(
-            offsets,
-            acc_pivot[prompt_key].to_numpy(),
-            width=bar_width,
-            label=prompt_labels[prompt_key],
-            color=mean_color,
-        )
-        _label_finite_bars(ax1, bars_acc)
 
         bars_pe = ax2.bar(
             offsets,
@@ -610,7 +647,6 @@ def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[s
         ax.axhline(0, color='black', linewidth=0.5)
 
 
-    prompt_handles, prompt_labels_for_legend = ax1.get_legend_handles_labels()
     hatch_label = f'Not significant (p > {significance_threshold:.2f})'
     hatch_patch = Patch(facecolor='white', edgecolor='black', hatch='///', label=hatch_label)
     ax3.legend(
