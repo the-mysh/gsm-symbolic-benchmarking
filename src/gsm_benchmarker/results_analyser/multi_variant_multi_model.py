@@ -11,7 +11,7 @@ import seaborn as sns
 from collections import Counter
 
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
-from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_success_rate_matrix,
+from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_difficulty_matrix,
                                                              plot_question_difficulty_histogram, plot_number_counts)
 from gsm_benchmarker.results_analyser.common import GLMMRunner
 
@@ -261,7 +261,7 @@ class MultiVariantMultiModelResultsAnalyser:
 
     def plot_question_difficulty_per_model(self, **kwargs):
         difficulties = self.get_question_difficulty_per_model()
-        return plot_question_success_rate_matrix(difficulties, **kwargs)
+        return plot_question_difficulty_matrix(difficulties, **kwargs)
 
     def plot_question_difficulty_histogram(self, model: str | None = None,
                                            save_prefix: str | Path | None = None, **kwargs):

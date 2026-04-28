@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.prompt_effect_analyser import PromptEffectAnalyser
-from gsm_benchmarker.results_analyser.plotting_utils import plot_glmm, plot_acc_change_distribution, Colour, plot_prompt_format_comparison
+from gsm_benchmarker.results_analyser.plotting_utils import plot_glmm, plot_acc_change_distribution, Colour
 
 
 @dataclass

@@ -66,7 +66,7 @@ class Colour:
     def _decrease(value, factor):
         return max(value - factor * (1 - value), 0)
 
-    def lighten(self, factor: float = 0.5):
+    def lighten(self, factor: float = 0.5) -> str:
         h, s, v = rgb_to_hsv(self._value)
 
         v = self._increase(v, factor)
@@ -187,8 +187,8 @@ def plot_stats(cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None,
     return fig, cs
 
 
-@save_plot("difficulty_matrix")
-def plot_question_success_rate_matrix(df, title: str | None = None):
+@save_plot("question_difficulty_matrix")
+def plot_question_difficulty_matrix(df, title: str | None = None):
     n_models, n_questions = df.shape
 
     # Calculate marginals & sort
@@ -488,180 +488,102 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'mean_diff', 
 
 
 @save_plot("prompts")
-def plot_prompt_format_comparison(plot_df: pd.DataFrame, selected_models: list[str], prompt_order: list[str],
-                                  prompt_labels: dict[str, str], prompt_colours: dict[str, str],
-                                  title: str | None = None, mean_ylabel: str = 'Mean accuracy',
-                                  prompt_effect_ylabel: str = 'Prompt performance delta',
-                                  variant_ylabel: str = 'Symbolic performance delta',
-                                  significance_threshold: float = 0.05,
-                                  include_gsm8k_mean: bool = False,
-                                  gsm8k_mean_ylabel: str = 'GSM8K mean accuracy'):
-    required_cols = {
-        'model', 'prompt', 'mean_accuracy', 'prompt_accuracy_change',
-        'prompt_p_value', 'mean_diff', 'p_value'
-    }
-    if include_gsm8k_mean:
-        required_cols.add('gsm8k_mean_accuracy')
-    missing = required_cols - set(plot_df.columns)
-    if missing:
-        raise ValueError(f"plot_df is missing required columns: {', '.join(sorted(missing))}")
+def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None):
+    if models:
+        all_prompts_summary = all_prompts_summary[models]
 
-    plot_df = plot_df.copy()
+    prompts = all_prompts_summary.index.get_level_values('prompt').unique().tolist()
 
-    acc_pivot = (
-        plot_df
-        .pivot(index='model', columns='prompt', values='mean_accuracy')
-        .reindex(selected_models)
-        .reindex(columns=prompt_order)
-    )
-    gsm8k_acc_pivot = None
-    if include_gsm8k_mean:
-        gsm8k_acc_pivot = (
-            plot_df
-            .pivot(index='model', columns='prompt', values='gsm8k_mean_accuracy')
-            .reindex(selected_models)
-            .reindex(columns=prompt_order)
-        )
-    var_pivot = (
-        plot_df
-        .pivot(index='model', columns='prompt', values='mean_diff')
-        .reindex(selected_models)
-        .reindex(columns=prompt_order)
-    )
-    pe_pivot = (
-        plot_df
-        .pivot(index='model', columns='prompt', values='prompt_accuracy_change')
-        .reindex(selected_models)
-        .reindex(columns=prompt_order)
-    )
-    pe_sig_pivot = (
-        plot_df
-        .pivot(index='model', columns='prompt', values='prompt_p_value')
-        .reindex(selected_models)
-        .reindex(columns=prompt_order)
-    )
-    sig_pivot = (
-        plot_df
-        .pivot(index='model', columns='prompt', values='p_value')
-        .reindex(selected_models)
-        .reindex(columns=prompt_order)
-    )
+    def prep_data(q):
+        data = all_prompts_summary.xs(q, level='quantity')
+        data = data.reindex(prompts, fill_value=None)
+        data = data.transpose()
+        return data
 
-    x = np.arange(len(selected_models))
-    bar_width = 0.18
-    offset_center = (len(prompt_order) - 1) / 2
-    ax0 = None
+    def plot_quantity(quantity, ax, title, mask_quantity=None, **kwargs):
+        data = prep_data(quantity)
+        mask = prep_data(mask_quantity) if mask_quantity else None
 
-    if include_gsm8k_mean:
-        fig, (ax0, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(12, 10), sharex=True)
+        data.plot.bar(ax=ax, legend=False, **kwargs, edgecolor='white')
+
+        for i, container in enumerate(ax.containers):
+            heights = [bar.get_height() for bar in container.patches]
+            labels = [f'{height:.3f}' if height else '' for height in heights]
+            ax.bar_label(container, labels=labels, fontsize=6, padding=1)
+
+            if mask is not None:
+                for bar, sig in zip(container.patches, mask[mask.columns[i]]):
+                    if not sig:
+                        bar.set_hatch('///')
+
+        ax.set_title(title)
+        ax.axhline(0, c='k', lw=0.5)
+
+    fig, axes = plt.subplots(4, 1, figsize=(10, 8), sharex='all')
+
+    plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours)
+    plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours)
+    plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours, mask_quantity='delta_symb_significant')
+    plot_quantity('delta_prompt', axes[3], r'Prompt performance delta ($\Delta_{prompt}$)', color=colours, mask_quantity='delta_prompt_significant')
+
+    axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=0)
+    axes[-1].set_xlabel("Model")
+
+    handles, labels = axes[0].get_legend_handles_labels()
+    hatch_patch = Patch(
+        facecolor='grey', edgecolor='white', hatch='///',
+        label=r"$\Delta_{symb}$ / $\Delta_{prompt}$ not significant")
+    handles.append(hatch_patch)
+    labels.append(hatch_patch.get_label())
+
+    fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
+    fig.tight_layout(rect=(0, .07, 1, 1))
+
+    return fig
+
+
+@save_plot("prompt_acc_evolution")
+def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], models: list[str] | None = None):
+    if models:
+        all_prompts_summary = all_prompts_summary[models]
     else:
-        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 8), sharex=True)
+        models = all_prompts_summary.columns.values.tolist()
 
-    def _label_finite_bars(ax, bars):
-        labels = [f'{height:.3f}' if np.isfinite(height) else '' for height in bars.datavalues]
-        ax.bar_label(bars, labels=labels, fontsize=8, padding=2)
+    n_models = len(models)
+    n_cols = 2
+    n_rows = n_models // n_cols + n_models % n_cols
 
-    def _plot_mean_axis(ax, pivot, ylabel):
-        for i, prompt_key in enumerate(prompt_order):
-            offsets = x + (i - offset_center) * bar_width
-            base_color = prompt_colours[prompt_key]
-            prompt_colour = Colour(base_color)
-            mean_color = prompt_colour.lighten(0.7)
+    x_data = all_prompts_summary.xs('GSM8K_acc', level='quantity')
+    y_data = all_prompts_summary.xs('delta_symb', level='quantity')
+    sig_data = all_prompts_summary.xs('delta_symb_significant', level='quantity')
 
-            bars_acc = ax.bar(
-                offsets,
-                pivot[prompt_key].to_numpy(),
-                width=bar_width,
-                label=prompt_labels[prompt_key],
-                color=mean_color,
-            )
-            _label_finite_bars(ax, bars_acc)
+    fig, axes = plt.subplots(n_rows, n_cols, sharex='all', sharey='all', figsize=(10, 8))
+    for i, (ax, model) in enumerate(zip(axes.flatten(), models)):
+        ax.set_title(model)
+        ax.set_xlabel("Mean accuracy on GSM8K")
+        ax.set_ylabel(r"Symbolic performance delta ($\Delta_{symb}$)")
+        ax.set_aspect('equal')
+        ax.axhline(0, c='k', lw=0.5, ls='--')
+        model_data = pd.concat([x_data[model], y_data[model], sig_data[model]], axis=1, keys=['x', 'y', 'significant'])
 
-        ax.set_xticks(x)
-        ax.set_xticklabels(selected_models, rotation=15)
-        ax.set_ylim(0, 1)
-        ax.set_ylabel(ylabel)
-        ax.axhline(0, color='black', linewidth=0.5)
-        return ax.get_legend_handles_labels()
+        for prompt in model_data.index:
+            x_val, y_val, _ = model_data.loc[prompt]
+            colour = colours[prompt]
+            ax.plot(x_val, y_val, marker='o', c=colour, label=prompt)
+            ax.annotate(prompt, (x_val, y_val), textcoords='offset points', xytext=(4, 4), fontsize=8, color=colour)
 
-    if include_gsm8k_mean:
-        prompt_handles, prompt_labels_for_legend = _plot_mean_axis(ax0, gsm8k_acc_pivot, gsm8k_mean_ylabel)
-        ax0.legend(handles=prompt_handles, labels=prompt_labels_for_legend, title='Prompt', frameon=True, fontsize=8)
-        _plot_mean_axis(ax1, acc_pivot, mean_ylabel)
-        ax1.legend(handles=prompt_handles, labels=prompt_labels_for_legend, title='Prompt', frameon=True, fontsize=8)
-    else:
-        prompt_handles, prompt_labels_for_legend = _plot_mean_axis(ax1, acc_pivot, mean_ylabel)
+        for pair in (['GSM', 'nonformal'], ['nonformal', 'formal'], ['formal', 'code']):
+            pair_data = model_data.loc[pair]
+            ax.plot(pair_data['x'], pair_data['y'], lw=0.5, c='darkslategrey')
 
-    for i, prompt_key in enumerate(prompt_order):
-        offsets = x + (i - offset_center) * bar_width
-        base_color = prompt_colours[prompt_key]
-        prompt_colour = Colour(base_color)
-        prompt_effect_color = prompt_colour.lighten(0.5)
-        variant_color = prompt_colour.value
-
-        bars_pe = ax2.bar(
-            offsets,
-            pe_pivot[prompt_key].to_numpy(),
-            width=bar_width,
-            color=prompt_effect_color,
-        )
-        _label_finite_bars(ax2, bars_pe)
-
-        pe_pvals = pe_sig_pivot[prompt_key].to_numpy()
-        for bar, p_value in zip(bars_pe, pe_pvals):
-            if np.isfinite(p_value) and p_value > significance_threshold:
-                bar.set_hatch('///')
-                bar.set_edgecolor('black')
-                bar.set_linewidth(0.8)
-
-        bars_var = ax3.bar(
-            offsets,
-            var_pivot[prompt_key].to_numpy(),
-            width=bar_width,
-            color=variant_color,
-        )
-        _label_finite_bars(ax3, bars_var)
-
-        pvals = sig_pivot[prompt_key].to_numpy()
-        for bar, p_value in zip(bars_var, pvals):
-            if np.isfinite(p_value) and p_value > significance_threshold:
-                bar.set_hatch('///')
-                bar.set_edgecolor('black')
-                bar.set_linewidth(0.8)
-
-    ax1.set_xticks(x)
-    ax1.set_xticklabels(selected_models, rotation=15)
-    ax1.set_ylim(0, 1)
-    ax1.set_ylabel(mean_ylabel)
-
-    ax2.set_xticks(x)
-    ax2.set_xticklabels(selected_models, rotation=15)
-    ax2.set_ylabel(prompt_effect_ylabel)
-
-    ax3.set_xticks(x)
-    ax3.set_xticklabels(selected_models, rotation=15)
-    ax3.set_ylabel(variant_ylabel)
-    ax3.set_xlabel('Model')
-
-    for ax in (ax1, ax2, ax3):
-        ax.axhline(0, color='black', linewidth=0.5)
+        model_sig_data = model_data[model_data.significant]
+        if sig_data.size:
+            ax.plot(model_sig_data['x'], model_sig_data['y'], marker='o', lw=0, c='none', mec='darkred', ms=12, label=r'significant $\Delta_{symb}$')
 
 
-    hatch_label = f'Not significant (p > {significance_threshold:.2f})'
-    hatch_patch = Patch(facecolor='white', edgecolor='black', hatch='///', label=hatch_label)
-    ax3.legend(
-        handles=prompt_handles + [hatch_patch],
-        labels=prompt_labels_for_legend + [hatch_label],
-        title='Prompt / significance',
-        frameon=True,
-        fontsize=8,
-    )
-
-    if title:
-        fig.suptitle(title, y=1.02)
-
-    fig.tight_layout()
-
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
+    fig.tight_layout(rect=(0, .05, 1, 1))
     return fig
 
 
