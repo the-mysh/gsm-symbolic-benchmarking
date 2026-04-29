@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from gsm_benchmarker.results_analyser.model import ModelResultsAnalyser
+from gsm_benchmarker.results_analyser.plotting_utils import add_bar_labels
 
 
 logger = logging.getLogger(__name__)
@@ -204,35 +205,53 @@ class MultiModelResultsAnalyser:
 
     @staticmethod
     def _plot_bars(counts_df: pd.DataFrame, color=None, title: str = None, legend_title: str | None = None,
-                   category_name: str | None = None, rotate_labels: bool = True, percentage: bool = False):
-        fig, axes = plt.subplots(1, 2, figsize=(12, 6), gridspec_kw={'width_ratios': [3, 1]})
+                   category_name: str | None = None, rotate_labels: bool = True, percentage_total: int | float = None,
+                   stacked: bool = True, bar_labels: bool = False, include_pie: bool = True):
+        fig, axes = plt.subplots(1, (1 + int(include_pie)), figsize=(12, 6),
+                                 gridspec_kw={'width_ratios': [3, 1]} if include_pie else {})
+        if not include_pie:
+            axes = [axes]
+        bar_ax = axes[0]
+
+        if percentage_total:
+            percentage_bar_ax = bar_ax.twinx()
+            percentage_bar_ax.set_ylabel("percentage")
+
+            def update_percentage_axis(ref_ax):
+                percentage_bar_ax.set_ylim(*[100 * lim / percentage_total for lim in ref_ax.get_ylim()])
+                fig.canvas.draw()
+            bar_ax.callbacks.connect("ylim_changed", update_percentage_axis)
 
         counts_df.plot(
             kind='bar',
-            stacked=True,
-            ax=axes[0],
+            stacked=stacked,
+            ax=bar_ax,
             color=color,
             legend=False
         )
         if category_name:
-            axes[0].set_title(f"By {category_name}")
-            axes[0].set_xlabel(category_name.capitalize())
-        axes[0].set_ylabel('% all answers' if percentage else 'Count')
-        axes[0].legend(title=legend_title, fancybox=True, framealpha=0.7, frameon=True)
+            bar_ax.set_title(f"By {category_name}")
+            bar_ax.set_xlabel(category_name.capitalize())
+        bar_ax.set_ylabel('Count')
+        bar_ax.legend(title=legend_title, fancybox=True, framealpha=0.7, frameon=True)
 
-        axes[0].tick_params(axis='x', rotation=45 if rotate_labels else 0)
+        bar_ax.tick_params(axis='x', rotation=45 if rotate_labels else 0)
 
         if rotate_labels:
-            for label in axes[0].get_xticklabels():
+            for label in bar_ax.get_xticklabels():
                 label.set_ha('right')
 
-        counts_df.sum().plot(
-            kind='pie',
-            ax=axes[1],
-            colors=color,
-            textprops={'size': 'smaller'},
-        )
-        axes[1].set_title("Combined")
+        if bar_labels:
+            add_bar_labels(bar_ax, precision=0, fontsize=7)
+
+        if include_pie:
+            counts_df.sum().plot(
+                kind='pie',
+                ax=axes[1],
+                colors=color,
+                textprops={'size': 'smaller'},
+            )
+            axes[1].set_title("Combined")
 
         if title is not None:
             fig.suptitle(title)
@@ -264,20 +283,18 @@ class MultiModelResultsAnalyser:
         return ret
 
     def plot_error_types_by_model(
-            self, title: str | None = None, percentage: bool = False, models: list[str] | None = None):
+            self, title: str | None = None, models: list[str] | None = None, include_percentage: bool = True, **kwargs):
 
         failed = self.get_failed_answer_cases(models=models)
 
         counts_df = failed.groupby(['model', 'detected_result_pattern']).size().unstack(fill_value=0)
 
-        if percentage:
-            counts_df = self._get_percentages(counts_df, 'model')
-
         fig = self._plot_bars(
             counts_df,
             title=title or "Error types",
             category_name="model",
-            percentage=percentage
+            percentage_total=self.get_percentage_total('model') if include_percentage else None,
+            **kwargs
         )
 
         return fig
@@ -289,9 +306,17 @@ class MultiModelResultsAnalyser:
 
         return counts_df
 
+    def get_percentage_total(self, col: str) -> int | None:
+        full_counts = self.full_data.groupby(col).size()
+        if full_counts.unique().size == 1:
+            return full_counts.iloc[0]
+
+        logger.warning(f"Full counts are not uniform: {full_counts}")
+        return None
+
     def plot_error_types_by_question_id(self, title: str | None = None, max_questions: int | None = None,
-                                        highest: bool = True, percentage=False):
-        failed = self.get_failed_answer_cases()
+                                        highest: bool = True, include_percentage=True, models: list[str] | None = None):
+        failed = self.get_failed_answer_cases(models=models)
 
         counts_df = failed.groupby(['id', 'detected_result_pattern']).size().unstack(fill_value=0)
         counts_df = counts_df.reindex(counts_df.sum(axis=1).sort_values(ascending=False).index)
@@ -304,15 +329,13 @@ class MultiModelResultsAnalyser:
                 counts_df = counts_df[-max_questions:]
                 counts_df = counts_df.reindex(["..."] + counts_df.index.tolist(), fill_value=0)
 
-        if percentage:
-            counts_df = self._get_percentages(counts_df, 'id')
-
         fig = self._plot_bars(
             counts_df,
             title=title or "Error types",
             category_name="question template id",
             rotate_labels=False,
-            percentage=percentage
+            percentage_total = self.get_percentage_total('id') if include_percentage else None,
+            include_pie = max_questions is None
         )
 
         return fig

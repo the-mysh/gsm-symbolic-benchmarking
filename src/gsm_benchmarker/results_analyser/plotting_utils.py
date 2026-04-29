@@ -148,13 +148,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
     for ax in axes:
         ax.axvline(0, color='k', lw=1, zorder=1)
-        for container in ax.containers:
-            labels = [
-                f"{v:.3f}" if v >= 0.001 or v == 0 else f"{v:.1e}"
-                for v in container.datavalues
-            ]
-
-            ax.bar_label(container, labels=labels, fontsize=7)
+        add_bar_labels(ax, precision=3, fontsize=7)
         ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
     if title:
@@ -163,6 +157,24 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
     fig.tight_layout()
 
     return fig
+
+
+def add_bar_labels(ax, precision: int = 3, fontsize: int = 7):
+    if precision == 0:
+        fmt = lambda v: f"{v:d}"
+    elif precision > 0:
+        def fmt(v):
+            if not v:
+                return "0.0"
+            if v >= 10**(-precision):
+                return f"{v:.{precision}f}"
+            return f"{v:.1e}"
+    else:
+        raise ValueError("Precision cannot be negative")
+
+    for container in ax.containers:
+        labels = [fmt(val) for val in container.datavalues]
+        ax.bar_label(container, labels=labels, fontsize=fontsize)
 
 
 def plot_stats(cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None, title: str | None = None):
