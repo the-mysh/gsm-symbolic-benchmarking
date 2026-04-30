@@ -145,27 +145,34 @@ class AnswerExtractor:
     def extract_answer_code(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
         func_def, func_name = cls.extract_function_definition(text)
 
-        if not func_def:
-            logger.warning("Failed to find valid function definition in text")
-            return None, ErrorType.NO_FUNCTION
+        res, answer_pattern_or_error_type, issue = cls.try_running_function(func_def, func_name)
 
-        res, answer_pattern_or_error_type = cls.run_extracted_function(func_def, func_name=func_name)
-
-        if isinstance(answer_pattern_or_error_type, AnswerPattern) and not isinstance(res, (int, float)):
-            if res is None:
-                logger.warning("The function did not return any value")
-                return None, ErrorType.NONE_RETURNED
-            else:
-                logger.warning(f"The result returned by the extracted function "
-                               f"({res}, type: {type(res).__name__}) is not a number")
-                return None, ErrorType.NOT_A_NUMBER
+        if issue:
+            logger.warning(issue)
 
         return res, answer_pattern_or_error_type
 
     @classmethod
-    def run_extracted_function(cls, func_def: str, func_name: str = 'solution') -> tuple[Any, AnswerPattern | ErrorType]:
+    def try_running_function(cls, func_def: str, func_name: str):
+        if not func_def:
+            return None, ErrorType.NO_FUNCTION, "Failed to find valid function definition in text"
+
+        res, answer_pattern_or_error_type, issue = cls.run_extracted_function(func_def, func_name=func_name)
+
+        if isinstance(answer_pattern_or_error_type, AnswerPattern) and not isinstance(res, (int, float)):
+            if res is None:
+                return None, ErrorType.NONE_RETURNED, "The function did not return any value"
+            else:
+                issue = (f"The result returned by the extracted function "
+                          f"({res}, type: {type(res).__name__}) is not a number")
+                return None, ErrorType.NOT_A_NUMBER, issue
+
+        return res, answer_pattern_or_error_type, issue
+
+    @classmethod
+    def run_extracted_function(cls, func_def: str, func_name: str = 'solution') -> tuple[Any, AnswerPattern | ErrorType, str]:
         if cls.check_extracted_func(func_def):
-            return None, ErrorType.FORBIDDEN_STRING
+            return None, ErrorType.FORBIDDEN_STRING, "Extracted function uses a forbidden string"
 
         scope = {'__builtins__': SAFE_BUILTINS.copy(), **SAFE_IMPORTS}
         loc = {}
@@ -173,26 +180,20 @@ class AnswerExtractor:
         try:
             exec(code, scope, loc)
         except SyntaxError as exc:
-            logger.warning(f"Extracted function definition has invalid syntax: {exc}")
-            return None, ErrorType.SYNTAX_ERROR
+            return None, ErrorType.SYNTAX_ERROR, f"Extracted function definition has invalid syntax: {exc}"
         except NameError as exc:
-            logger.warning(f"NameError when running extracted function: {exc}")
-            return None, ErrorType.NAME_ERROR
+            return None, ErrorType.NAME_ERROR, f"NameError when running extracted function: {exc}"
         except AttributeError as exc:
-            logger.warning(f"AttributeError when running extracted function: {exc}")
-            return None, ErrorType.ATTRIBUTE_ERROR
+            return None, ErrorType.ATTRIBUTE_ERROR, f"AttributeError when running extracted function: {exc}"
         except ZeroDivisionError as exc:
-            logger.warning(f"ZeroDivisionError when running extracted function: {exc}")
-            return None, ErrorType.ZERO_DIVISION_ERROR
+            return None, ErrorType.ZERO_DIVISION_ERROR, f"ZeroDivisionError when running extracted function: {exc}"
         except (TypeError, ValueError) as exc:
-            logger.warning(f"{exc.__class__.__name__} when running extracted function: {exc}")
-            return None, ErrorType.TYPE_VALUE_ERROR
+            return None, ErrorType.TYPE_VALUE_ERROR, f"{exc.__class__.__name__} when running extracted function: {exc}"
         except Exception as exc:
-            logger.warning(f"Error when running extracted function: {exc.__class__.__name__}: {exc}")
-            return None, ErrorType.UNCLASSIFIED
+            return None, ErrorType.UNCLASSIFIED, f"Error when running extracted function: {exc.__class__.__name__}: {exc}"
 
         res = loc['ret']
-        return res, AnswerPattern.CODE
+        return res, AnswerPattern.CODE, ""
 
     @classmethod
     def trim_response(cls, text: str) -> str:

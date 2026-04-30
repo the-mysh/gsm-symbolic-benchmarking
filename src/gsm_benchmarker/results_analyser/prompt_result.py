@@ -82,7 +82,7 @@ class PromptResult:
             self.prompt_effect,
             'mean_diff',
             "Prompt performance delta",
-            bar_colour=self.colour.lighten(),
+            bar_colour=self.colour.value,
             save_prefix=self.save_dest/(self.short_label + "_pe") if self.save_dest is not None else None,
             **kwargs
         )
@@ -96,7 +96,7 @@ class PromptResult:
             acc_change_raw,
             label="Prompt performance delta",
             models=self.models,
-            color=self.colour.lighten(),
+            color=self.colour.value,
             save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
             **kwargs
         )
@@ -128,5 +128,5 @@ class PromptResult:
 
         df = pd.DataFrame(d).transpose()
         if self.models:
-            df = df[self.models]
+            df = df[[col for col in df.columns if col in self.models]]
         return df

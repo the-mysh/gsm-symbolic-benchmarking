@@ -66,21 +66,21 @@ class Colour:
     def _decrease(value, factor):
         return max(value - factor * (1 - value), 0)
 
-    def lighten(self, factor: float = 0.5) -> str:
+    def lighten(self, factor: float = 0.5) -> "Colour":
         h, s, v = rgb_to_hsv(self._value)
 
         v = self._increase(v, factor)
         s = self._decrease(s, factor)
 
-        return rgb2hex(hsv_to_rgb([h, s, v]).tolist())
+        return Colour(rgb2hex(hsv_to_rgb([h, s, v]).tolist()))
 
-    def darken(self, factor: float = 0.5):
+    def darken(self, factor: float = 0.5) -> "Colour":
         h, s, v = rgb_to_hsv(self._value)
 
         v = self._decrease(v, factor)
         s = self._increase(v, factor)
 
-        return rgb2hex(hsv_to_rgb([h, s, v]).tolist())
+        return Colour(rgb2hex(hsv_to_rgb([h, s, v]).tolist()))
 
 
 class SignificancePoint(NamedTuple):
@@ -584,11 +584,13 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
             ax.plot(x_val, y_val, marker='o', c=colour, label=prompt)
             ax.annotate(prompt, (x_val, y_val), textcoords='offset points', xytext=(4, 4), fontsize=8, color=colour)
 
-        for pair in (['GSM', 'nonformal'], ['nonformal', 'formal'], ['formal', 'code']):
+        for pair in (['GSM', 'nonformal'], ['nonformal', 'formal'], ['nonformal', 'code-short'],
+                     ['formal', 'code-long'], ['code-short', 'code-long']):
             pair_data = model_data.loc[pair]
             ax.plot(pair_data['x'], pair_data['y'], lw=0.5, c='darkslategrey')
 
-        model_sig_data = model_data[model_data.significant]
+        model_sig_data = model_data[~model_data.significant.isna()]
+        model_sig_data = model_sig_data[model_sig_data.significant]
         if sig_data.size:
             ax.plot(model_sig_data['x'], model_sig_data['y'], marker='o', lw=0, c='none', mec='darkred', ms=12, label=r'significant $\Delta_{symb}$')
 
