@@ -4,9 +4,15 @@ import logging
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import plot_stats
-from gsm_benchmarker.results_analyser.common import GLMMRunner
 
 logger = logging.getLogger(__name__)
+
+try:
+    from gsm_benchmarker.results_analyser.common import GLMMRunner
+except (ValueError, ImportError) as exc:
+    logger.warning("R not configured, some functions will not be available")
+    logger.warning(exc)
+    GLMMRunner = None
 
 
 class PromptEffectAnalyser:
@@ -84,6 +90,9 @@ class PromptEffectAnalyser:
         Run two-tailed GLMM test (per model) to check whether accuracy change between experiment and baseline
         on a given variant is significant.
         """
+
+        if GLMMRunner is None:
+            raise RuntimeError("R not available")
 
         glmm_runner = GLMMRunner(
             label='is_experiment',

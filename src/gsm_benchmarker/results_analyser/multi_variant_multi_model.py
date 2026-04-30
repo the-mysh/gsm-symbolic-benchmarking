@@ -13,9 +13,16 @@ from collections import Counter
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_difficulty_matrix,
                                                              plot_question_difficulty_histogram, plot_number_counts)
-from gsm_benchmarker.results_analyser.common import GLMMRunner
+
 
 logger = logging.getLogger(__name__)
+
+try:
+    from gsm_benchmarker.results_analyser.common import GLMMRunner
+except (ValueError, ImportError) as exc:
+    logger.warning("R not configured, some functions will not be available")
+    logger.warning(exc)
+    GLMMRunner = None
 
 
 class MultiVariantMultiModelResultsAnalyser:
@@ -292,6 +299,9 @@ class MultiVariantMultiModelResultsAnalyser:
     def analyse_variant_effect(self, variant: str, models: list[str] | None = None, metric: str | None = None):
         if models is not None:
             models = self._validate_models(models, variant)
+
+        if GLMMRunner is None:
+            raise RuntimeError("R not available")
 
         glmm_runner = GLMMRunner(label='is_variant', question_difficulties=self.get_question_difficulty_per_model())
         glmm_results_df = glmm_runner.run(
