@@ -7,6 +7,7 @@ from matplotlib.colors import to_rgb, rgb_to_hsv, hsv_to_rgb, rgb2hex
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 import matplotlib.ticker as mtick
+from matplotlib import rc_context
 from pathlib import Path
 from typing import NamedTuple
 import logging
@@ -500,7 +501,8 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'mean_diff', 
 
 
 @save_plot("prompts")
-def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None):
+def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
+                           hatch_lw: int = 2):
     if models:
         all_prompts_summary = all_prompts_summary[models]
 
@@ -516,35 +518,39 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         data = prep_data(quantity)
         mask = prep_data(mask_quantity) if mask_quantity else None
 
-        data.plot.bar(ax=ax, legend=False, **kwargs, edgecolor='white')
+        with rc_context({'hatch.linewidth': hatch_lw}):
+            data.plot.bar(ax=ax, legend=False, **kwargs, edgecolor='white')
 
-        for i, container in enumerate(ax.containers):
-            heights = [bar.get_height() for bar in container.patches]
-            labels = [f'{height:.3f}' if height else '' for height in heights]
-            ax.bar_label(container, labels=labels, fontsize=6, padding=1)
+            for i, container in enumerate(ax.containers):
+                heights = [bar.get_height() for bar in container.patches]
+                labels = [f'{height:.3f}' if height else '' for height in heights]
+                ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
-            if mask is not None:
-                for bar, sig in zip(container.patches, mask[mask.columns[i]]):
-                    if not sig:
-                        bar.set_hatch('///')
+                if mask is not None:
+                    for bar, sig in zip(container.patches, mask[mask.columns[i]]):
+                        if not sig:
+                            bar.set_hatch('///')
 
-        ax.set_title(title)
-        ax.axhline(0, c='k', lw=0.5)
+            ax.set_title(title)
+            ax.axhline(0, c='k', lw=0.5)
 
-    fig, axes = plt.subplots(4, 1, figsize=(10, 8), sharex='all')
+    fig, axes = plt.subplots(5, 1, figsize=(10, 10), sharex='all')
 
     plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours)
     plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours)
-    plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours, mask_quantity='delta_symb_significant')
-    plot_quantity('delta_prompt', axes[3], r'Prompt performance delta ($\Delta_{prompt}$)', color=colours, mask_quantity='delta_prompt_significant')
+    plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours,
+                  mask_quantity='delta_symb_significant')
+    plot_quantity('delta_prompt', axes[3], r'Prompt performance delta ($\Delta_{prompt}$)', color=colours,
+                  mask_quantity='delta_prompt_significant')
+    plot_quantity('number_effect', axes[4], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
+                  mask_quantity='number_effect_significant')
 
     axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=0)
     axes[-1].set_xlabel("Model")
 
     handles, labels = axes[0].get_legend_handles_labels()
-    hatch_patch = Patch(
-        facecolor='grey', edgecolor='white', hatch='///',
-        label=r"$\Delta_{symb}$ / $\Delta_{prompt}$ not significant")
+    with rc_context({'hatch.linewidth': hatch_lw}):
+        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$\Delta$ not significant")
     handles.append(hatch_patch)
     labels.append(hatch_patch.get_label())
 

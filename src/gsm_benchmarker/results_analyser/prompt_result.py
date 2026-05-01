@@ -23,6 +23,7 @@ class PromptResult:
     pea: PromptEffectAnalyser | None = None
     _variant_effect: pd.DataFrame | None = None
     _prompt_effect: pd.DataFrame | None = None
+    _number_effect: pd.DataFrame | None = None
 
     def __post_init__(self):
         if self.mres is None:
@@ -49,7 +50,6 @@ class PromptResult:
             raise ValueError(f"Prompt effect analysis not possible for baseline prompt ({self.full_label})")
         return self.pea
 
-
     @property
     def prompt_effect(self) -> pd.DataFrame:
         if self._prompt_effect is None:
@@ -58,6 +58,14 @@ class PromptResult:
         assert self._prompt_effect is not None
         return self._prompt_effect
 
+    @property
+    def number_effect(self) -> pd.DataFrame:
+        if self._number_effect is None:
+            assert self.mres is not None
+            self._number_effect = self.mres.analyse_number_effect(variant='main', metric=self.metric, models=self.models)
+
+        assert self._number_effect is not None
+        return self._number_effect
 
     def display_plots(self, *figs):
         if self.notebook:
@@ -125,6 +133,13 @@ class PromptResult:
                 'delta_prompt_p_value': self.prompt_effect['p_value'],
                 'delta_prompt_significant': self.prompt_effect['p_value'] < alpha
             }
+
+        # add 'number effect' - influence of bigger numbers on odds of getting a correct answer
+        d |= {
+            'number_effect': self.number_effect['odds_change'],
+            'number_effect_p_value': self.number_effect['p_value'],
+            'number_effect_significant': self.number_effect['p_value'] < alpha
+        }
 
         df = pd.DataFrame(d).transpose()
         if self.models:

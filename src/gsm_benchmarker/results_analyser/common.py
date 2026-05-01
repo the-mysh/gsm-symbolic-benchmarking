@@ -42,8 +42,9 @@ def do_for_metrics(func):
 
 
 class GLMMRunner:
-    def __init__(self, label: str, question_difficulties: pd.DataFrame):
-        self._formula = f'is_correct ~ {label} + difficulty + (1 | id)'
+    def __init__(self, label: str, question_difficulties: pd.DataFrame | None = None):
+        diff_term = " + difficulty" if question_difficulties is not None else ""
+        self._formula = f'is_correct ~ {label}{diff_term} + (1 | id)'
         self._label = label
         self._question_difficulties = question_difficulties
 
@@ -69,7 +70,7 @@ class GLMMRunner:
 
         return coefs_df
 
-    def prep_df(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
+    def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
         def _prep(label_value: bool, ra: "MultiModelResultsAnalyser"):
             res = ra.full_data
             res = res[['model', 'id', metric]][:]
@@ -82,22 +83,24 @@ class GLMMRunner:
 
         return df
 
-    @do_for_metrics
-    def run(self, ras: dict[int, "MultiModelResultsAnalyser"], metric: str, models: list[str] | None = None):
-        df = self.prep_df(metric=metric, ras=ras)
+    def run(self, df: pd.DataFrame, models: list[str] | None = None):
         glmm_results = []
 
         for model_name, group_df in df.groupby('model'):
             if models is not None and model_name not in models:
                 continue
-            difficulty = self._question_difficulties.loc[model_name]
-            difficulty.name = 'difficulty'
-            group_df = group_df.merge(difficulty.reset_index(), on='id', how='left')
+
+            if self._question_difficulties is not None:
+                difficulty = self._question_difficulties.loc[model_name]
+                difficulty.name = 'difficulty'
+                group_df = group_df.merge(difficulty.reset_index(), on='id', how='left')
+
+            group_df = group_df.dropna(subset=[self._label])  # make sure there are no NaNs
 
             try:
                 coefs_df = self.fit_df(group_df)
             except GLMMFitError as err:
-                logger.warning(f"{model_name}, {metric}: {err}")
+                logger.warning(f"{model_name}: {err}")
                 res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan}
             else:
                 res = dict(

@@ -18,7 +18,7 @@ from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_diffi
 logger = logging.getLogger(__name__)
 
 try:
-    from gsm_benchmarker.results_analyser.common import GLMMRunner
+    from gsm_benchmarker.results_analyser.common import GLMMRunner, do_for_metrics
 except (ValueError, ImportError) as exc:
     logger.warning("R not configured, some functions will not be available")
     logger.warning(exc)
@@ -296,7 +296,8 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return models_validated
 
-    def analyse_variant_effect(self, variant: str, models: list[str] | None = None, metric: str | None = None):
+    @do_for_metrics
+    def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None):
         if models is not None:
             models = self._validate_models(models, variant)
 
@@ -304,17 +305,54 @@ class MultiVariantMultiModelResultsAnalyser:
             raise RuntimeError("R not available")
 
         glmm_runner = GLMMRunner(label='is_variant', question_difficulties=self.get_question_difficulty_per_model())
-        glmm_results_df = glmm_runner.run(
+        data_df = glmm_runner.prep_df_with_bool_labels(
+            metric=metric,
             ras={
                 0: self.variants[self.BASELINE_VARIANT],
                 1: self.variants[variant]
-            },
-            models=models,
-            metric=metric
-        )
+        })
+
+        glmm_results_df = glmm_runner.run(df=data_df, models=models)
 
         # add plain accuracy drops
         glmm_results_df['mean_diff'] = self.get_mean_accuracy_change(metric=metric)
+
+        return glmm_results_df
+
+    def _get_number_effect_glmm_data(self, variant: str, metric: str):
+        df = self.variants[variant].full_data.reset_index()
+
+        number_pattern = re.compile(r'\d*\.?\d+')
+        def extract_sum_logs(text):
+            matches = number_pattern.findall(text)
+            if not matches:
+                return np.nan # Handle the rare case where a prompt has no numbers
+            numbers = (float(match) for match in matches)
+            logs = ((np.log10(number) if number > 0 else 0) for number in numbers)
+            return sum(logs)
+
+        df_for_glmm = pd.DataFrame({
+            'model': df.model,
+            'id': df.id,
+            'is_correct': df[metric].astype(int),
+            'sum_logs': df.question.apply(extract_sum_logs)
+        })
+
+        return df_for_glmm
+
+    @do_for_metrics
+    def analyse_number_effect(self, variant: str, metric: str | None = None, models: list[str] | None = None):
+        if models is not None:
+            models = self._validate_models(models, variant)
+
+        if GLMMRunner is None:
+            raise RuntimeError("R not available")
+
+        glmm_data = self._get_number_effect_glmm_data(variant=variant, metric=metric)
+
+        glmm_runner = GLMMRunner(label="sum_logs")
+        glmm_results_df = glmm_runner.run(df=glmm_data, models=models)
+        glmm_results_df['odds_change'] = np.exp(glmm_results_df.estimate) - 1  # change in odds
 
         return glmm_results_df
 

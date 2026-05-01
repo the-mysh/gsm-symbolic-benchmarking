@@ -8,7 +8,7 @@ from gsm_benchmarker.results_analyser.plotting_utils import plot_stats
 logger = logging.getLogger(__name__)
 
 try:
-    from gsm_benchmarker.results_analyser.common import GLMMRunner
+    from gsm_benchmarker.results_analyser.common import GLMMRunner, do_for_metrics
 except (ValueError, ImportError) as exc:
     logger.warning("R not configured, some functions will not be available")
     logger.warning(exc)
@@ -84,12 +84,15 @@ class PromptEffectAnalyser:
         return plot_stats(cs, n_models=n_models, titles=titles,
                           title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
 
-    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None
-                                             , metric: str | None = None):
+    @do_for_metrics
+    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None, metric: str | None = None):
         """
         Run two-tailed GLMM test (per model) to check whether accuracy change between experiment and baseline
         on a given variant is significant.
         """
+
+        if metric is None:
+            raise ValueError("Metric must be specified")
 
         if GLMMRunner is None:
             raise RuntimeError("R not available")
@@ -103,20 +106,21 @@ class PromptEffectAnalyser:
             models = list(set(self._experiment_mres.models) | set(self._baseline_mres.models))
 
         models_validated = []
+        assert models is not None
         for model in models:
             if model not in self._experiment_mres.models or model not in self._baseline_mres.models:
                 logger.warning(f"No data for model {model}")
             else:
                 models_validated.append(model)
 
-        glmm_results_df = glmm_runner.run(
+        data_df = glmm_runner.prep_df_with_bool_labels(
+            metric=metric,
             ras={
                 0: self._baseline_mres.variants[variant],
                 1: self._experiment_mres.variants[variant]
-            },
-            models=models_validated,
-            metric=metric
-        )
+            })
+
+        glmm_results_df = glmm_runner.run(df=data_df, models=models_validated)
 
         # add plain accuracy change
         glmm_results_df['mean_diff'] = self.get_mean_accuracy_change(metric=metric)
