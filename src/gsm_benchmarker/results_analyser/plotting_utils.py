@@ -167,7 +167,7 @@ def add_bar_labels(ax, precision: int = 3, fontsize: int = 7):
         def fmt(v):
             if not v:
                 return "0.0"
-            if v >= 10**(-precision):
+            if abs(v) >= 10**(-precision):
                 return f"{v:.{precision}f}"
             return f"{v:.1e}"
     else:
