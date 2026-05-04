@@ -103,12 +103,13 @@ class GLMMRunner:
                 coefs_df = self.fit_df(group_df)
             except GLMMFitError as err:
                 logger.warning(f"{model_name}: {err}")
-                res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan}
+                res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan, 'z_value': np.nan}
             else:
                 res = dict(
                     estimate=coefs_df.loc[self._label, 'Estimate'],
                     p_value=coefs_df.loc[self._label, 'Pr(>|z|)'],
                     std_err=coefs_df.loc[self._label, 'Std. Error'],
+                    z_value=coefs_df.loc[self._label, 'z value']
                 )
 
 
