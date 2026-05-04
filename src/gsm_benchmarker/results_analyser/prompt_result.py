@@ -24,6 +24,7 @@ class PromptResult:
     _variant_effect: pd.DataFrame | None = None
     _prompt_effect: pd.DataFrame | None = None
     _number_effect: pd.DataFrame | None = None
+    use_difficulty: bool = True
 
     def __post_init__(self):
         if self.mres is None:
@@ -40,7 +41,8 @@ class PromptResult:
     def variant_effect(self) -> pd.DataFrame:
         if self._variant_effect is None:
             assert self.mres is not None
-            self._variant_effect = self.mres.analyse_variant_effect(variant='main', metric=self.metric, models=self.models)
+            self._variant_effect = self.mres.analyse_variant_effect(
+                variant='main', metric=self.metric, models=self.models, use_difficulty=self.use_difficulty)
 
         assert self._variant_effect is not None
         return self._variant_effect
@@ -53,7 +55,8 @@ class PromptResult:
     @property
     def prompt_effect(self) -> pd.DataFrame:
         if self._prompt_effect is None:
-            self._prompt_effect = self._check_pea().analyse_accuracy_change_significance(variant='main', models=self.models, metric=self.metric)
+            self._prompt_effect = self._check_pea().analyse_accuracy_change_significance(
+                variant='main', models=self.models, metric=self.metric, use_difficulty=self.use_difficulty)
 
         assert self._prompt_effect is not None
         return self._prompt_effect

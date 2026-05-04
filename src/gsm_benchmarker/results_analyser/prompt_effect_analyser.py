@@ -85,7 +85,8 @@ class PromptEffectAnalyser:
                           title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
 
     @do_for_metrics
-    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None, metric: str | None = None):
+    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None,
+                                             metric: str | None = None, use_difficulty: bool = True):
         """
         Run two-tailed GLMM test (per model) to check whether accuracy change between experiment and baseline
         on a given variant is significant.
@@ -99,7 +100,7 @@ class PromptEffectAnalyser:
 
         glmm_runner = GLMMRunner(
             label='is_experiment',
-            question_difficulties=self._baseline_mres.get_question_difficulty_per_model()
+            question_difficulties=self._baseline_mres.get_question_difficulty_per_model() if use_difficulty else None
         )
 
         if models is None:

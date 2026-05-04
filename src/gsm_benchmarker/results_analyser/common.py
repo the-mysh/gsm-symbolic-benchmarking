@@ -48,6 +48,8 @@ class GLMMRunner:
         self._label = label
         self._question_difficulties = question_difficulties
 
+        logger.info(("Using" if question_difficulties is not None else "Not using") + "question difficulty in GLMM")
+
     def fit_df(self, df: pd.DataFrame):
         glmm_model = glmer(
             self._formula,

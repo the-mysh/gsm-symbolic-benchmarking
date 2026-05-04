@@ -297,14 +297,16 @@ class MultiVariantMultiModelResultsAnalyser:
         return models_validated
 
     @do_for_metrics
-    def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None):
+    def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None,
+                               use_difficulty: bool = True):
         if models is not None:
             models = self._validate_models(models, variant)
 
         if GLMMRunner is None:
             raise RuntimeError("R not available")
 
-        glmm_runner = GLMMRunner(label='is_variant', question_difficulties=self.get_question_difficulty_per_model())
+        difficulty = self.get_question_difficulty_per_model() if use_difficulty else None
+        glmm_runner = GLMMRunner(label='is_variant', question_difficulties=difficulty)
         data_df = glmm_runner.prep_df_with_bool_labels(
             metric=metric,
             ras={
