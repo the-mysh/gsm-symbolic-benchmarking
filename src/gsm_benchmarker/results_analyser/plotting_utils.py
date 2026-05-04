@@ -449,12 +449,13 @@ def plot_for_metrics(func):
 
 @plot_for_metrics
 def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, metric: str | None = None,
-              bar_colour: str | None = None, title: str | None = None, save_prefix: str | Path | None = None, **kwargs):
+              bar_colour: str | None = None, title: str | None = None, save_prefix: str | Path | None = None,
+              model_order: list[str] | None = None, **kwargs):
 
     metric_text = f"\n{metric} accuracy" if metric else ""
 
     f1, model_order = plot_models_odds_ratios(
-        df, metric, log_scale=True, sort_models=True, save_prefix=save_prefix, **kwargs,
+        df, metric, log_scale=True, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
         title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 

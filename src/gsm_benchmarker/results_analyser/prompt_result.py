@@ -113,7 +113,7 @@ class PromptResult:
 
     def get_significant_models(self, alpha: float):
         df = self.variant_effect
-        models = df[df.p_value < alpha].index.get_level_values('model').unique().tolist()
+        models = df[df.p_value < alpha].sort_values('estimate', ascending=True).index.tolist()
         return models
 
     def summary(self, alpha: float = 0.05):
