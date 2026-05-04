@@ -299,11 +299,11 @@ def _define_significance_points(projected_alpha: float | None):
         'significant_drop': SignificancePoint(0.05, True, 'sandybrown', 'Significant drop' + pp),
         'potentially_significant_drop': SignificancePoint(
             projected_alpha, True, 'khaki', 'Potentially significant drop' + pp),
-        'not_significant': SignificancePoint(1, None, 'darkgray', f'Not significant'),
+        'strong_rise': SignificancePoint(0.01, False, 'darkgreen', 'Strong rise' + pp),
+        'significant_rise': SignificancePoint(0.05, False, 'limegreen', 'Significant rise' + pp),
         'potentially_significant_rise': SignificancePoint(
             projected_alpha, False, 'palegreen', 'Potentially significant rise' + pp),
-        'significant_rise': SignificancePoint(0.05, False, 'limegreen','Significant rise' + pp),
-        'strong_rise': SignificancePoint(0.01, False, 'darkgreen', 'Strong rise' + pp)
+        'not_significant': SignificancePoint(1, None, 'darkgray', f'Not significant')
     }
 
     return p_thresholds
