@@ -1,12 +1,13 @@
 import pandas as pd
 
 
-def pandas_to_latex(tab: pd.DataFrame, position: str = 't', **kwargs) -> str:
+def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, **kwargs) -> str:
     tab = tab.copy()
 
-    # escape LaTeX special characters
-    tab.columns = [str(col).replace('_', '\\_') for col in tab.columns]
-    tab.index = [str(idx).replace('_', '\\_') for idx in tab.index]
+    if clean_header:
+        # escape LaTeX special characters
+        tab.columns = [str(col).replace('_', '\\_') for col in tab.columns]
+        tab.index = [str(idx).replace('_', '\\_') for idx in tab.index]
 
     tab.columns.name = None
 

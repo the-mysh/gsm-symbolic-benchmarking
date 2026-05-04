@@ -50,7 +50,7 @@ class PromptEffectAnalyser:
                 v = new.loc[model][column]
                 t_stat, p_value = stats.ttest_rel(v, u)
                 rc = {}
-                rc['mean_diff'] = v.mean() - u.mean()
+                rc['acc_diff'] = v.mean() - u.mean()
                 rc["p_value"] = p_value
                 rc['t_stat'] = t_stat
 
@@ -124,7 +124,7 @@ class PromptEffectAnalyser:
         glmm_results_df = glmm_runner.run(df=data_df, models=models_validated)
 
         # add plain accuracy change
-        glmm_results_df['mean_diff'] = self.get_mean_accuracy_change(metric=metric)
+        glmm_results_df['acc_diff'] = self.get_mean_accuracy_change(metric=metric)
 
         return glmm_results_df
 
@@ -132,7 +132,7 @@ class PromptEffectAnalyser:
         baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
         experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
         acc_change = experiment_accuracies - baseline_accuracies
-        acc_change.rename('mean_diff', inplace=True)
+        acc_change.rename('acc_diff', inplace=True)
         return acc_change
 
     def get_mean_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.Series:

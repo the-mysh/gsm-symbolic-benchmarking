@@ -87,16 +87,19 @@ class MultiVariantMultiModelResultsAnalyser:
             raise ValueError(f"{self.BASELINE_VARIANT} is the baseline variant "
                              f"- choose a different variant to compare it to")
 
-    def get_accuracy_change(self, variant: str, metric: str | None = None):
+    def get_accuracy_summary(self, variant: str, metric: str | None = None):
         self._check_variant(variant)
 
         baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id(metric=metric)
         variant_accuracies = self._variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
 
-        acc_change = variant_accuracies - baseline_accuracies
-        acc_change = acc_change.rename('mean_diff')
+        acc_data = pd.DataFrame({
+            self.BASELINE_VARIANT + '_acc': baseline_accuracies,
+            variant + '_acc': variant_accuracies,
+            'acc_diff': variant_accuracies - baseline_accuracies
+        })
 
-        return acc_change
+        return acc_data
 
     def get_baseline_comparison_df(self, variant: str, model: str | None = None):
         self._check_variant(variant)
@@ -317,7 +320,7 @@ class MultiVariantMultiModelResultsAnalyser:
         glmm_results_df = glmm_runner.run(df=data_df, models=models)
 
         # add plain accuracy drops
-        glmm_results_df['mean_diff'] = self.get_mean_accuracy_change(metric=metric)
+        glmm_results_df = glmm_results_df.join(self.get_mean_accuracy_summary(metric=metric))
 
         return glmm_results_df
 
@@ -359,8 +362,8 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return glmm_results_df
 
-    def get_mean_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.Series:
-        acc_change = self.get_accuracy_change(variant=variant, metric=metric)
+    def get_mean_accuracy_summary(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
+        acc_change = self.get_accuracy_summary(variant=variant, metric=metric)
         gb = ['model', 'metric'] if metric is None else ['model']
         return acc_change.groupby(gb).mean()
 

@@ -2,10 +2,12 @@ from pathlib import Path
 import pandas as pd
 from IPython.display import display
 from dataclasses import dataclass
+import numpy as np
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.prompt_effect_analyser import PromptEffectAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import plot_glmm, plot_acc_change_distribution, Colour
+from gsm_benchmarker.results_analyser.utils import pandas_to_latex
 
 
 @dataclass
@@ -47,6 +49,57 @@ class PromptResult:
         assert self._variant_effect is not None
         return self._variant_effect
 
+    def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None):
+        df = self.variant_effect.copy()
+
+        if self.models is not None:
+            df = df[df.index.isin(self.models)]
+
+        df['odds_ratio'] = np.exp(df['estimate']).round(2)
+
+        # Calculate the 95% CI bounds for the log-odds, then exponentiate them
+        # The z-score for a 95% confidence interval is approx 1.96
+        df['or_ci_lower'] = np.exp(df['estimate'] - (1.96 * df['std_err'])).round(2)
+        df['or_ci_upper'] = np.exp(df['estimate'] + (1.96 * df['std_err'])).round(2)
+
+        def fmt(precision=3):
+            th = 10**(-precision)
+            def wrapper(v):
+                if abs(v) < th:
+                    return f"< {th:.{precision}f}"
+                return f"{v:.{precision}f}"
+            return wrapper
+
+        def fmt_significance(p):
+            if p < alpha:
+                return r"\textbf{Yes}"
+            if projected_alpha is not None and p < projected_alpha:
+                return "Potentially"
+            return "No"
+
+        df1 = pd.DataFrame({
+            'GSM8K acc': df['GSM8K_acc'].apply(fmt(2)),
+            'main acc': df['main_acc'].apply(fmt(2)),
+            r'$\Delta_{acc}$': df['acc_diff'].apply(fmt(3)),
+            'p value': df['p_value'].apply(fmt(3)),
+            'Significant': df['p_value'].apply(fmt_significance)
+        }, index=df.index)
+        df1.index.name = 'Model'
+
+        df2 = pd.DataFrame({
+            'Odds ratio': df['odds_ratio'].apply(fmt(2)),
+            r'95\% CI': df.apply(lambda row: f"[{row['or_ci_lower']:.2f}, {row['or_ci_upper']:.2f}]", axis=1),
+            'Z value': df['z_value'].apply(fmt(2)),
+            'Std. error': df['std_err'].apply(fmt(2))
+        }, index=df.index)
+        df2.index.name = 'Model'
+
+        df1_latex = pandas_to_latex(df1, label=f"tab:{self.short_label}-results", caption=f"Results of {self.full_label}", clean_header=False)
+        df2_latex = pandas_to_latex(df2, label=f"tab:{self.short_label}-stats", caption=f"Additional statistics for results of {self.full_label}", clean_header=False)
+
+        print(df1_latex)
+        print(df2_latex)
+
     def _check_pea(self):
         if self.pea is None:
             raise ValueError(f"Prompt effect analysis not possible for baseline prompt ({self.full_label})")
@@ -79,7 +132,7 @@ class PromptResult:
     def plot_variant_effect(self, **kwargs):
         figs = plot_glmm(
             self.variant_effect,
-            'mean_diff',
+            'acc_diff',
             "Symbolic performance delta",
             bar_colour=self.colour.value,
             save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
@@ -91,7 +144,7 @@ class PromptResult:
     def plot_prompt_effect(self, **kwargs):
         figs = plot_glmm(
             self.prompt_effect,
-            'mean_diff',
+            'acc_diff',
             "Prompt performance delta",
             bar_colour=self.colour.value,
             save_prefix=self.save_dest/(self.short_label + "_pe") if self.save_dest is not None else None,
@@ -125,14 +178,14 @@ class PromptResult:
         d = {
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
             'main_acc': self.mres.variants['main'].get_accuracies_per_model(metric=self.metric),
-            'delta_symb': self.variant_effect['mean_diff'],
+            'delta_symb': self.variant_effect['acc_diff'],
             'delta_symb_p_value': self.variant_effect['p_value'],
             'delta_symb_significant': self.variant_effect['p_value'] < alpha
         }
 
         if self._prompt_effect is not None or self.baseline is not None:
             d |= {
-                'delta_prompt': self.prompt_effect['mean_diff'],
+                'delta_prompt': self.prompt_effect['acc_diff'],
                 'delta_prompt_p_value': self.prompt_effect['p_value'],
                 'delta_prompt_significant': self.prompt_effect['p_value'] < alpha
             }

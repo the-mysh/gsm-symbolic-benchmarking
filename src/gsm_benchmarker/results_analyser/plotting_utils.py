@@ -470,7 +470,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 
 @plot_for_metrics
 @save_plot("acc_change_distribution")
-def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'mean_diff', label: str | None = None, metric: str | None = None,
+def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', label: str | None = None, metric: str | None = None,
                                  models: list[str] | None = None, color: str | None = None):
     if metric is not None:
         df = df.xs(metric, level='metric')
