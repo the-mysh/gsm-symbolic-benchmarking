@@ -330,6 +330,7 @@ class MultiVariantMultiModelResultsAnalyser:
             if not matches:
                 return np.nan # Handle the rare case where a prompt has no numbers
             numbers = (float(match) for match in matches)
+            numbers = (number for number in numbers if not number%1)  # take integers only
             logs = ((np.log10(number) if number > 0 else 0) for number in numbers)
             return sum(logs)
 
