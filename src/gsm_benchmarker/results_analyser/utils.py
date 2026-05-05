@@ -1,4 +1,5 @@
 import pandas as pd
+from statsmodels.stats.multitest import multipletests
 
 
 def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, **kwargs) -> str:
@@ -21,3 +22,10 @@ def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool =
     )
 
     return latex_code
+
+
+def correct_p_values(p_values):
+    _, p_corrected, _, _ = multipletests(p_values, is_sorted=False, returnsorted=False, method='holm')
+    if isinstance(p_values, pd.Series):
+        p_corrected = pd.Series(p_corrected, index=p_values.index)
+    return p_corrected

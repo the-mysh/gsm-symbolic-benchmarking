@@ -7,7 +7,7 @@ import numpy as np
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.prompt_effect_analyser import PromptEffectAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import plot_glmm, plot_acc_change_distribution, Colour
-from gsm_benchmarker.results_analyser.utils import pandas_to_latex
+from gsm_benchmarker.results_analyser.utils import pandas_to_latex, correct_p_values
 
 
 @dataclass
@@ -72,19 +72,22 @@ class PromptResult:
                 return f"{v:.{precision}f}"
             return wrapper
 
-        def fmt_significance(p):
-            if p < alpha:
-                return r"\textbf{Yes}"
-            if projected_alpha is not None and p < projected_alpha:
-                return "Potentially"
-            return "No"
+        def fmt_p_val(precision=3):
+            str_fmt = fmt(precision=precision)
+            a = projected_alpha if projected_alpha is not None else alpha
+            def wrapper(v):
+                v_formatted = str_fmt(v)
+                if v < a:
+                    return r"\textbf{" + v_formatted + "}"
+                return v_formatted
+            return wrapper
 
         df1 = pd.DataFrame({
             'GSM8K acc': df['GSM8K_acc'].apply(fmt(1)),
             'main acc': df['main_acc'].apply(fmt(1)),
-            r'$\Delta_{acc}$': df['acc_diff'].apply(fmt(2)),
-            'P value': df['p_value'].apply(fmt(3)),
-            'Significant': df['p_value'].apply(fmt_significance)
+            r'$\Delta$ Acc': df['acc_diff'].apply(fmt(2)),
+            'P value': df['p_value'].apply(fmt_p_val(3)),
+            'Corrected P value': correct_p_values(df['p_value']).apply(fmt_p_val(3))
         }, index=df.index)
         df1.index.name = 'Model'
 
@@ -169,8 +172,10 @@ class PromptResult:
 
         return self.display_plots(fig)
 
-    def get_significant_models(self, alpha: float):
+    def get_significant_models(self, alpha: float, drop_only: bool = False):
         df = self.variant_effect
+        if drop_only:
+            df = df[df.acc_diff < 0]
         models = df[df.p_value < alpha].sort_values('estimate', ascending=True).index.tolist()
         return models
 

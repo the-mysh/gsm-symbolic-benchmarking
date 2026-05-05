@@ -373,7 +373,7 @@ class MultiVariantMultiModelResultsAnalyser:
         if bin_edges is None:
             bin_edges = [0, 1, 2, 3, 4, 5, 10, 20, 50, 100, 1000, float('inf')]
 
-        bin_labels = ['fractions']
+        bin_labels = []
         for start, end in zip(bin_edges[:-1], bin_edges[1:]):
             if np.isinf(end):
                 label = f"{start}+"
@@ -389,22 +389,13 @@ class MultiVariantMultiModelResultsAnalyser:
             variant_df = self.variants[variant_name].full_data
             model_df = variant_df.loc[variant_df['model'] == (model or self.models[0]), ['question']].copy()
             extracted_numbers = model_df['question'].str.findall(self.NUMBER_PATTERN).explode().dropna().astype(float)
+            extracted_numbers = extracted_numbers[~(extracted_numbers % 1).astype(bool)]  # limit to integers
             raw_counts_dict[variant_name] = Counter(extracted_numbers)
 
             # put into bins, all fractions in a single separate bin
-            integer_mask = np.isclose(extracted_numbers, np.round(extracted_numbers))
-            integer_numbers = extracted_numbers[integer_mask]
-            fraction_count = int((~integer_mask).sum())
-            integer_binned = pd.cut(
-                integer_numbers,
-                bins=bin_edges,
-                labels=bin_labels[1:],
-                right=False,
-                include_lowest=True,
-            )
-            integer_counts = integer_binned.value_counts().reindex(bin_labels[1:], fill_value=0)
-            binned_counts = pd.Series([fraction_count] + integer_counts.values.tolist(), index=bin_labels, dtype=int)
-            binned_counts_dict[variant_name] = binned_counts
+            binned = pd.cut(extracted_numbers, bins=bin_edges, labels=bin_labels, right=False, include_lowest=True)
+            number_counts = binned.value_counts().reindex(bin_labels, fill_value=0)
+            binned_counts_dict[variant_name] = number_counts
 
         raw_counts_df = pd.DataFrame(raw_counts_dict).fillna(0).astype(int).sort_index()
         binned_counts_df = pd.DataFrame(binned_counts_dict).fillna(0).astype(int)
