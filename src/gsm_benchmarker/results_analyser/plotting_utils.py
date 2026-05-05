@@ -149,8 +149,10 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
     for ax in axes:
         ax.axvline(0, color='k', lw=1, zorder=1)
-        add_bar_labels(ax, precision=3, fontsize=7)
         ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
+
+    add_bar_labels(axes[0], precision=1, fontsize=7)
+    add_bar_labels(axes[1], precision=3, fontsize=7)
 
     if title:
         fig.suptitle(title)
@@ -515,7 +517,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         data = data.transpose()
         return data
 
-    def plot_quantity(quantity, ax, title, mask_quantity=None, **kwargs):
+    def plot_quantity(quantity, ax, title, mask_quantity=None, precision: int = 3, ylabel: str | None = None, **kwargs):
         data = prep_data(quantity)
         mask = prep_data(mask_quantity) if mask_quantity else None
 
@@ -524,7 +526,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
             for i, container in enumerate(ax.containers):
                 heights = [bar.get_height() for bar in container.patches]
-                labels = [f'{height:.3f}' if height else '' for height in heights]
+                labels = [f'{height:.{precision}f}' if height else '' for height in heights]
                 ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
                 if mask is not None:
@@ -535,16 +537,19 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             ax.set_title(title)
             ax.axhline(0, c='k', lw=0.5)
 
+            if ylabel is not None:
+                ax.set_ylabel(ylabel, fontsize=8)
+
     fig, axes = plt.subplots(5, 1, figsize=(10, 10), sharex='all')
 
-    plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours)
-    plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours)
+    plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours, precision=1, ylabel="Accuracy, %")
+    plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours,
-                  mask_quantity='delta_symb_significant')
+                  mask_quantity='delta_symb_significant', precision=2, ylabel="Accuracy delta, pp")
     plot_quantity('delta_prompt', axes[3], r'Prompt performance delta ($\Delta_{prompt}$)', color=colours,
-                  mask_quantity='delta_prompt_significant')
+                  mask_quantity='delta_prompt_significant', precision=2, ylabel="Accuracy delta, pp")
     plot_quantity('number_effect', axes[4], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
-                  mask_quantity='number_effect_significant')
+                  mask_quantity='number_effect_significant', precision=2, ylabel="Odds ratio delta")
 
     axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=0)
     axes[-1].set_xlabel("Model")
@@ -579,8 +584,8 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
     fig, axes = plt.subplots(n_rows, n_cols, sharex='all', sharey='all', figsize=(10, 8))
     for i, (ax, model) in enumerate(zip(axes.flatten(), models)):
         ax.set_title(model)
-        ax.set_xlabel("Mean accuracy on GSM8K")
-        ax.set_ylabel(r"Symbolic performance delta ($\Delta_{symb}$)")
+        ax.set_xlabel("Mean accuracy on GSM8K, %")
+        ax.set_ylabel(r"Symbolic performance delta ($\Delta_{symb}$), pp")
         ax.set_aspect('equal')
         ax.axhline(0, c='k', lw=0.5, ls='--')
         model_data = pd.concat([x_data[model], y_data[model], sig_data[model]], axis=1, keys=['x', 'y', 'significant'])

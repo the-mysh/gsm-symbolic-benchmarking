@@ -79,7 +79,7 @@ class MultiModelResultsAnalyser:
                 keys=['standard', 'discounted'],
                 names=('metric', 'model', 'id')
             ).swaplevel(0, 1).swaplevel(1, 2).sort_index()
-        return res
+        return res * 100
 
     @staticmethod
     def _make_summary_df(summary_data_dict):

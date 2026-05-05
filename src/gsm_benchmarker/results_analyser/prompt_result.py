@@ -65,6 +65,8 @@ class PromptResult:
         def fmt(precision=3):
             th = 10**(-precision)
             def wrapper(v):
+                if not precision:
+                    return str(round(v))
                 if abs(v) < th:
                     return f"< {th:.{precision}f}"
                 return f"{v:.{precision}f}"
@@ -78,10 +80,10 @@ class PromptResult:
             return "No"
 
         df1 = pd.DataFrame({
-            'GSM8K acc': df['GSM8K_acc'].apply(fmt(2)),
-            'main acc': df['main_acc'].apply(fmt(2)),
-            r'$\Delta_{acc}$': df['acc_diff'].apply(fmt(3)),
-            'p value': df['p_value'].apply(fmt(3)),
+            'GSM8K acc': df['GSM8K_acc'].apply(fmt(1)),
+            'main acc': df['main_acc'].apply(fmt(1)),
+            r'$\Delta_{acc}$': df['acc_diff'].apply(fmt(2)),
+            'P value': df['p_value'].apply(fmt(3)),
             'Significant': df['p_value'].apply(fmt_significance)
         }, index=df.index)
         df1.index.name = 'Model'
@@ -133,7 +135,7 @@ class PromptResult:
         figs = plot_glmm(
             self.variant_effect,
             'acc_diff',
-            "Symbolic performance delta",
+            "Symbolic performance delta, pp",
             bar_colour=self.colour.value,
             save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
             **kwargs
@@ -145,7 +147,7 @@ class PromptResult:
         figs = plot_glmm(
             self.prompt_effect,
             'acc_diff',
-            "Prompt performance delta",
+            "Prompt performance delta, pp",
             bar_colour=self.colour.value,
             save_prefix=self.save_dest/(self.short_label + "_pe") if self.save_dest is not None else None,
             **kwargs
@@ -158,7 +160,7 @@ class PromptResult:
 
         fig = plot_acc_change_distribution(
             acc_change_raw,
-            label="Prompt performance delta",
+            label="Prompt performance delta, pp",
             models=self.models,
             color=self.colour.value,
             save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
