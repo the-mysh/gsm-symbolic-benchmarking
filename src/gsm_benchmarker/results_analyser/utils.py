@@ -9,7 +9,8 @@ def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool =
         tab.columns = [str(col).replace('_', '\\_') for col in tab.columns]
         tab.index = [str(idx).replace('_', '\\_') for idx in tab.index]
 
-    tab.columns.name = None
+    tab.columns.name = tab.index.name
+    tab.index.name = None
 
     # Generate the LaTeX string
     latex_code = tab.style.format(escape=None).to_latex(
