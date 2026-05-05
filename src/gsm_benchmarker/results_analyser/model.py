@@ -86,7 +86,7 @@ class ModelResultsAnalyser:
 
         data = pd.DataFrame({col: self._data[col], 'ok': ok})
 
-        return data.groupby(col).ok.mean()
+        return data.groupby(col).ok.mean() * 100
 
     def get_accuracy_per_instance(self, strict: bool = False) -> pd.Series:
         return self._get_accuracy_per('instance', strict=strict)
