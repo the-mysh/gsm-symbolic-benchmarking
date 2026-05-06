@@ -540,16 +540,20 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             if ylabel is not None:
                 ax.set_ylabel(ylabel, fontsize=8)
 
-    fig, axes = plt.subplots(5, 1, figsize=(10, 10), sharex='all')
+    fig, axes = plt.subplots(7, 1, figsize=(10, 14), sharex='all')
 
     plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours,
                   mask_quantity='delta_symb_significant', precision=2, ylabel="Accuracy delta, pp")
-    plot_quantity('delta_prompt', axes[3], r'Prompt performance delta ($\Delta_{prompt}$)', color=colours,
-                  mask_quantity='delta_prompt_significant', precision=2, ylabel="Accuracy delta, pp")
-    plot_quantity('number_effect', axes[4], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
-                  mask_quantity='number_effect_significant', precision=2, ylabel="Odds ratio delta")
+    plot_quantity('delta_prompt_gsm8k', axes[3], r'Prompt performance delta ($\Delta_{prompt}$) on GSM8K', color=colours,
+                  mask_quantity='delta_prompt_gsm8k_significant', precision=2, ylabel="Accuracy delta, pp")
+    plot_quantity('delta_prompt_main', axes[4], r'Prompt performance delta ($\Delta_{prompt}$) on main', color=colours,
+                  mask_quantity='delta_prompt_main_significant', precision=2, ylabel="Accuracy delta, pp")
+    plot_quantity('number_effect_gsm8k', axes[5], r'Number effect on GSM8K ($\Delta_{OR,number}$)', color=colours,
+                  mask_quantity='number_effect_gsm8k_significant', precision=2, ylabel="Odds ratio delta")
+    plot_quantity('number_effect_main', axes[6], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
+                  mask_quantity='number_effect_main_significant', precision=2, ylabel="Odds ratio delta")
 
     axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=0)
     axes[-1].set_xlabel("Model")
@@ -561,7 +565,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
     labels.append(hatch_patch.get_label())
 
     fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
-    fig.tight_layout(rect=(0, .07, 1, 1))
+    fig.tight_layout(rect=(0, .04, 1, 1))
 
     return fig
 
@@ -609,7 +613,7 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
-    fig.tight_layout(rect=(0, .05, 1, 1))
+    fig.tight_layout(rect=(0, .07, 1, 1))
     return fig
 
 

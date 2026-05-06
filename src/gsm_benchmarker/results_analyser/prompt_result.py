@@ -3,6 +3,7 @@ import pandas as pd
 from IPython.display import display
 from dataclasses import dataclass
 import numpy as np
+from functools import cached_property
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.prompt_effect_analyser import PromptEffectAnalyser
@@ -23,9 +24,6 @@ class PromptResult:
     mres: MultiVariantMultiModelResultsAnalyser | None = None
     baseline: MultiVariantMultiModelResultsAnalyser | None = None
     pea: PromptEffectAnalyser | None = None
-    _variant_effect: pd.DataFrame | None = None
-    _prompt_effect: pd.DataFrame | None = None
-    _number_effect: pd.DataFrame | None = None
     use_difficulty: bool = True
 
     def __post_init__(self):
@@ -39,15 +37,11 @@ class PromptResult:
         if self.short_label is None:
             self.short_label = self.full_label.split(' ')[0]
 
-    @property
+    @cached_property
     def variant_effect(self) -> pd.DataFrame:
-        if self._variant_effect is None:
-            assert self.mres is not None
-            self._variant_effect = self.mres.analyse_variant_effect(
-                variant='main', metric=self.metric, models=self.models, use_difficulty=self.use_difficulty)
-
-        assert self._variant_effect is not None
-        return self._variant_effect
+        assert self.mres is not None
+        return self.mres.analyse_variant_effect(
+            variant='main', metric=self.metric, models=self.models, use_difficulty=self.use_difficulty)
 
     def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
         df = self.variant_effect.copy()
@@ -115,23 +109,29 @@ class PromptResult:
             raise ValueError(f"Prompt effect analysis not possible for baseline prompt ({self.full_label})")
         return self.pea
 
-    @property
-    def prompt_effect(self) -> pd.DataFrame:
-        if self._prompt_effect is None:
-            self._prompt_effect = self._check_pea().analyse_accuracy_change_significance(
-                variant='main', models=self.models, metric=self.metric, use_difficulty=self.use_difficulty)
+    def _make_prompt_effect_df(self, variant):
+        return self._check_pea().analyse_accuracy_change_significance(
+            variant=variant, models=self.models, metric=self.metric, use_difficulty=self.use_difficulty)
 
-        assert self._prompt_effect is not None
-        return self._prompt_effect
+    @cached_property
+    def prompt_effect_main(self) -> pd.DataFrame:
+        return self._make_prompt_effect_df('main')
 
-    @property
-    def number_effect(self) -> pd.DataFrame:
-        if self._number_effect is None:
-            assert self.mres is not None
-            self._number_effect = self.mres.analyse_number_effect(variant='main', metric=self.metric, models=self.models)
+    @cached_property
+    def prompt_effect_gsm8k(self) -> pd.DataFrame:
+        return self._make_prompt_effect_df('GSM8K')
 
-        assert self._number_effect is not None
-        return self._number_effect
+    def _make_number_effect_df(self, variant):
+        assert self.mres is not None
+        return  self.mres.analyse_number_effect(variant=variant, metric=self.metric, models=self.models)
+
+    @cached_property
+    def number_effect_main(self) -> pd.DataFrame:
+        return self._make_number_effect_df('main')
+
+    @cached_property
+    def number_effect_gsm8k(self) -> pd.DataFrame:
+        return self._make_number_effect_df('GSM8K')
 
     def display_plots(self, *figs):
         if self.notebook:
@@ -153,7 +153,7 @@ class PromptResult:
 
     def plot_prompt_effect(self, **kwargs):
         figs = plot_glmm(
-            self.prompt_effect,
+            self.prompt_effect_main,
             'acc_diff',
             "Prompt performance delta, pp",
             bar_colour=self.colour.value,
@@ -195,19 +195,24 @@ class PromptResult:
             'delta_symb_significant': self.variant_effect['p_value'] < alpha
         }
 
-        if self._prompt_effect is not None or self.baseline is not None:
+        for label in ('main', 'gsm8k'):
+            # add 'number effect' - influence of bigger numbers on odds of getting a correct answer
+            df_ne = getattr(self, f"number_effect_{label}")
             d |= {
-                'delta_prompt': self.prompt_effect['acc_diff'],
-                'delta_prompt_p_value': self.prompt_effect['p_value'],
-                'delta_prompt_significant': self.prompt_effect['p_value'] < alpha
+                f'number_effect_{label}': df_ne['odds_change'],
+                f'number_effect_{label}_p_value': df_ne['p_value'],
+                f'number_effect_{label}_significant': df_ne['p_value'] < alpha
             }
 
-        # add 'number effect' - influence of bigger numbers on odds of getting a correct answer
-        d |= {
-            'number_effect': self.number_effect['odds_change'],
-            'number_effect_p_value': self.number_effect['p_value'],
-            'number_effect_significant': self.number_effect['p_value'] < alpha
-        }
+            # add prompt effect data
+            if self.baseline is None:
+                continue
+            df_pe = getattr(self, f"prompt_effect_{label}")
+            d |= {
+                f'delta_prompt_{label}': df_pe['acc_diff'],
+                f'delta_prompt_{label}_p_value': df_pe['p_value'],
+                f'delta_prompt_{label}_significant': df_pe['p_value'] < alpha
+            }
 
         df = pd.DataFrame(d).transpose()
         if self.models:
