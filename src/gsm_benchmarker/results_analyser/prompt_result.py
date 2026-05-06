@@ -49,11 +49,16 @@ class PromptResult:
         assert self._variant_effect is not None
         return self._variant_effect
 
-    def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None):
+    def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
         df = self.variant_effect.copy()
 
         if self.models is not None:
             df = df[df.index.isin(self.models)]
+
+        if model_order is not None:
+            df = df.sort_index(
+                key=lambda c: c.map({model: index for index, model in enumerate(model_order)})
+            )
 
         df['odds_ratio'] = np.exp(df['estimate']).round(2)
 
