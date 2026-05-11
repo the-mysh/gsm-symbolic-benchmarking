@@ -19,10 +19,12 @@ class BenchmarkConfig:
     max_length: int = 2048
     use_4bit: bool = True  # for memory efficiency
     trust_remote_code_global: bool = False
+    native_dtype: type[torch.float] = torch.float16
 
     # memory settings
     gpu_max_memory: int | None = 7
     gpu_index: int | None | type[_AUTO] = _AUTO
+    gpu_auto: bool = False
     cpu_max_memory: int = 12
 
     def __post_init__(self):
@@ -67,6 +69,8 @@ class BenchmarkConfig:
         n_gpus = machine_params.get('gpus')
         assert isinstance(n_gpus, int)
 
+        native_dtype = torch.bfloat16 if machine_params['bfloat'] else torch.float16
+
         cls.validate_gpu_index(machine_name, n_gpus, gpu_index)
         cpu_max_memory, gpu_max_memory = cls.get_max_memories(machine_params, gpu_index, ram_margin, vram_margin)
 
@@ -78,6 +82,7 @@ class BenchmarkConfig:
 
         return BenchmarkConfig(
             gpu_index=gpu_index,
+            native_dtype=native_dtype,
             **kwargs
         )
 

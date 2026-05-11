@@ -117,8 +117,12 @@ def make_config(pargs: Namespace):
 
     if getattr(pargs, 'no_gpu', False):
         kwargs['gpu_index'] = None
+    elif getattr(pargs, 'auto_gpu', False):
+        kwargs['gpu_auto'] = True
     else:
         add_to_kwargs('gpu_index')
+
+    kwargs['use_4bit'] = getattr(pargs, 'quantise', False)
 
     if pargs.no_machine_preset:
         bc = BenchmarkConfig(**kwargs)
@@ -165,6 +169,7 @@ def make_parser() -> ArgumentParser:
     g = parser.add_mutually_exclusive_group()
     g.add_argument('--gpu-index', type=int)
     g.add_argument('--no-gpu', dest='no_gpu', action='store_true')
+    g.add_argument('--auto-gpu', action='store_true', dest='auto_gpu')
 
     parser.add_argument('--log-level', default=logging.INFO)
     parser.add_argument('--output-root-path', default=None)
@@ -175,6 +180,8 @@ def make_parser() -> ArgumentParser:
 
     parser.add_argument('--n-sets', type=int, default=None)
     parser.add_argument('--n-per-set', type=int, default=None)
+
+    parser.add_argument('--quantise', action='store_true', default=False)
 
     gp = parser.add_mutually_exclusive_group()
     gp.add_argument('--prompt-preset', default=None)

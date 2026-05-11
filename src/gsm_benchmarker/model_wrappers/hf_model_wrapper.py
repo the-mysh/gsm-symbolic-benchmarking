@@ -62,30 +62,43 @@ class HFModelWrapper(BaseModelWrapper):
         return model
 
     def _load_model_cuda(self, config: BenchmarkConfig):
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=config.use_4bit,
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=True,  # Extra compression
-            bnb_4bit_quant_type="nf4",
-            llm_int8_enable_fp32_cpu_offload=True
-        )
-
         logger.debug("Loading model with CUDA")
-        extras = self._model_spec.extra_kwargs_model_init
+        extras = self._model_spec.extra_kwargs_model_init or {}
         if extras:
             logger.debug(f"Passing extra kwargs to 'AutoModelForCausalLM.from_pretrained': {extras}")
 
-        gpu_index = self.config.gpu_index
-        if gpu_index is None:
-            raise RuntimeError("GPU index is None - cannot use CUDA")
+        if config.use_4bit:
+            logger.info("4-bit quantization enabled.")
+            bnb_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=config.native_dtype,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+                llm_int8_enable_fp32_cpu_offload=True
+            )
+            extras["quantization_config"] = bnb_config
+        else:
+            logger.info("Running in full native precision (No Quantization).")
+
+
+        if self.config.gpu_auto:
+            device_map = "auto"
+            max_memory = None
+        else:
+            gpu_index = self.config.gpu_index
+            if gpu_index is None:
+                raise RuntimeError("GPU index is None - cannot use CUDA")
+            device_map = f"cuda:{gpu_index}"
+            max_memory = config.memory_settings
+
+        logger.info(f"Device map: {device_map}")
 
         model = AutoModelForCausalLM.from_pretrained(
             self._model_spec.name,
-            quantization_config=bnb_config,
-            device_map=f"cuda:{gpu_index}",
-            dtype=torch.bfloat16,
+            device_map=device_map,
+            torch_dtype=config.native_dtype,
             low_cpu_mem_usage=True,
-            max_memory=config.memory_settings,
+            max_memory=max_memory,
             trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
             **extras
         )

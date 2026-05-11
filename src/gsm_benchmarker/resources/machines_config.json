@@ -4,27 +4,33 @@
     "no-gpu": {
       "ram": 120,
       "vram": null,
-      "gpus": 0
+      "gpus": 0,
+      "bfloat": false
     },
     "single-v100": {
       "ram": 64,
       "vram": 32,
-      "gpus": 1
+      "gpus": 1,
+     "bfloat": false
     },
     "double-a40": {
       "ram": 240,
       "vram": 48,
-      "gpus": 2
+      "gpus": 2,
+     "bfloat": true
     },
     "quadruple-v100": {
       "ram": 256,
       "vram": 32,
-      "gpus": 4
+      "gpus": 4,
+     "bfloat": false
     },
     "quadruple-a100": {
       "ram": 960,
       "vram": 80,
-      "gpus": 4
+      "gpus": 4,
+     "bfloat": true
+
     }
   },
   "machines": {
