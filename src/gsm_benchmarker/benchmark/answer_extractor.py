@@ -54,12 +54,12 @@ SAFE_IMPORTS = {
 
 
 class AnswerExtractor:
-    _number_pattern_str = r'\s*(?P<number>(-?\d+(?:\.\d+)?))'
+    _number_pattern_str = r'-?\d+(?:\.\d+)?'
     _import_pattern = re.compile(r'\s*(from \w+ )?import \w+')
 
     ANSWER_PATTERNS = {
-        AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern_str),
-        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is:?\s*\$?' + _number_pattern_str),
+        AnswerPattern.GMS8K: re.compile(r'####\s*[^\d-]*(' + _number_pattern_str + ')'),
+        AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is:?\s*[^\d-]*(' + _number_pattern_str + ')'),
     }
 
     FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\s*\n(?P<body>(?:\s+.*|\n)+)", flags=re.MULTILINE)
@@ -100,15 +100,20 @@ class AnswerExtractor:
             logger.warning("The response is empty after trimming generated questions")
             return None, ErrorType.EMPTY_AFTER_TRIM
 
-        for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
-            match = pattern.search(text)
-            if match:
-                return float(match.group('number')), pattern_enum
+        # Remove commas before regex evaluation to handle thousands (e.g. 5,000 -> 5000)
+        clean_text = text.replace(',', '')
 
-        # Last resort if none of the patterns work: find last number in text
-        numbers = re.findall(cls._number_pattern_str, text)
+        # Try standard patterns
+        for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
+            match = pattern.search(clean_text)
+            if match:
+                # match.group(1) specifically grabs the digits, ignoring any '$' or spaces caught by [^\d-]*
+                return float(match.group(1)), pattern_enum
+
+        # Last resort: find last number in text
+        numbers = re.findall(cls._number_pattern_str, clean_text)
         if numbers:
-            return float(numbers[-1][0]), AnswerPattern.LAST_NUMBER
+            return float(numbers[-1]), AnswerPattern.LAST_NUMBER
 
         logger.warning(f"Could not locate numerical answer")
         return None, ErrorType.NO_NUMBER
