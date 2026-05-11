@@ -16,6 +16,7 @@ class BenchmarkConfig:
 
     temperature: float = 0.0  # greedy decoding
     max_new_tokens: int = 1024
+    max_length: int = 2048
     use_4bit: bool = True  # for memory efficiency
     trust_remote_code_global: bool = False
 

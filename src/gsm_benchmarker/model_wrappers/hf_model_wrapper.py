@@ -1,9 +1,10 @@
 import logging
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, StoppingCriteriaList
 from huggingface_hub import scan_cache_dir
 import torch
 
 from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
+from gsm_benchmarker.benchmark.utils import StopOnStringCriteria
 from gsm_benchmarker.model_wrappers.base_model_wrapper import BaseModelWrapper
 from gsm_benchmarker.model_wrappers.models_config_parser import SingleModelConfig
 
@@ -18,6 +19,12 @@ class HFModelWrapper(BaseModelWrapper):
         self.tokeniser = self._load_tokeniser(config=self.config)
         self.model = self._load_model(config=self.config)
         logger.info("Model loaded")
+
+        # don't let models generate new questions;
+        # still ok for babbling analysis bc the 'Q:' is detected
+        self.q_stopper = StoppingCriteriaList([
+            StopOnStringCriteria(stop_strings=["\nQ:", " Q:"], tokenizer=self.tokeniser)
+        ])
 
     def _load_tokeniser(self, config: BenchmarkConfig):
         logger.debug("Loading tokeniser")
@@ -108,17 +115,18 @@ class HFModelWrapper(BaseModelWrapper):
             prompt,
             return_tensors="pt",
             truncation=True,
-            max_length=2048
+            max_length=self.config.max_length
         ).to(self.model.device)
 
         with torch.no_grad():
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=self.config.max_new_tokens,
-                temperature=self.config.temperature if self.config.temperature > 0 else 1.0,
+                temperature=self.config.temperature,
                 do_sample=self.config.temperature > 0,
                 pad_token_id=self.tokeniser.pad_token_id,
                 eos_token_id=self.tokeniser.eos_token_id,
+                stopping_criteria=self.q_stopper
             )
 
         # Decode only the generated part (not the prompt)
