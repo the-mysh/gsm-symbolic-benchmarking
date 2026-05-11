@@ -1,9 +1,6 @@
 [project]
 name = "gsm_benchmarker"
 version = "0.0.1"
-authors = [
-  { name="Dominika Dlugosz", email="dominika.a.m.dlugosz@gmail.com" }
-]
 description = "Reproducing and extending GSM-Symbolic benchmark"
 readme = "README.md"
 requires-python = "==3.12.*"  # for now, to keep consistent with current remote version (on the cluster)
@@ -70,7 +67,3 @@ explicit = true
 name = "pytorch-cu126"
 url = "https://download.pytorch.org/whl/cu126"
 explicit = true
-
-
-[project.urls]
-"Homepage" = "https://github.com/the-mysh/gsm-symbolic-benchmarking"
