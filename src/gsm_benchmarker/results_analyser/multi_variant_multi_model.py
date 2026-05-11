@@ -358,7 +358,9 @@ class MultiVariantMultiModelResultsAnalyser:
 
         glmm_runner = GLMMRunner(label="sum_logs")
         glmm_results_df = glmm_runner.run(df=glmm_data, models=models)
-        glmm_results_df['odds_change'] = np.exp(glmm_results_df.estimate) - 1  # change in odds
+        odds_ratio = np.exp(glmm_results_df.estimate)
+        glmm_results_df['odds_ratio'] = odds_ratio
+        glmm_results_df['odds_change'] = odds_ratio - 1  # change in odds
 
         return glmm_results_df
 

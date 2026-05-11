@@ -526,7 +526,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
             for i, container in enumerate(ax.containers):
                 heights = [bar.get_height() for bar in container.patches]
-                labels = [f'{height:.{precision}f}' if height else '' for height in heights]
+                labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height in heights]
                 ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
                 if mask is not None:

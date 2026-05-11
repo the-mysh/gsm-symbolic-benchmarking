@@ -8,8 +8,8 @@ from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor
 
 logging.getLogger('gsm_benchmarker').setLevel(logging.ERROR)
 
-RESULTS_FOLDER = 'mini_20x50x4__14_11'
-CODE = False
+RESULTS_FOLDER = 'code_no_sep_full__12_03'
+CODE = True
 
 
 ROOT_PATH = Path(f"{__file__}/../../../../data/gsm-symbolic/outputs").resolve()
@@ -46,13 +46,13 @@ for folder in os.listdir(p_results):
                 result, result_type = AnswerExtractor.extract_answer_textual(row.full_response)
 
             m.loc[i, "detected_result_pattern"] = result_type.name
+            m.loc[i, "predicted_numerical_result"] = result
+            m.loc[i, "correct"] = (result == m.loc[i, "numerical_result"])
 
             if result == m.loc[i, "predicted_numerical_result"]:
                 continue  # no change
 
             fixed += 1
-            m.loc[i, "predicted_numerical_result"] = result
-            m.loc[i, "correct"] = (result == m.loc[i, "numerical_result"])
 
         all_fixed += fixed
         print(f"\tfixed         : {fixed}")

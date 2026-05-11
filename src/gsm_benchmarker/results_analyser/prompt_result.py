@@ -19,7 +19,6 @@ class PromptResult:
     short_label: str | None = None
     models: list[str] | None = None
     metric: str | None = None
-    notebook: bool = False
     save_dest: Path | None = None
     mres: MultiVariantMultiModelResultsAnalyser | None = None
     baseline: MultiVariantMultiModelResultsAnalyser | None = None
@@ -133,12 +132,6 @@ class PromptResult:
     def number_effect_gsm8k(self) -> pd.DataFrame:
         return self._make_number_effect_df('GSM8K')
 
-    def display_plots(self, *figs):
-        if self.notebook:
-            for fig in figs:
-                display(fig)
-        return figs
-
     def plot_variant_effect(self, **kwargs):
         figs = plot_glmm(
             self.variant_effect,
@@ -149,7 +142,7 @@ class PromptResult:
             **kwargs
         )
 
-        return self.display_plots(*figs)
+        return figs
 
     def plot_prompt_effect(self, **kwargs):
         figs = plot_glmm(
@@ -161,7 +154,7 @@ class PromptResult:
             **kwargs
         )
 
-        return self.display_plots(*figs)
+        return figs
 
     def plot_acc_change_dist(self, **kwargs):
         acc_change_raw = self._check_pea().get_accuracy_change(variant='main', metric=self.metric)
@@ -175,7 +168,7 @@ class PromptResult:
             **kwargs
         )
 
-        return self.display_plots(fig)
+        return fig
 
     def get_significant_models(self, alpha: float, drop_only: bool = False):
         df = self.variant_effect
@@ -200,6 +193,7 @@ class PromptResult:
             df_ne = getattr(self, f"number_effect_{label}")
             d |= {
                 f'number_effect_{label}': df_ne['odds_change'],
+                f'number_effect_{label}_or': df_ne['odds_ratio'],
                 f'number_effect_{label}_p_value': df_ne['p_value'],
                 f'number_effect_{label}_significant': df_ne['p_value'] < alpha
             }

@@ -124,7 +124,7 @@ class PromptEffectAnalyser:
         glmm_results_df = glmm_runner.run(df=data_df, models=models_validated)
 
         # add plain accuracy change
-        glmm_results_df['acc_diff'] = self.get_mean_accuracy_change(metric=metric)
+        glmm_results_df['acc_diff'] = self.get_mean_accuracy_change(metric=metric, variant=variant)
 
         return glmm_results_df
 
