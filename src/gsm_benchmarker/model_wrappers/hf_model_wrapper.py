@@ -96,7 +96,7 @@ class HFModelWrapper(BaseModelWrapper):
         model = AutoModelForCausalLM.from_pretrained(
             self._model_spec.name,
             device_map=device_map,
-            torch_dtype=config.native_dtype,
+            dtype=config.native_dtype,
             low_cpu_mem_usage=True,
             max_memory=max_memory,
             trust_remote_code=config.trust_remote_code_global and self._model_spec.trust_remote_code,
