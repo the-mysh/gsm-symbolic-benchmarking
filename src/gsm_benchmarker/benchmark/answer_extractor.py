@@ -10,7 +10,6 @@ logger = logging.getLogger(__name__)
 class AnswerPattern(Enum):
     GMS8K = auto()
     GSM_SYMBOLIC = auto()
-    EQUAL_SIGN = auto()
     LAST_NUMBER = auto()
     CODE = auto()
 
@@ -28,6 +27,8 @@ class ErrorType(Enum):
     ZERO_DIVISION_ERROR = auto()
     ATTRIBUTE_ERROR = auto()
     UNCLASSIFIED = auto()  # all others
+    EMPTY_RESPONSE = auto()  # for textual answers - when empty, before trimming
+    EMPTY_AFTER_TRIM = auto()
 
 
 # builtins and imports we can let the generated code use
@@ -59,7 +60,6 @@ class AnswerExtractor:
     ANSWER_PATTERNS = {
         AnswerPattern.GMS8K: re.compile(r'####' + _number_pattern_str),
         AnswerPattern.GSM_SYMBOLIC: re.compile(r'[Tt]he (?:final )?answer is:?\s*\$?' + _number_pattern_str),
-        AnswerPattern.EQUAL_SIGN: re.compile(r'=' + _number_pattern_str)
     }
 
     FUNCTION_PATTERN = re.compile(r"^def (?P<func_name>\w+)\(\):\s*\n(?P<body>(?:\s+.*|\n)+)", flags=re.MULTILINE)
@@ -90,7 +90,15 @@ class AnswerExtractor:
 
     @classmethod
     def extract_answer_textual(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
+        if not text:
+            logger.warning("The response is empty")
+            return None, ErrorType.EMPTY_RESPONSE
+
         text = cls.trim_response(text)
+
+        if not text.strip('\n').strip():
+            logger.warning("The response is empty after trimming generated questions")
+            return None, ErrorType.EMPTY_AFTER_TRIM
 
         for pattern_enum, pattern in cls.ANSWER_PATTERNS.items():
             match = pattern.search(text)
