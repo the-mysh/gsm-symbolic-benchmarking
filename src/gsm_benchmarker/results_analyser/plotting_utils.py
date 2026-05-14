@@ -505,7 +505,7 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
 
 @save_plot("prompts")
 def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
-                           hatch_lw: int = 2):
+                           hatch_lw: int = 2, add_bar_labels: bool = False, x_labels_rotation: float = 0, x_labels_ha='center'):
     if models:
         all_prompts_summary = all_prompts_summary[models]
 
@@ -525,9 +525,10 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             data.plot.bar(ax=ax, legend=False, **kwargs, edgecolor='white')
 
             for i, container in enumerate(ax.containers):
-                heights = [bar.get_height() for bar in container.patches]
-                labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height in heights]
-                ax.bar_label(container, labels=labels, fontsize=6, padding=1)
+                if add_bar_labels:
+                    heights = [bar.get_height() for bar in container.patches]
+                    labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height in heights]
+                    ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
                 if mask is not None:
                     for bar, sig in zip(container.patches, mask[mask.columns[i]]):
@@ -555,7 +556,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
     plot_quantity('number_effect_main', axes[6], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
                   mask_quantity='number_effect_main_significant', precision=2, ylabel="Odds ratio delta")
 
-    axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=0)
+    axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
     axes[-1].set_xlabel("Model")
 
     handles, labels = axes[0].get_legend_handles_labels()
@@ -571,26 +572,27 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
 
 @save_plot("prompt_acc_evolution")
-def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], models: list[str] | None = None):
+def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], models: list[str] | None = None,
+                              n_cols: int = 2, sharex='all', sharey='all', equal_aspect: bool = True):
     if models:
         all_prompts_summary = all_prompts_summary[models]
     else:
         models = all_prompts_summary.columns.values.tolist()
 
     n_models = len(models)
-    n_cols = 2
     n_rows = n_models // n_cols + n_models % n_cols
 
     x_data = all_prompts_summary.xs('GSM8K_acc', level='quantity')
     y_data = all_prompts_summary.xs('delta_symb', level='quantity')
     sig_data = all_prompts_summary.xs('delta_symb_significant', level='quantity')
 
-    fig, axes = plt.subplots(n_rows, n_cols, sharex='all', sharey='all', figsize=(10, 8))
+    fig, axes = plt.subplots(n_rows, n_cols, sharex=sharex, sharey=sharey, figsize=(10, 8))
     for i, (ax, model) in enumerate(zip(axes.flatten(), models)):
         ax.set_title(model)
         ax.set_xlabel("Mean accuracy on GSM8K, %")
         ax.set_ylabel(r"Symbolic performance delta ($\Delta_{symb}$), pp")
-        ax.set_aspect('equal')
+        if equal_aspect:
+            ax.set_aspect('equal')
         ax.axhline(0, c='k', lw=0.5, ls='--')
         model_data = pd.concat([x_data[model], y_data[model], sig_data[model]], axis=1, keys=['x', 'y', 'significant'])
 

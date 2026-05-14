@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 
+from gsm_benchmarker.results_analyser.common import do_for_metrics
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_difficulty_matrix,
                                                              plot_question_difficulty_histogram, plot_number_counts)
@@ -18,7 +19,7 @@ from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_diffi
 logger = logging.getLogger(__name__)
 
 try:
-    from gsm_benchmarker.results_analyser.common import GLMMRunner, do_for_metrics
+    from gsm_benchmarker.results_analyser.common import GLMMRunner
 except (ValueError, ImportError) as exc:
     logger.warning("R not configured, some functions will not be available")
     logger.warning(exc)
@@ -282,15 +283,20 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return plot_question_difficulty_histogram(difficulties, **kwargs, save_prefix=save_prefix)
 
-    def _validate_models(self, models: list[str], variant: str):
-        models_validated = []
-
+    def _validate_models(self, models: list[str] | None, variant: str):
         baseline_models = self.variants[self.BASELINE_VARIANT].models
         variant_models = self.variants[variant].models
 
+        if models is None:
+            models = list(set(baseline_models + variant_models))
+
+        models_validated = []
+
         for model in models:
-            if model not in baseline_models or model not in variant_models:
-                logger.warning(f"No data for model {model}")
+            if model not in baseline_models:
+                logger.warning(f"No baseline data for model {model}")
+            elif model not in variant_models:
+                logger.warning(f"No variant data for model {model}")
             else:
                 models_validated.append(model)
 
@@ -302,8 +308,7 @@ class MultiVariantMultiModelResultsAnalyser:
     @do_for_metrics
     def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None,
                                use_difficulty: bool = True):
-        if models is not None:
-            models = self._validate_models(models, variant)
+        models = self._validate_models(models, variant)
 
         if GLMMRunner is None:
             raise RuntimeError("R not available")
