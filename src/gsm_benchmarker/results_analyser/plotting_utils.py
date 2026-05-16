@@ -541,19 +541,15 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             if ylabel is not None:
                 ax.set_ylabel(ylabel, fontsize=8)
 
-    fig, axes = plt.subplots(7, 1, figsize=(10, 14), sharex='all')
+    fig, axes = plt.subplots(5, 1, figsize=(10, 12), sharex='all')
 
     plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours,
                   mask_quantity='delta_symb_significant', precision=2, ylabel="Accuracy delta, pp")
-    plot_quantity('delta_prompt_gsm8k', axes[3], r'Prompt performance delta ($\Delta_{prompt}$) on GSM8K', color=colours,
-                  mask_quantity='delta_prompt_gsm8k_significant', precision=2, ylabel="Accuracy delta, pp")
-    plot_quantity('delta_prompt_main', axes[4], r'Prompt performance delta ($\Delta_{prompt}$) on main', color=colours,
-                  mask_quantity='delta_prompt_main_significant', precision=2, ylabel="Accuracy delta, pp")
-    plot_quantity('number_effect_gsm8k', axes[5], r'Number effect on GSM8K ($\Delta_{OR,number}$)', color=colours,
+    plot_quantity('number_effect_gsm8k', axes[3], r'Number effect on GSM8K ($\Delta_{OR,number}$)', color=colours,
                   mask_quantity='number_effect_gsm8k_significant', precision=2, ylabel="Odds ratio delta")
-    plot_quantity('number_effect_main', axes[6], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
+    plot_quantity('number_effect_main', axes[4], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
                   mask_quantity='number_effect_main_significant', precision=2, ylabel="Odds ratio delta")
 
     axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
@@ -566,14 +562,14 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
     labels.append(hatch_patch.get_label())
 
     fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
-    fig.tight_layout(rect=(0, .04, 1, 1))
+    fig.tight_layout(rect=(0, .045, 1, 1))
 
     return fig
 
 
 @save_plot("prompt_acc_evolution")
 def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], models: list[str] | None = None,
-                              n_cols: int = 2, sharex='all', sharey='all', equal_aspect: bool = True):
+                              n_cols: int = 2, sharex='all', sharey='all', equal_aspect: bool = True, figsize=(10, 8), bottom_margin=.05):
     if models:
         all_prompts_summary = all_prompts_summary[models]
     else:
@@ -586,11 +582,9 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
     y_data = all_prompts_summary.xs('delta_symb', level='quantity')
     sig_data = all_prompts_summary.xs('delta_symb_significant', level='quantity')
 
-    fig, axes = plt.subplots(n_rows, n_cols, sharex=sharex, sharey=sharey, figsize=(10, 8))
+    fig, axes = plt.subplots(n_rows, n_cols, sharex=sharex, sharey=sharey, figsize=figsize)
     for i, (ax, model) in enumerate(zip(axes.flatten(), models)):
         ax.set_title(model)
-        ax.set_xlabel("Mean accuracy on GSM8K, %")
-        ax.set_ylabel(r"Symbolic performance delta ($\Delta_{symb}$), pp")
         if equal_aspect:
             ax.set_aspect('equal')
         ax.axhline(0, c='k', lw=0.5, ls='--')
@@ -605,17 +599,22 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
         for pair in (['GSM', 'nonformal'], ['nonformal', 'formal'], ['nonformal', 'code-short'],
                      ['formal', 'code-long'], ['code-short', 'code-long']):
             pair_data = model_data.loc[pair]
-            ax.plot(pair_data['x'], pair_data['y'], lw=0.5, c='darkslategrey')
+            ax.plot(pair_data['x'], pair_data['y'], lw=0.2, c='darkslategrey')
 
         model_sig_data = model_data[~model_data.significant.isna()]
         model_sig_data = model_sig_data[model_sig_data.significant]
         if sig_data.size:
             ax.plot(model_sig_data['x'], model_sig_data['y'], marker='o', lw=0, c='none', mec='darkred', ms=12, label=r'significant $\Delta_{symb}$')
 
+    for ax in axes[:, 0]:
+        ax.set_ylabel("Symbolic performance delta\n" + r"($\Delta_{symb}$), pp")
+    for ax in axes[-1, :]:
+        ax.set_xlabel("Mean accuracy on GSM8K, %")
+
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
-    fig.tight_layout(rect=(0, .07, 1, 1))
+    fig.tight_layout(rect=(0, bottom_margin, 1, 1))
     return fig
 
 
