@@ -42,13 +42,9 @@ def do_for_metrics(func):
 
 
 class GLMMRunner:
-    def __init__(self, label: str, question_difficulties: pd.DataFrame | None = None):
-        diff_term = " + difficulty" if question_difficulties is not None else ""
-        self._formula = f'is_correct ~ {label}{diff_term} + (1 | id)'
+    def __init__(self, label: str):
+        self._formula = f'is_correct ~ {label} + (1 | id)'
         self._label = label
-        self._question_difficulties = question_difficulties
-
-        logger.info(("Using" if question_difficulties is not None else "Not using") + "question difficulty in GLMM")
 
     def fit_df(self, df: pd.DataFrame):
         glmm_model = glmer(
@@ -91,11 +87,6 @@ class GLMMRunner:
         for model_name, group_df in df.groupby('model'):
             if models is not None and model_name not in models:
                 continue
-
-            if self._question_difficulties is not None:
-                difficulty = self._question_difficulties.loc[model_name]
-                difficulty.name = 'difficulty'
-                group_df = group_df.merge(difficulty.reset_index(), on='id', how='left')
 
             group_df = group_df.dropna(subset=[self._label])  # make sure there are no NaNs
 

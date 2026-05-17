@@ -12,8 +12,7 @@ from collections import Counter
 
 from gsm_benchmarker.results_analyser.common import do_for_metrics
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
-from gsm_benchmarker.results_analyser.plotting_utils import (plot_question_difficulty_matrix,
-                                                             plot_question_difficulty_histogram, plot_number_counts)
+from gsm_benchmarker.results_analyser.plotting_utils import plot_number_counts
 
 
 logger = logging.getLogger(__name__)
@@ -236,52 +235,6 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return fig
 
-    def get_question_difficulty(self, model: str | None = None):
-        """
-        Compute a question difficulty score: proportion of models that got each question wrong ([0, 1]).
-
-        If 'model' is provided, skip this model's results when calculating difficulty (leave-one-out model)
-        to avoid circularity.
-        """
-
-        df = self._variants[self.BASELINE_VARIANT].full_data
-
-        if model is not None:
-            if model not in df.model.unique():
-                logger.warning(f"'{model}' does not match any model; the results will be calculated for all models")
-            else:
-                df = df[df.model != model]
-
-        difficulty = df.groupby('id')['correct'].mean().rename('difficulty')
-        difficulty = 1 - difficulty  # invert results - highest difficulty gets highest score (lowest % solved)
-        return difficulty
-
-    def get_question_difficulty_per_model(self):
-        difficulties = {}
-
-        if len(self.models) == 1:
-            difficulties[self.models[0]] = self.get_question_difficulty()  # array of zeros if only one model present
-        else:
-            for model in self.models:
-                difficulties[model] = self.get_question_difficulty(model=model)
-
-        difficulties['OVERALL'] = self.get_question_difficulty()
-
-        difficulties_df = pd.DataFrame(difficulties).T
-        return difficulties_df
-
-    def plot_question_difficulty_per_model(self, **kwargs):
-        difficulties = self.get_question_difficulty_per_model()
-        return plot_question_difficulty_matrix(difficulties, **kwargs)
-
-    def plot_question_difficulty_histogram(self, model: str | None = None,
-                                           save_prefix: str | Path | None = None, **kwargs):
-        difficulties = self.get_question_difficulty(model=model)
-
-        if save_prefix is not None and model is not None:
-            save_prefix = f"{save_prefix}_{model}"
-
-        return plot_question_difficulty_histogram(difficulties, **kwargs, save_prefix=save_prefix)
 
     def _validate_models(self, models: list[str] | None, variant: str):
         baseline_models = self.variants[self.BASELINE_VARIANT].models
@@ -306,15 +259,13 @@ class MultiVariantMultiModelResultsAnalyser:
         return models_validated
 
     @do_for_metrics
-    def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None,
-                               use_difficulty: bool = True):
+    def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None):
         models = self._validate_models(models, variant)
 
         if GLMMRunner is None:
             raise RuntimeError("R not available")
 
-        difficulty = self.get_question_difficulty_per_model() if use_difficulty else None
-        glmm_runner = GLMMRunner(label='is_variant', question_difficulties=difficulty)
+        glmm_runner = GLMMRunner(label='is_variant')
         data_df = glmm_runner.prep_df_with_bool_labels(
             metric=metric,
             ras={

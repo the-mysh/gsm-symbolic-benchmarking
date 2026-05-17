@@ -23,7 +23,6 @@ class PromptResult:
     mres: MultiVariantMultiModelResultsAnalyser | None = None
     baseline: MultiVariantMultiModelResultsAnalyser | None = None
     pea: PromptEffectAnalyser | None = None
-    use_difficulty: bool = True
 
     def __post_init__(self):
         if self.mres is None:
@@ -40,7 +39,7 @@ class PromptResult:
     def variant_effect(self) -> pd.DataFrame:
         assert self.mres is not None
         return self.mres.analyse_variant_effect(
-            variant='main', metric=self.metric, models=self.models, use_difficulty=self.use_difficulty)
+            variant='main', metric=self.metric, models=self.models)
 
     def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
         df = self.variant_effect.copy()
@@ -110,7 +109,7 @@ class PromptResult:
 
     def _make_prompt_effect_df(self, variant):
         return self._check_pea().analyse_accuracy_change_significance(
-            variant=variant, models=self.models, metric=self.metric, use_difficulty=self.use_difficulty)
+            variant=variant, models=self.models, metric=self.metric)
 
     @cached_property
     def prompt_effect_main(self) -> pd.DataFrame:
