@@ -453,19 +453,25 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
     plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours, precision=1, ylabel="Accuracy, %")
-    plot_quantity('delta_symb', axes[2], r'Symbolic performance delta ($\Delta_{symb}$)', color=colours,
-                  mask_quantity='delta_symb_significant', precision=2, ylabel="Accuracy delta, pp")
-    plot_quantity('number_effect_gsm8k', axes[3], r'Number effect on GSM8K ($\Delta_{OR,number}$)', color=colours,
-                  mask_quantity='number_effect_gsm8k_significant', precision=2, ylabel="Odds ratio delta")
-    plot_quantity('number_effect_main', axes[4], r'Number effect on main ($\Delta_{OR,number}$)', color=colours,
-                  mask_quantity='number_effect_main_significant', precision=2, ylabel="Odds ratio delta")
+    plot_quantity('delta_symb_oc', axes[2], r'Symbolic performance - odds change ($\Omega_{symb}$)', color=colours,
+                  mask_quantity='delta_symb_significant', precision=2, ylabel="Odds change")
+    plot_quantity('number_effect_oc', axes[3], r'Number effect - odds change ($\Omega_{number}$)', color=colours,
+                  mask_quantity='number_effect_significant', precision=2, ylabel="Odds change")
+    plot_quantity('delta_symb_ne_oc', axes[4], r'Number-effect-corrected symbolic performance - odds change ($\Omega_{symb,corr}$)', color=colours,
+                  mask_quantity='delta_symb_ne_significant', precision=2, ylabel="Odds change")
+
+    for ax in axes[2:]:
+        y_min, y_max = ax.get_ylim()
+        y_min = max(-1, y_min)
+        y_max = min(y_max, 1)
+        ax.set_ylim(y_min, y_max)
 
     axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
     axes[-1].set_xlabel("Model")
 
     handles, labels = axes[0].get_legend_handles_labels()
     with rc_context({'hatch.linewidth': hatch_lw}):
-        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$\Delta$ not significant")
+        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$\Omega$ not significant")
     handles.append(hatch_patch)
     labels.append(hatch_patch.get_label())
 
@@ -487,7 +493,7 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
     n_rows = n_models // n_cols + n_models % n_cols
 
     x_data = all_prompts_summary.xs('GSM8K_acc', level='quantity')
-    y_data = all_prompts_summary.xs('delta_symb', level='quantity')
+    y_data = all_prompts_summary.xs('delta_symb_acc_diff', level='quantity')
     sig_data = all_prompts_summary.xs('delta_symb_significant', level='quantity')
 
     fig, axes = plt.subplots(n_rows, n_cols, sharex=sharex, sharey=sharey, figsize=figsize)

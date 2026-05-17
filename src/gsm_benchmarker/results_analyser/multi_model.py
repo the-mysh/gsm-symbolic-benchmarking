@@ -274,8 +274,12 @@ class MultiModelResultsAnalyser:
 
         return fig
 
-    def get_failed_answer_cases(self, models: list[str] | None = None):
-        ret = self._full_data[self.full_data.predicted_numerical_result.isna()]
+    def get_failed_answer_cases(self, models: list[str] | None = None, numerical_errors: bool = False):
+        if numerical_errors:
+            cond = ~self.full_data.correct
+        else:
+            cond = self.full_data.predicted_numerical_result.isna()
+        ret = self._full_data[cond]
 
         if models is not None:
             ret = ret[ret.model.apply(lambda m: m in models)]

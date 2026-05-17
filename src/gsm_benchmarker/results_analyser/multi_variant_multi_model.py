@@ -274,6 +274,7 @@ class MultiVariantMultiModelResultsAnalyser:
         })
 
         glmm_results_df = glmm_runner.run(df=data_df, models=models, simplify=True)
+        self._add_odds_changes(glmm_results_df)
 
         # add plain accuracy drops
         glmm_results_df = glmm_results_df.join(self.get_mean_accuracy_summary(metric=metric))
@@ -320,13 +321,17 @@ class MultiVariantMultiModelResultsAnalyser:
 
         glmm_data = self._get_number_effect_glmm_data(variant=variant, metric=metric)
 
-        glmm_runner = GLMMRunner("sum_logs_c")
-        glmm_results_df = glmm_runner.run(df=glmm_data, models=models, simplify=True)
-        odds_ratio = np.exp(glmm_results_df.estimate)
-        glmm_results_df['odds_ratio'] = odds_ratio
-        glmm_results_df['odds_change'] = odds_ratio - 1  # change in odds
-
+        glmm_runner = GLMMRunner("is_variant + sum_logs_c")
+        glmm_results_df = glmm_runner.run(df=glmm_data, models=models)
+        self._add_odds_changes(glmm_results_df)
         return glmm_results_df
+
+    @staticmethod
+    def _add_odds_changes(df):
+        odds_ratio = np.exp(df.estimate)
+        df['odds_ratio'] = odds_ratio
+        df['odds_change'] = odds_ratio - 1  # change in odds
+        return df
 
     def get_mean_accuracy_summary(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
         acc_change = self.get_accuracy_summary(variant=variant, metric=metric)

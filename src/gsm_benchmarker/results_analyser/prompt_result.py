@@ -20,7 +20,7 @@ class PromptResult:
     models: list[str] | None = None
     metric: str | None = None
     save_dest: Path | None = None
-    mres: MultiVariantMultiModelResultsAnalyser | None = None
+    mres: MultiVariantMultiModelResultsAnalyser = None
     baseline: MultiVariantMultiModelResultsAnalyser | None = None
     pea: PromptEffectAnalyser | None = None
 
@@ -119,17 +119,9 @@ class PromptResult:
     def prompt_effect_gsm8k(self) -> pd.DataFrame:
         return self._make_prompt_effect_df('GSM8K')
 
-    def _make_number_effect_df(self, variant):
-        assert self.mres is not None
-        return  self.mres.analyse_number_effect(variant=variant, metric=self.metric, models=self.models)
-
     @cached_property
-    def number_effect_main(self) -> pd.DataFrame:
-        return self._make_number_effect_df('main')
-
-    @cached_property
-    def number_effect_gsm8k(self) -> pd.DataFrame:
-        return self._make_number_effect_df('GSM8K')
+    def number_effect(self) -> pd.DataFrame:
+        return self.mres.analyse_number_effect('main', metric=self.metric, models=self.models)
 
     def plot_variant_effect(self, **kwargs):
         figs = plot_glmm(
@@ -177,34 +169,26 @@ class PromptResult:
         return models
 
     def summary(self, alpha: float = 0.05):
-        assert self.mres is not None
 
         d = {
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
             'main_acc': self.mres.variants['main'].get_accuracies_per_model(metric=self.metric),
-            'delta_symb': self.variant_effect['acc_diff'],
+            'delta_symb_acc_diff': self.variant_effect['acc_diff'],
+            'delta_symb_oc': self.variant_effect['odds_change'],
+            'delta_symb_or': self.variant_effect['odds_ratio'],
             'delta_symb_p_value': self.variant_effect['p_value'],
             'delta_symb_significant': self.variant_effect['p_value'] < alpha
         }
 
-        for label in ('main', 'gsm8k'):
-            # add 'number effect' - influence of bigger numbers on odds of getting a correct answer
-            df_ne = getattr(self, f"number_effect_{label}")
-            d |= {
-                f'number_effect_{label}': df_ne['odds_change'],
-                f'number_effect_{label}_or': df_ne['odds_ratio'],
-                f'number_effect_{label}_p_value': df_ne['p_value'],
-                f'number_effect_{label}_significant': df_ne['p_value'] < alpha
-            }
+        number_effect_df = self.number_effect
+        for (variable, variable_label) in (('sum_logs_c', 'number_effect'), ('is_variant', 'delta_symb_ne')):
+            df_ne = number_effect_df.xs(variable, level='variable')
 
-            # add prompt effect data
-            if self.baseline is None:
-                continue
-            df_pe = getattr(self, f"prompt_effect_{label}")
             d |= {
-                f'delta_prompt_{label}': df_pe['acc_diff'],
-                f'delta_prompt_{label}_p_value': df_pe['p_value'],
-                f'delta_prompt_{label}_significant': df_pe['p_value'] < alpha
+                f'{variable_label}_oc': df_ne['odds_change'],
+                f'{variable_label}_or': df_ne['odds_ratio'],
+                f'{variable_label}_p_value': df_ne['p_value'],
+                f'{variable_label}_significant': df_ne['p_value'] < alpha
             }
 
         df = pd.DataFrame(d).transpose()
