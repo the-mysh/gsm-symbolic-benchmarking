@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 from typing import TYPE_CHECKING
 import numpy as np
+import re
 
 from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as ro
@@ -42,9 +43,10 @@ def do_for_metrics(func):
 
 
 class GLMMRunner:
-    def __init__(self, label: str):
-        self._formula = f'is_correct ~ {label} + (1 | id)'
-        self._label = label
+    def __init__(self, key_term: str):
+        self._formula = f'is_correct ~ {key_term} + (1 | id)'
+        self._key_term = key_term
+        self._labels = list(set(set(re.findall(r"[\w\:]+", key_term))))
 
     def fit_df(self, df: pd.DataFrame):
         glmm_model = glmer(
@@ -69,10 +71,13 @@ class GLMMRunner:
         return coefs_df
 
     def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
+        if len(self._labels) > 1:
+            raise RuntimeError("Cannot automatically prep df with multiple labels")
+
         def _prep(label_value: bool, ra: "MultiModelResultsAnalyser"):
             res = ra.full_data
             res = res[['model', 'id', metric]][:]
-            res[self._label] = [label_value] * len(res)
+            res[self._key_term] = [label_value] * len(res)
             res['is_correct'] = res[metric].astype(int)
             res = res.drop(metric, axis=1)
             return res
@@ -81,41 +86,41 @@ class GLMMRunner:
 
         return df
 
-    def run(self, df: pd.DataFrame, models: list[str] | None = None):
-        glmm_results = []
+    def run(self, df: pd.DataFrame, models: list[str] | None = None, simplify=False):
+        glmm_results = {}
 
         for model_name, group_df in df.groupby('model'):
             if models is not None and model_name not in models:
                 continue
 
-            group_df = group_df.dropna(subset=[self._label])  # make sure there are no NaNs
+            for label in self._labels:
+                try:
+                    group_df = group_df.dropna(subset=[label])  # make sure there are no NaNs
+                except KeyError:
+                    pass
+
+            group_df = group_df[[c for c in group_df.columns if c != 'model']]
 
             try:
                 coefs_df = self.fit_df(group_df)
             except GLMMFitError as err:
                 logger.warning(f"{model_name}: {err}")
                 res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan, 'z_value': np.nan}
+                coefs_df = pd.DataFrame(len(self._labels) * [res], index=self._labels)
             else:
-                res = dict(
-                    estimate=coefs_df.loc[self._label, 'Estimate'],
-                    p_value=coefs_df.loc[self._label, 'Pr(>|z|)'],
-                    std_err=coefs_df.loc[self._label, 'Std. Error'],
-                    z_value=coefs_df.loc[self._label, 'z value']
-                )
+                coefs_df.rename(columns={'Estimate': 'estimate', 'Pr(>|z|)': 'p_value', 'Std. Error': 'std_err', 'z value': 'z_value' }, inplace=True)
+                coefs_df.drop('(Intercept)', axis=0, inplace=True)
 
+            glmm_results[model_name] = coefs_df
 
-            glmm_results.append({
-                'model': model_name,
-                **res,
-            })
-
-        glmm_results_df = pd.DataFrame(glmm_results)
+        glmm_results_df = pd.concat(glmm_results.values(), keys=glmm_results.keys(), names=['model', 'variable'])
+        if simplify and len(glmm_results_df.index.get_level_values('variable').unique()) < 2:
+            glmm_results_df = glmm_results_df.reset_index().drop('variable', axis=1).set_index('model')
 
         if models is not None:
-            models_with_results = glmm_results_df.model.unique()
+            models_with_results = glmm_results_df.index.get_level_values('model').unique()
             for requested_model_name in models:
                 if requested_model_name not in models_with_results:
                     logger.warning(f"No data for model {requested_model_name}")
 
-        glmm_results_df = glmm_results_df.set_index('model')
         return glmm_results_df

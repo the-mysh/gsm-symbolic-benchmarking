@@ -265,7 +265,7 @@ class MultiVariantMultiModelResultsAnalyser:
         if GLMMRunner is None:
             raise RuntimeError("R not available")
 
-        glmm_runner = GLMMRunner(label='is_variant')
+        glmm_runner = GLMMRunner('is_variant')
         data_df = glmm_runner.prep_df_with_bool_labels(
             metric=metric,
             ras={
@@ -273,7 +273,7 @@ class MultiVariantMultiModelResultsAnalyser:
                 1: self.variants[variant]
         })
 
-        glmm_results_df = glmm_runner.run(df=data_df, models=models)
+        glmm_results_df = glmm_runner.run(df=data_df, models=models, simplify=True)
 
         # add plain accuracy drops
         glmm_results_df = glmm_results_df.join(self.get_mean_accuracy_summary(metric=metric))
@@ -281,29 +281,37 @@ class MultiVariantMultiModelResultsAnalyser:
         return glmm_results_df
 
     def _get_number_effect_glmm_data(self, variant: str, metric: str):
-        df = self.variants[variant].full_data.reset_index()
-
         number_pattern = re.compile(r'\d*\.?\d+')
+
         def extract_sum_logs(text):
             matches = number_pattern.findall(text)
             if not matches:
-                return np.nan # Handle the rare case where a prompt has no numbers
+                return np.nan  # Handle the rare case where a prompt has no numbers
             numbers = (float(match) for match in matches)
-            numbers = (number for number in numbers if not number%1)  # take integers only
+            numbers = (number for number in numbers if not number % 1)  # take integers only
             logs = ((np.log10(number) if number > 0 else 0) for number in numbers)
             return sum(logs)
 
-        df_for_glmm = pd.DataFrame({
-            'model': df.model,
-            'id': df.id,
-            'is_correct': df[metric].astype(int),
-            'sum_logs': df.question.apply(extract_sum_logs)
-        })
+        def _prep(res, variant_label: bool):
+            data = res.full_data[['model', 'id', metric, 'question']][:].reset_index(drop=True)
+            data['is_variant'] = [int(variant_label)] * len(data)
+            data['is_correct'] = data[metric]
+            data['id'] = data['id']
+            data['sum_logs'] = data.question.apply(extract_sum_logs)
 
-        return df_for_glmm
+            data = data.drop(metric, axis=1).drop('question', axis=1)
+            return data
+
+        baseline_df = _prep(self.variants[self.BASELINE_VARIANT], False)
+        variant_df = _prep(self.variants[variant], True)
+
+        df = pd.concat([baseline_df, variant_df]).reset_index(drop=True)
+        df['sum_logs_c'] = df['sum_logs'] - df['sum_logs'].mean()
+        df = df.drop('sum_logs', axis=1)
+        return df
 
     @do_for_metrics
-    def analyse_number_effect(self, variant: str, metric: str | None = None, models: list[str] | None = None):
+    def analyse_number_effect(self, variant: str, metric: str, models: list[str] | None = None):
         if models is not None:
             models = self._validate_models(models, variant)
 
@@ -312,8 +320,8 @@ class MultiVariantMultiModelResultsAnalyser:
 
         glmm_data = self._get_number_effect_glmm_data(variant=variant, metric=metric)
 
-        glmm_runner = GLMMRunner(label="sum_logs")
-        glmm_results_df = glmm_runner.run(df=glmm_data, models=models)
+        glmm_runner = GLMMRunner("sum_logs_c")
+        glmm_results_df = glmm_runner.run(df=glmm_data, models=models, simplify=True)
         odds_ratio = np.exp(glmm_results_df.estimate)
         glmm_results_df['odds_ratio'] = odds_ratio
         glmm_results_df['odds_change'] = odds_ratio - 1  # change in odds

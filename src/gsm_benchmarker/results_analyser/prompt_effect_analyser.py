@@ -98,7 +98,7 @@ class PromptEffectAnalyser:
         if GLMMRunner is None:
             raise RuntimeError("R not available")
 
-        glmm_runner = GLMMRunner(label='is_experiment')
+        glmm_runner = GLMMRunner('is_experiment')
 
         if models is None:
             models = list(set(self._experiment_mres.models) | set(self._baseline_mres.models))
@@ -118,7 +118,7 @@ class PromptEffectAnalyser:
                 1: self._experiment_mres.variants[variant]
             })
 
-        glmm_results_df = glmm_runner.run(df=data_df, models=models_validated)
+        glmm_results_df = glmm_runner.run(df=data_df, models=models_validated, simplify=True)
 
         # add plain accuracy change
         glmm_results_df['acc_diff'] = self.get_mean_accuracy_change(metric=metric, variant=variant)
