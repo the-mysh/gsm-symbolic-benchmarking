@@ -174,7 +174,7 @@ class PromptResult:
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
             'main_acc': self.mres.variants['main'].get_accuracies_per_model(metric=self.metric),
             'delta_symb_acc_diff': self.variant_effect['acc_diff'],
-            'delta_symb_oc': self.variant_effect['odds_change'],
+            'delta_symb_log_or': self.variant_effect['estimate'],
             'delta_symb_or': self.variant_effect['odds_ratio'],
             'delta_symb_p_value': self.variant_effect['p_value'],
             'delta_symb_significant': self.variant_effect['p_value'] < alpha
@@ -185,7 +185,7 @@ class PromptResult:
             df_ne = number_effect_df.xs(variable, level='variable')
 
             d |= {
-                f'{variable_label}_oc': df_ne['odds_change'],
+                f'{variable_label}_log_or': df_ne['estimate'],
                 f'{variable_label}_or': df_ne['odds_ratio'],
                 f'{variable_label}_p_value': df_ne['p_value'],
                 f'{variable_label}_significant': df_ne['p_value'] < alpha

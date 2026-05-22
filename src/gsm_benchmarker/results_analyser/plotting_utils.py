@@ -219,6 +219,7 @@ def _define_significance_points(projected_alpha: float | None):
     return p_thresholds
 
 
+
 def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, projected_alpha: float | None = None,
                               model_order: list[str] | None = None, sort_models: bool = False
                               ) -> tuple[pd.DataFrame, dict[str, SignificancePoint], list[str] | None]:
@@ -248,17 +249,13 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
     # compute odds ratios and 95% confidence intervals
     estimate = df_plot.estimate
     err = df_plot['std_err']
-    err_threshold = estimate.abs().max() * 0.5
-    df_plot['odds_ratio'] = np.exp(estimate)
     df_plot['odds_ratio_plot'] = np.where(np.isnan(df_plot.odds_ratio), 1, df_plot.odds_ratio)
 
-    std_err_clipped = np.minimum(err, err_threshold)  # clip for plotting
     f = 1.96
-    ci_lower_log = estimate - f * std_err_clipped
-    ci_upper_log = estimate + f * std_err_clipped
-    df_plot['ci_lower_or'] = np.exp(ci_lower_log)
-    df_plot['ci_upper_or'] = np.exp(ci_upper_log)
-    df_plot['ci_clipped'] = np.where(err > err_threshold, True, False)
+    ci_lower_log = estimate - f * err
+    ci_upper_log = estimate + f * err
+    df_plot['ci_lower_log_or'] = ci_lower_log
+    df_plot['ci_upper_log_or'] = ci_upper_log
 
     if model_order is None:
         if sort_models:
@@ -274,7 +271,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
 
 @save_plot("odds_ratios")
 def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None,
-                            model_order: list[str] | None = None, log_scale: bool = False, sort_models: bool = False,
+                            model_order: list[str] | None = None, sort_models: bool = False,
                             title: str | None = None):
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
@@ -287,28 +284,20 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     for i, row in df_plot.iterrows():
         y = row['model']
 
-        if np.isnan(row['odds_ratio']):
+        if np.isnan(row['estimate']):
             ax.scatter(x=[1], y=[y], marker='x', color='k', lw=0.5, s=50)
             continue
 
         # draw CIs
-        ax.hlines(y, xmin=row['ci_lower_or'], xmax=row['ci_upper_or'], color=ci_colour, lw=2)
-        if row["ci_clipped"]:
-            # mark that the errors are in fact bigger - clipped here
-            ax.plot(row['ci_lower_or'], y, '<', c=ci_colour)
-            ax.plot(row['ci_upper_or'], y, '>', c=ci_colour)
-        else:
-            ax.plot([row['ci_lower_or'], row['ci_upper_or']], [y, y], '|', c=ci_colour)
+        ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2)
+        ax.plot([row['ci_lower_log_or'], row['ci_upper_log_or']], [y, y], '|', c=ci_colour, ms=15)
 
         # draw the dot using the dynamically assigned colour
-        ax.scatter(x=row['odds_ratio'], y=y, color=row['colour'], s=80, zorder=2, ec='black', lw=0.5)
+        ax.scatter(x=row['estimate'], y=y, color=row['colour'], s=80, zorder=2, ec='black', lw=0.5)
 
-    ax.axvline(x=1, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
+    ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
-    if log_scale:
-        ax.set_xscale('log')
-
-    ax.set_xlabel('Odds ratio' +  (' (log scale)' if log_scale else ''))
+    ax.set_xlabel('Log Odds Ratio')
 
     # legend
     point_colours = df_plot.colour.unique()
@@ -365,7 +354,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
     metric_text = f"\n{metric} accuracy" if metric else ""
 
     f1, model_order = plot_models_odds_ratios(
-        df, metric, log_scale=True, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
+        df, metric, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
         title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 
@@ -451,27 +440,23 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
     fig, axes = plt.subplots(5, 1, figsize=(10, 12), sharex='all')
 
+    or_label = r"$\beta$ (log OR)"
+
     plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours, precision=1, ylabel="Accuracy, %")
     plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours, precision=1, ylabel="Accuracy, %")
-    plot_quantity('delta_symb_oc', axes[2], r'Symbolic performance - odds change ($\Omega_{symb}$)', color=colours,
-                  mask_quantity='delta_symb_significant', precision=2, ylabel="Odds change")
-    plot_quantity('number_effect_oc', axes[3], r'Number effect - odds change ($\Omega_{number}$)', color=colours,
-                  mask_quantity='number_effect_significant', precision=2, ylabel="Odds change")
-    plot_quantity('delta_symb_ne_oc', axes[4], r'Number-effect-corrected symbolic performance - odds change ($\Omega_{symb,corr}$)', color=colours,
-                  mask_quantity='delta_symb_ne_significant', precision=2, ylabel="Odds change")
-
-    for ax in axes[2:]:
-        y_min, y_max = ax.get_ylim()
-        y_min = max(-1, y_min)
-        y_max = min(y_max, 1)
-        ax.set_ylim(y_min, y_max)
+    plot_quantity('delta_symb_log_or', axes[2], r'Variant performance change (main vs GSM8K) - log odds ratio', color=colours,
+                  mask_quantity='delta_symb_significant', precision=2, ylabel=or_label)
+    plot_quantity('number_effect_log_or', axes[3], r'Number effect - log odds ratio', color=colours,
+                  mask_quantity='number_effect_significant', precision=2, ylabel=or_label)
+    plot_quantity('delta_symb_ne_log_or', axes[4], r'Number-effect-corrected variant performance change - log odds ratio', color=colours,
+                  mask_quantity='delta_symb_ne_significant', precision=2, ylabel=or_label)
 
     axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
     axes[-1].set_xlabel("Model")
 
     handles, labels = axes[0].get_legend_handles_labels()
     with rc_context({'hatch.linewidth': hatch_lw}):
-        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$\Omega$ not significant")
+        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$\beta$ (log OR) n.s. (p > .05)")
     handles.append(hatch_patch)
     labels.append(hatch_patch.get_label())
 
@@ -518,10 +503,10 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
         model_sig_data = model_data[~model_data.significant.isna()]
         model_sig_data = model_sig_data[model_sig_data.significant]
         if sig_data.size:
-            ax.plot(model_sig_data['x'], model_sig_data['y'], marker='o', lw=0, c='none', mec='darkred', ms=12, label=r'significant $\Delta_{symb}$')
+            ax.plot(model_sig_data['x'], model_sig_data['y'], marker='o', lw=0, c='none', mec='darkred', ms=12, label=r'significant $\Delta_{var}$')
 
     for ax in axes[:, 0]:
-        ax.set_ylabel("Symbolic performance delta\n" + r"($\Delta_{symb}$), pp")
+        ax.set_ylabel("Variant performance delta\n" + r"($\Delta_{var}$), pp")
     for ax in axes[-1, :]:
         ax.set_xlabel("Mean accuracy on GSM8K, %")
 
