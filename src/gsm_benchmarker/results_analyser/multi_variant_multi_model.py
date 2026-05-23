@@ -25,6 +25,12 @@ except (ValueError, ImportError) as exc:
     GLMMRunner = None
 
 
+VARIANT_LABELS = {
+    'main': 'GSM-Variants',
+    'GSM8K': 'GSM-Base'
+}
+
+
 class MultiVariantMultiModelResultsAnalyser:
     VARIANT_NAME_PATTERN = re.compile(r"(?P<variant>\w+)_test")
     NUMBER_PATTERN = re.compile(r'\d+(?:\.\d+)?')
@@ -357,16 +363,17 @@ class MultiVariantMultiModelResultsAnalyser:
         binned_counts_dict = {}
         raw_counts_dict = {}
         for variant_name in self.variants:
+            variant_label = VARIANT_LABELS.get(variant_name, variant_name)
             variant_df = self.variants[variant_name].full_data
             model_df = variant_df.loc[variant_df['model'] == (model or self.models[0]), ['question']].copy()
             extracted_numbers = model_df['question'].str.findall(self.NUMBER_PATTERN).explode().dropna().astype(float)
             extracted_numbers = extracted_numbers[~(extracted_numbers % 1).astype(bool)]  # limit to integers
-            raw_counts_dict[variant_name] = Counter(extracted_numbers)
+            raw_counts_dict[variant_label] = Counter(extracted_numbers)
 
             # put into bins, all fractions in a single separate bin
             binned = pd.cut(extracted_numbers, bins=bin_edges, labels=bin_labels, right=False, include_lowest=True)
             number_counts = binned.value_counts().reindex(bin_labels, fill_value=0)
-            binned_counts_dict[variant_name] = number_counts
+            binned_counts_dict[variant_label] = number_counts
 
         raw_counts_df = pd.DataFrame(raw_counts_dict).fillna(0).astype(int).sort_index()
         binned_counts_df = pd.DataFrame(binned_counts_dict).fillna(0).astype(int)

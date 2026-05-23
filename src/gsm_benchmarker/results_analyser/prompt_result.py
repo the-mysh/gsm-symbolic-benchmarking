@@ -80,8 +80,8 @@ class PromptResult:
             return wrapper
 
         df1 = pd.DataFrame({
-            'GSM8K acc': df['GSM8K_acc'].apply(fmt(1)),
-            'main acc': df['main_acc'].apply(fmt(1)),
+            'GSM-Base acc': df['GSM8K_acc'].apply(fmt(1)),
+            'GSM-Variants acc': df['main_acc'].apply(fmt(1)),
             r'$\Delta$ Acc': df['acc_diff'].apply(fmt(2)),
             'P value': df['p_value'].apply(fmt_p_val(3)),
             'Corrected P value': correct_p_values(df['p_value']).apply(fmt_p_val(3))
@@ -127,7 +127,7 @@ class PromptResult:
         figs = plot_glmm(
             self.variant_effect,
             'acc_diff',
-            "Symbolic performance delta, pp",
+            "Variant performance delta, pp",
             bar_colour=self.colour.value,
             save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
             **kwargs

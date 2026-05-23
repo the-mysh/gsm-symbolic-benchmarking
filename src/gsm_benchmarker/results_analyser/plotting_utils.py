@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 VARIANT_COLOURS = {
-    'GSM8K': 'mediumslateblue',
-    'main': 'darksalmon'
+    'GSM-Base': 'mediumslateblue',
+    'GSM-Variants': 'darksalmon'
 }
 
 
@@ -440,11 +440,11 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
     fig, axes = plt.subplots(5, 1, figsize=(10, 12), sharex='all')
 
-    or_label = r"$\beta$ (log OR)"
+    or_label = r"log OR"
 
-    plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM8K', color=colours, precision=1, ylabel="Accuracy, %")
-    plot_quantity('main_acc', axes[1], 'Mean accuracy on main', color=colours, precision=1, ylabel="Accuracy, %")
-    plot_quantity('delta_symb_log_or', axes[2], r'Variant performance change (main vs GSM8K) - log odds ratio', color=colours,
+    plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM-Base', color=colours, precision=1, ylabel="Accuracy, %")
+    plot_quantity('main_acc', axes[1], 'Mean accuracy on GSM-Variants', color=colours, precision=1, ylabel="Accuracy, %")
+    plot_quantity('delta_symb_log_or', axes[2], r'Variant performance change (GSM-Variants vs GSM-Base) - log odds ratio', color=colours,
                   mask_quantity='delta_symb_significant', precision=2, ylabel=or_label)
     plot_quantity('number_effect_log_or', axes[3], r'Number effect - log odds ratio', color=colours,
                   mask_quantity='number_effect_significant', precision=2, ylabel=or_label)
@@ -456,7 +456,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
     handles, labels = axes[0].get_legend_handles_labels()
     with rc_context({'hatch.linewidth': hatch_lw}):
-        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$\beta$ (log OR) n.s. (p > .05)")
+        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$log OR n.s. (p > .05)")
     handles.append(hatch_patch)
     labels.append(hatch_patch.get_label())
 
@@ -495,8 +495,8 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
             ax.plot(x_val, y_val, marker='o', c=colour, label=prompt)
             ax.annotate(prompt, (x_val, y_val), textcoords='offset points', xytext=(4, 4), fontsize=8, color=colour)
 
-        for pair in (['GSM', 'nonformal'], ['nonformal', 'formal'], ['nonformal', 'code-short'],
-                     ['formal', 'code-long'], ['code-short', 'code-long']):
+        for pair in (['GSM', 'NL-simple'], ['NL-simple', 'NL-structured'], ['NL-simple', 'code-simple'],
+                     ['NL-structured', 'code-structured'], ['code-simple', 'code-structured']):
             pair_data = model_data.loc[pair]
             ax.plot(pair_data['x'], pair_data['y'], lw=0.2, c='darkslategrey')
 
@@ -508,7 +508,7 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
     for ax in axes[:, 0]:
         ax.set_ylabel("Variant performance delta\n" + r"($\Delta_{var}$), pp")
     for ax in axes[-1, :]:
-        ax.set_xlabel("Mean accuracy on GSM8K, %")
+        ax.set_xlabel("Mean accuracy on GSM-Base, %")
 
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
@@ -552,7 +552,7 @@ def plot_number_counts(raw_counts_df: pd.DataFrame, binned_counts_df: pd.DataFra
 
     for ax in (ax_count, ax_cum):
         ax.yaxis.set_major_formatter(mtick.PercentFormatter(xmax=100, decimals=0))
-        ax.legend(title='Dataset variant')
+        ax.legend(title='Dataset')
 
     ax_count.set_xticks(plot_bin_centers)
     ax_count.set_xticklabels(binned_counts_df.index)
