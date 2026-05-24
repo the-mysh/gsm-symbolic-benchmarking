@@ -24,7 +24,7 @@ VARIANT_COLOURS = {
 
 
 
-def save_plot(label):
+def save_plot(*labels):
     def decorator(func):
         def wrapper(*args, save_prefix: str | Path | None = None, save_ext: str = "png", **kwargs):
             ret = func(*args, **kwargs)
@@ -33,14 +33,16 @@ def save_plot(label):
             ret_items = ret if isinstance(ret, tuple) else (ret,)
             figures = [r for r in ret_items if isinstance(r, Figure)]
 
-            idx_format = "_{}" if len(figures) > 1 else ""
+            if (nl := len(labels)) < (nf := len(figures)):
+                raise ValueError(f"Got {nf} figures, but only {nl} labels")
+
             sep = "_"
             if isinstance(save_prefix, str) and save_prefix.endswith("/"):
                 sep = ""
 
-            for i, fig in enumerate(figures):
+            for label, fig in zip(labels, figures):
                 if save_prefix is not None:
-                    save_name = Path(f"{save_prefix}{sep}{label}{idx_format.format(i)}.{save_ext}").resolve()
+                    save_name = Path(f"{save_prefix}{sep}{label}.{save_ext}").resolve()
                     fig.savefig(save_name)
                     logger.debug(f"Figure saved as: {save_name}")
 
@@ -400,13 +402,15 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
     return g.figure
 
 
-@save_plot("prompts")
+@save_plot("prompts_variant_effect", "prompts_number_effect")
 def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
-                           hatch_lw: int = 2, add_bar_labels: bool = False, x_labels_rotation: float = 0, x_labels_ha='center'):
+                           hatch_lw: int = 2, add_bar_labels: bool = False, x_labels_rotation: float = 0,
+                           x_labels_ha='center'):
     if models:
         all_prompts_summary = all_prompts_summary[models]
 
     prompts = all_prompts_summary.index.get_level_values('prompt').unique().tolist()
+    or_label = r"log OR"
 
     def prep_data(q):
         data = all_prompts_summary.xs(q, level='quantity')
@@ -424,7 +428,8 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             for i, container in enumerate(ax.containers):
                 if add_bar_labels:
                     heights = [bar.get_height() for bar in container.patches]
-                    labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height in heights]
+                    labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height
+                              in heights]
                     ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
                 if mask is not None:
@@ -438,33 +443,62 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             if ylabel is not None:
                 ax.set_ylabel(ylabel, fontsize=8)
 
-    fig, axes = plt.subplots(5, 1, figsize=(10, 12), sharex='all')
+    # Reusable figure builder
+    def create_figure(specs, figsize, bottom_rect, legend_title=None):
+        fig, axes = plt.subplots(len(specs), 1, figsize=figsize, sharex='all')
 
-    or_label = r"log OR"
+        # Ensure axes is iterable even if there's only 1 subplot
+        if len(specs) == 1:
+            axes = [axes]
 
-    plot_quantity('GSM8K_acc', axes[0], 'Mean accuracy on GSM-Base', color=colours, precision=1, ylabel="Accuracy, %")
-    plot_quantity('main_acc', axes[1], 'Mean accuracy on GSM-Variants', color=colours, precision=1, ylabel="Accuracy, %")
-    plot_quantity('delta_symb_log_or', axes[2], r'Variant performance change (GSM-Variants vs GSM-Base) - log odds ratio', color=colours,
-                  mask_quantity='delta_symb_significant', precision=2, ylabel=or_label)
-    plot_quantity('number_effect_log_or', axes[3], r'Number effect - log odds ratio', color=colours,
-                  mask_quantity='number_effect_significant', precision=2, ylabel=or_label)
-    plot_quantity('delta_symb_ne_log_or', axes[4], r'Number-effect-corrected variant performance change - log odds ratio', color=colours,
-                  mask_quantity='delta_symb_ne_significant', precision=2, ylabel=or_label)
+        # Iterate over the provided configurations to build each subplot
+        for ax, spec in zip(axes, specs):
+            plot_quantity(ax=ax, **spec)
 
-    axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
-    axes[-1].set_xlabel("Model")
+        axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
+        axes[-1].set_xlabel("Model")
 
-    handles, labels = axes[0].get_legend_handles_labels()
-    with rc_context({'hatch.linewidth': hatch_lw}):
-        hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"$log OR n.s. (p > .05)")
-    handles.append(hatch_patch)
-    labels.append(hatch_patch.get_label())
+        # Create standard handles/labels and append the shared hatch patch
+        handles, labels = axes[0].get_legend_handles_labels()
+        with rc_context({'hatch.linewidth': hatch_lw}):
+            hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"effect n.s. (p > .05)")
+        handles.append(hatch_patch)
+        labels.append(hatch_patch.get_label())
 
-    fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
-    fig.tight_layout(rect=(0, .045, 1, 1))
+        fig.legend(handles, labels, title=legend_title, loc='lower center', ncol=6, frameon=True)
 
-    return fig
+        # We adjust bottom_rect slightly depending on subplot count to leave room for the legend
+        fig.tight_layout(rect=(0, bottom_rect, 1, 1))
 
+        return fig
+
+    # Configuration for the first plot (2 subplots)
+    plot1_specs = [
+        dict(quantity='GSM8K_acc', title='Mean accuracy on GSM-Base', color=colours, precision=1, ylabel="Accuracy, %"),
+        dict(quantity='main_acc', title='Mean accuracy on GSM-Variants', color=colours, precision=1,
+             ylabel="Accuracy, %"),
+        dict(quantity='delta_symb_acc_diff', title=r'Variant performance delta', color=colours,
+             mask_quantity='delta_symb_significant', precision=2, ylabel="Accuracy change, pp"),
+    ]
+
+    # Configuration for the second plot (3 subplots)
+    plot2_specs = [
+        dict(quantity='delta_symb_log_or', title=r'Variant effect - log odds ratio', color=colours,
+             mask_quantity='delta_symb_significant', precision=2, ylabel=or_label),
+        dict(quantity='number_effect_log_or', title=r'Number effect - log odds ratio', color=colours,
+             mask_quantity='number_effect_significant', precision=2, ylabel=or_label),
+        dict(quantity='delta_symb_ne_log_or', title=r'Number-effect-corrected variant effect - log odds ratio',
+             color=colours,
+             mask_quantity='delta_symb_ne_significant', precision=2, ylabel=or_label)
+    ]
+
+    # Generate both figures with adjusted heights and bottom margins
+    fig1 = create_figure(plot1_specs, figsize=(10, 8), bottom_rect=0.06,
+                         legend_title='Prompt formats & significance of variant effect')
+    fig2 = create_figure(plot2_specs, figsize=(10, 8), bottom_rect=0.06,
+                         legend_title='Prompt formats & significance of variant and number effects')
+
+    return fig1, fig2
 
 @save_plot("prompt_acc_evolution")
 def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], models: list[str] | None = None,
@@ -498,7 +532,7 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
         for pair in (['GSM', 'NL-simple'], ['NL-simple', 'NL-structured'], ['NL-simple', 'code-simple'],
                      ['NL-structured', 'code-structured'], ['code-simple', 'code-structured']):
             pair_data = model_data.loc[pair]
-            ax.plot(pair_data['x'], pair_data['y'], lw=0.2, c='darkslategrey')
+            ax.plot(pair_data['x'], pair_data['y'], lw=0.2, ls='--', c='darkslategrey')
 
         model_sig_data = model_data[~model_data.significant.isna()]
         model_sig_data = model_sig_data[model_sig_data.significant]
@@ -512,7 +546,7 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
 
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.legend(handles, labels, title='Prompt / significance', loc='lower center', ncol=6, frameon=True)
+    fig.legend(handles, labels, title='Prompt formats & significance of effects', loc='lower center', ncol=6, frameon=True)
     fig.tight_layout(rect=(0, bottom_margin, 1, 1))
     return fig
 
