@@ -11,9 +11,9 @@ from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor, AnswerPa
     ("The answer is 38", 38, AnswerPattern.GSM_SYMBOLIC),
     ("#### -1", -1, AnswerPattern.GMS8K),
     ("###### 3", 3, AnswerPattern.GMS8K),
-    ("=2.5", 2.5, AnswerPattern.EQUAL_SIGN),
-    ("=      -23.8", -23.8, AnswerPattern.EQUAL_SIGN),
-    ("value=3.2\n", 3.2, AnswerPattern.EQUAL_SIGN)
+    ("=2.5", 2.5, AnswerPattern.LAST_NUMBER),
+    ("=      -23.8", -23.8, AnswerPattern.LAST_NUMBER),
+    ("value=3.2\n", 3.2, AnswerPattern.LAST_NUMBER)
 ))
 def test_extract_answer_textual_from_pattern(resp, value, pattern, caplog):
 
@@ -40,7 +40,9 @@ def test_extract_answer_textual_no_pattern(resp, value, caplog):
 
 @pytest.mark.parametrize(("resp", "trimmed"), (
     ("some answer blah blah\n\nQ:", "some answer blah blah\n\n"),
+    ("some answer blah blah\n\nQuestion:", "some answer blah blah\n\n"),
     ("xyz!Q:ddd", "xyz!"),
+    ("xyz!Question:ddd", "xyz!"),
 ))
 def test_trim_response(resp, trimmed):
     assert AnswerExtractor.trim_response(resp) == trimmed
@@ -53,6 +55,22 @@ def test_trim_response(resp, trimmed):
 ))
 def test_trim_response_no_trim(resp):
     assert AnswerExtractor.trim_response(resp) == resp
+
+
+def test_extract_answer_textual_empty_response(caplog):
+    with caplog.at_level(logging.DEBUG):
+        extracted_value, detected_pattern = AnswerExtractor.extract_answer_textual("")
+
+    assert extracted_value is None
+    assert detected_pattern.name == "EMPTY_RESPONSE"
+
+
+def test_extract_answer_textual_empty_after_trim(caplog):
+    with caplog.at_level(logging.DEBUG):
+        extracted_value, detected_pattern = AnswerExtractor.extract_answer_textual("Question:")
+
+    assert extracted_value is None
+    assert detected_pattern.name == "EMPTY_AFTER_TRIM"
 
 
 def test_code_clean_explicit_definition():

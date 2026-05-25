@@ -1,3 +1,17 @@
+"""Extract numeric answers from GSM-Symbolic model responses.
+
+The extractor supports two modes:
+
+* textual extraction, which looks for common answer phrases and falls back to
+  the last number in the response; and
+* code extraction, which parses a generated function, executes it in a
+  restricted namespace, and interprets the return value as the answer.
+
+The code-execution path intentionally uses a small allowlist of builtins and
+imports plus a few string-level safety checks to reduce the risk of running
+dangerous generated code.
+"""
+
 import re
 import logging
 from enum import Enum, auto
@@ -8,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 class AnswerPattern(Enum):
+    """Successful answer-extraction patterns."""
+
     GMS8K = auto()
     GSM_SYMBOLIC = auto()
     LAST_NUMBER = auto()
@@ -16,6 +32,8 @@ class AnswerPattern(Enum):
 
 
 class ErrorType(Enum):
+    """Failure modes encountered while extracting or executing an answer."""
+
     NO_NUMBER = auto()  # for textual answers - when a number could not be extracted
     NO_FUNCTION = auto()  # failed to extract function definition
     SYNTAX_ERROR = auto()  # function definition extracted, but has invalid syntax
@@ -54,6 +72,8 @@ SAFE_IMPORTS = {
 
 
 class AnswerExtractor:
+    """Extract answers from either textual model outputs or generated code."""
+
     _number_pattern_str = r'-?\d+(?:\.\d+)?'
     _import_pattern = re.compile(r'\s*(from \w+ )?import \w+')
 
@@ -75,21 +95,29 @@ class AnswerExtractor:
     BABBLER_TOKENS = ("Q:", "Question:")  # when model moves on to generating a next question
 
     def __init__(self, code: bool = False):
-        self._extraction_method = self.extract_answer_code if code else self.extract_answer_textual
+        """Create an extractor configured for textual or code-based answers."""
+
+        self._code = code
 
     def extract_answer(self, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType | None]:
-        """
-        Extract numerical answer from text.
-        Looks for patterns like "#### NUMBER" or "The (final) answer is NUMBER"
-        """
+        """Extract a numeric answer and report the extraction pattern or error."""
 
-        res, answer_pattern_or_error_type = self._extraction_method(text)
+        res, answer_pattern_or_error_type = (
+            self.extract_answer_code(text) if self._code else self.extract_answer_textual(text)
+        )
         if res is None:
             logger.warning(f"-> Could not extract answer from model response:\n{text}")
         return res, answer_pattern_or_error_type
 
     @classmethod
     def extract_answer_textual(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
+        """Extract a numeric answer from plain-text model output.
+
+        The extractor trims any babbler suffix, checks a small set of common
+        answer formats, and finally falls back to the last number found in the
+        response.
+        """
+
         if not text:
             logger.warning("The response is empty")
             return None, ErrorType.EMPTY_RESPONSE
@@ -120,6 +148,8 @@ class AnswerExtractor:
 
     @classmethod
     def check_extracted_func(cls, func_def: str):
+        """Return True when a candidate function contains a forbidden construct."""
+
         for s in cls.FORBIDDEN_ITEMS:
             if (m := s.search(func_def)) is not None:
                 logger.warning(f"Potentially dangerous string ('{m.group()}') found in the extracted function")
@@ -128,6 +158,14 @@ class AnswerExtractor:
 
     @classmethod
     def extract_function_definition(cls, text: str) -> tuple[str, str]:
+        """Extract a function definition from generated code-like text.
+
+        If the model only produced a function body, a `def solution():` header
+        is prepended before parsing. Import lines are removed because the code
+        execution environment already exposes a safe import allowlist, and any
+        post-function text is discarded.
+        """
+
         text = cls.trim_response(text)
 
         text = "def solution():\n" + text
@@ -156,6 +194,8 @@ class AnswerExtractor:
 
     @classmethod
     def extract_answer_code(cls, text: str) -> tuple[float | int | None, AnswerPattern | ErrorType]:
+        """Extract an answer by parsing and executing generated code."""
+
         func_def, func_name = cls.extract_function_definition(text)
 
         res, answer_pattern_or_error_type, issue = cls.try_running_function(func_def, func_name)
@@ -167,6 +207,8 @@ class AnswerExtractor:
 
     @classmethod
     def try_running_function(cls, func_def: str, func_name: str):
+        """Run an extracted function and normalize non-numeric outcomes."""
+
         if not func_def:
             return None, ErrorType.NO_FUNCTION, "Failed to find valid function definition in text"
 
@@ -184,6 +226,13 @@ class AnswerExtractor:
 
     @classmethod
     def run_extracted_function(cls, func_def: str, func_name: str = 'solution') -> tuple[Any, AnswerPattern | ErrorType, str]:
+        """Execute extracted code in a restricted namespace.
+
+        The allowlisted namespace is intentionally small. Syntax and runtime
+        errors are mapped to `ErrorType` values so callers can report them in a
+        structured way.
+        """
+
         if cls.check_extracted_func(func_def):
             return None, ErrorType.FORBIDDEN_STRING, "Extracted function uses a forbidden string"
 
@@ -210,7 +259,7 @@ class AnswerExtractor:
 
     @classmethod
     def trim_response(cls, text: str) -> str:
-        """'Trim' model response to the appearance of a babbler token - if any."""
+        """Truncate a model response at the first babbler token, if present."""
 
         for bt in cls.BABBLER_TOKENS:
             idx = text.find(bt)
