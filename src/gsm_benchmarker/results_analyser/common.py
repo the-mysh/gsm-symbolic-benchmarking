@@ -43,10 +43,10 @@ def do_for_metrics(func):
 
 
 class GLMMRunner:
-    def __init__(self, key_term: str):
-        self._formula = f'is_correct ~ {key_term} + (1 | id)'
-        self._key_term = key_term
-        self._labels = list(set(set(re.findall(r"[\w\:]+", key_term))))
+    def __init__(self, fixed_effects_term: str, random_effects_term: str = "(1 | id)"):
+        self._formula = f'is_correct ~ {fixed_effects_term} + {random_effects_term}'
+        self._fixed_effects_term = fixed_effects_term
+        self._labels = list(set(set(re.findall(r"[\w\:]+", fixed_effects_term))))
 
     def fit_df(self, df: pd.DataFrame):
         glmm_model = glmer(
@@ -72,12 +72,12 @@ class GLMMRunner:
 
     def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
         if len(self._labels) > 1:
-            raise RuntimeError("Cannot automatically prep df with multiple labels")
+            raise RuntimeError("Cannot automatically prep df with multiple fixed effects")
 
         def _prep(label_value: bool, ra: "MultiModelResultsAnalyser"):
             res = ra.full_data
             res = res[['model', 'id', metric]][:]
-            res[self._key_term] = [label_value] * len(res)
+            res[self._fixed_effects_term] = [label_value] * len(res)
             res['is_correct'] = res[metric].astype(int)
             res = res.drop(metric, axis=1)
             return res
