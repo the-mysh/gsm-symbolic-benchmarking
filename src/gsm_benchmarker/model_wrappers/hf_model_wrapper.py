@@ -1,3 +1,9 @@
+"""HuggingFace model wrapper for local inference.
+
+Provides HFModelWrapper for loading and running HuggingFace transformer models
+locally with support for CUDA acceleration, quantization, and memory management.
+"""
+
 import logging
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, StoppingCriteriaList
 from huggingface_hub import scan_cache_dir
@@ -12,7 +18,23 @@ logger = logging.getLogger(__name__)
 
 
 class HFModelWrapper(BaseModelWrapper):
+    """Wrapper for HuggingFace transformer models running locally.
+
+    Handles model and tokenizer loading, GPU/CPU placement, quantization,
+    and inference with custom stopping criteria to prevent model from
+    generating new questions.
+    """
     def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig):
+        """Initialize the HuggingFace model wrapper.
+
+        Loads the tokenizer and model according to compute configuration
+        (CUDA with optional 4-bit quantization or CPU). Sets up stopping
+        criteria to prevent generation of new questions.
+
+        Args:
+            model_spec: Model identifier or SingleModelConfig.
+            config: Benchmark configuration (memory, dtype, quantization, etc.).
+        """
         super().__init__(model_spec, config)
 
         logger.info(f"Setting up model {self.model_name}")
@@ -27,6 +49,17 @@ class HFModelWrapper(BaseModelWrapper):
         ])
 
     def _load_tokeniser(self, config: BenchmarkConfig):
+        """Load the model's tokenizer.
+
+        Applies extra kwargs from model config, sets padding token,
+        and configures left-padding for batched generation.
+
+        Args:
+            config: Benchmark configuration.
+
+        Returns:
+            The loaded and configured tokenizer.
+        """
         logger.debug("Loading tokeniser")
         
         extras = self._model_spec.extra_kwargs_tokeniser_init
@@ -52,6 +85,14 @@ class HFModelWrapper(BaseModelWrapper):
         return tokeniser
 
     def _load_model(self, config: BenchmarkConfig):
+        """Load the model, choosing CUDA or CPU strategy.
+
+        Args:
+            config: Benchmark configuration.
+
+        Returns:
+            The loaded model.
+        """
         if torch.cuda.is_available():
             logger.debug("CUDA available")
             model = self._load_model_cuda(config=config)
@@ -62,6 +103,20 @@ class HFModelWrapper(BaseModelWrapper):
         return model
 
     def _load_model_cuda(self, config: BenchmarkConfig):
+        """Load model on GPU with optional 4-bit quantization.
+
+        Configures device placement using either 'auto' (if gpu_auto=True)
+        or explicit GPU index with memory limits.
+
+        Args:
+            config: Benchmark configuration (quantization, dtype, device mapping).
+
+        Returns:
+            The model loaded on GPU.
+
+        Raises:
+            RuntimeError: If GPU index is None when gpu_auto is False.
+        """
         logger.debug("Loading model with CUDA")
         extras = self._model_spec.extra_kwargs_model_init or {}
         if extras:
@@ -106,6 +161,14 @@ class HFModelWrapper(BaseModelWrapper):
         return model
 
     def _load_model_cpu(self, config: BenchmarkConfig):
+        """Load model on CPU only.
+
+        Args:
+            config: Benchmark configuration.
+
+        Returns:
+            The model loaded on CPU.
+        """
         logger.debug("Loading model for CPU only")
         
         extras = self._model_spec.extra_kwargs_model_init
@@ -123,7 +186,18 @@ class HFModelWrapper(BaseModelWrapper):
         return model
 
     def ask(self, prompt: str) -> str:
-        """Generate response from model"""
+        """Generate a response using the model.
+
+        Tokenizes the prompt, generates tokens with configured parameters
+        (temperature, max_new_tokens, stopping criteria), and returns
+        only the generated portion.
+
+        Args:
+            prompt: The input prompt.
+
+        Returns:
+            The model's generated response.
+        """
         inputs = self.tokeniser(
             prompt,
             return_tensors="pt",
@@ -151,6 +225,11 @@ class HFModelWrapper(BaseModelWrapper):
         return generated_text
     
     def delete_from_cache(self):
+        """Delete the model and tokenizer from HuggingFace cache.
+
+        Cleans up GPU/CPU memory and removes cached model files to reduce
+        storage usage.
+        """
         del self.model
         del self.tokeniser
 

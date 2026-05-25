@@ -1,3 +1,10 @@
+"""API-based model wrapper for remote inference.
+
+Provides APIModelWrapper for unified access to cloud-hosted models via
+OpenAI, Anthropic, and Google Gemini APIs. Handles provider-specific
+client setup and inference interfaces.
+"""
+
 import logging
 from typing import Callable
 
@@ -30,7 +37,25 @@ from gsm_benchmarker.model_wrappers.base_model_wrapper import BaseModelWrapper
 
 
 class APIModelWrapper(BaseModelWrapper):
+    """Wrapper for API-based models (OpenAI, Anthropic, Google Gemini).
+
+    Provides a unified inference interface for cloud-hosted models by
+    abstracting away provider-specific API details. Routes to appropriate
+    client setup based on model configuration.
+    """
     def __init__(self, model_spec: str | SingleModelConfig, config: BenchmarkConfig, api_type: APIType | None = None):
+        """Initialize the API model wrapper.
+
+        Args:
+            model_spec: Model identifier or SingleModelConfig. If string,
+                api_type must be explicitly provided.
+            config: Benchmark configuration (temperature, max_tokens, etc.).
+            api_type: Optional override for the API type. Uses model_spec's
+                api_type if not provided.
+
+        Raises:
+            RuntimeError: If model_spec is a string and api_type is None.
+        """
         if isinstance(model_spec, str) and api_type is None:
             raise RuntimeError(f"api_type must be specified for {self.__class__.__name__} either through model spec "
                                f"(given as a SingleModelConfig object) or through api_type arg; got neither")
@@ -43,6 +68,18 @@ class APIModelWrapper(BaseModelWrapper):
         self._client_interface = self._setup_client(self.config)
 
     def _setup_client(self, config: BenchmarkConfig) -> Callable[[str], str]:
+        """Set up the appropriate API client based on model config.
+
+        Args:
+            config: Benchmark configuration.
+
+        Returns:
+            A callable that takes a prompt and returns the API response.
+
+        Raises:
+            TypeError: If api_type is not an APIType enum member.
+            ValueError: If api_type is not recognized.
+        """
         api_type = self._model_spec.api_type
         if not isinstance(api_type, APIType):
             raise TypeError(f"Expected an APIType enum member; got {type(api_type)}: {api_type}")
@@ -62,6 +99,18 @@ class APIModelWrapper(BaseModelWrapper):
 
     @staticmethod
     def _setup_openai(model_spec: SingleModelConfig, config: BenchmarkConfig) -> Callable[[str], str]:
+        """Set up OpenAI API client.
+
+        Args:
+            model_spec: Model configuration with api model name.
+            config: Benchmark configuration.
+
+        Returns:
+            A callable that queries the OpenAI API.
+
+        Raises:
+            ImportError: If openai package is not installed.
+        """
         if openai is None:
             raise ImportError("openai package not installed")
 
@@ -79,6 +128,18 @@ class APIModelWrapper(BaseModelWrapper):
 
     @staticmethod
     def _setup_anthropic(model_spec: SingleModelConfig, config: BenchmarkConfig) -> Callable[[str], str]:
+        """Set up Anthropic (Claude) API client.
+
+        Args:
+            model_spec: Model configuration with Claude model name.
+            config: Benchmark configuration.
+
+        Returns:
+            A callable that queries the Anthropic API.
+
+        Raises:
+            ImportError: If anthropic package is not installed.
+        """
         if anthropic is None:
             raise ImportError("anthropic package not installed")
 
@@ -95,6 +156,18 @@ class APIModelWrapper(BaseModelWrapper):
 
     @staticmethod
     def _setup_google_genai(model_spec: SingleModelConfig, config: BenchmarkConfig) -> Callable[[str], str]:
+        """Set up Google Gemini API client.
+
+        Args:
+            model_spec: Model configuration with Gemini model name.
+            config: Benchmark configuration.
+
+        Returns:
+            A callable that queries the Google Gemini API.
+
+        Raises:
+            ImportError: If google-genai package is not installed.
+        """
         if genai is None:
             raise ImportError("google-genai package not installed")
 
@@ -117,4 +190,12 @@ class APIModelWrapper(BaseModelWrapper):
 
 
     def ask(self, prompt: str) -> str:
+        """Generate a response using the API.
+
+        Args:
+            prompt: The input prompt.
+
+        Returns:
+            The API model's response.
+        """
         return self._client_interface(prompt)
