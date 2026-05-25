@@ -2,9 +2,10 @@
 
 Reproducing and extending GSM-Symbolic benchmark. 
 
-See [notebooks](./notebooks), in particular [this one](./notebooks/full_results.ipynb) for analysis of results.
+See [notebooks](./notebooks), in particular [this one](./notebooks/full_results.ipynb), for analysis of results.
 
 Benchmarking script with configurable options available [here](./src/gsm_benchmarker/scripts/benchmark.py).
+
 See [resources](./src/gsm_benchmarker/resources) for definitions of alternative prompt formats used in this study.
 Prompt formats usage examples shown [in this notebook](./notebooks/prompting_experiments.ipynb) 
 (note: requires an `.env` file containing `HUGGINGFACEHUB_API_TOKEN` and `HF_HOME` present in the execution directory).
