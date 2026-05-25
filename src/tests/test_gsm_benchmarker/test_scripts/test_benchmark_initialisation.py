@@ -12,7 +12,6 @@ from gsm_benchmarker.scripts.benchmark import (
     choose_dataset_variants,
     get_paths,
     make_config,
-    make_parser,
 )
 
 
@@ -212,6 +211,7 @@ def test_make_config_no_preset_with_max_memories(mock_external_deps):
         cpu_max_memory=100, # max_ram is mapped
         gpu_max_memory=30,  # max_vram is mapped
         gpu_index=1,
+        use_4bit=False,
     )
     MockConfig.for_machine.assert_not_called()
 
@@ -231,6 +231,7 @@ def test_make_config_no_preset_no_gpu(mock_external_deps):
         trust_remote_code_global=True,
         cpu_max_memory=50,
         gpu_index=None, # Should be None due to no_gpu=True
+        use_4bit=False,
     )
 
 
@@ -265,6 +266,7 @@ def test_make_config_with_preset_and_margins(mock_external_deps):
     assert call_kwargs['vram_margin'] == 4
     assert call_kwargs['gpu_index'] == 0
     assert call_kwargs['trust_remote_code_global'] == True
+    assert call_kwargs['use_4bit'] is False
 
     MockConfig.assert_not_called() # Should not call the constructor
 
@@ -290,6 +292,7 @@ def test_make_config_with_preset_and_max_memories(mock_external_deps):
     # max_ram/max_vram should be mapped to cpu_max_memory/gpu_max_memory in kwargs
     assert call_kwargs['cpu_max_memory'] == 100
     assert call_kwargs['gpu_max_memory'] == 30
+    assert call_kwargs['use_4bit'] is False
 
     # Margin args should be absent since they were None in pargs
     assert 'ram_margin' not in call_kwargs
@@ -311,3 +314,4 @@ def test_make_config_with_preset_no_gpu(mock_external_deps):
 
     # gpu_index should be explicitly set to None
     assert call_kwargs['gpu_index'] is None
+    assert call_kwargs['use_4bit'] is False

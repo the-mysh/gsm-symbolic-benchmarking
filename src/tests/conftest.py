@@ -31,12 +31,11 @@ def shot_manager():
 
 
 @pytest.fixture
-def mock_shot_manager(mocker):
-    mocker.patch(
+def mock_shot_manager(monkeypatch):
+    monkeypatch.setattr(
         "gsm_benchmarker.input_data_management.shot_manager.load_resource_json",
-        return_value=MOCK_8SHOT_DATA
+        lambda *args, **kwargs: MOCK_8SHOT_DATA,
     )
 
-    # 2. Instantiate and return the object that uses the patched function
     manager = GSMShotManager()
     return manager
