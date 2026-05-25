@@ -1,3 +1,10 @@
+"""Dataset loading and management for GSM-Symbolic.
+
+Provides GSMSymbolicDataset to load the GSM-Symbolic dataset from HuggingFace
+Hub with support for multiple variants and instance-based filtering for
+reproducible evaluation sets.
+"""
+
 import logging
 from datasets import load_dataset, Dataset
 from enum import Enum, auto
@@ -13,7 +20,19 @@ logger = logging.getLogger(__name__)
 
 
 class GSMSymbolicDataset:
-    """Handler for GSM-Symbolic dataset from HuggingFace"""
+    """Handler for GSM-Symbolic dataset from HuggingFace Hub.
+
+    The GSM-Symbolic dataset provides mathematical problem-solving examples
+    with multiple perturbations (variants) for testing robustness:
+
+    * **main**: Original GSM-Symbolic perturbed problems (5000 examples, 50 templates)
+    * **p1**: Perturbation type 1 variations
+    * **p2**: Perturbation type 2 variations
+    * **GSM8K**: Original GSM8K baseline problems (100 examples from main instances)
+
+    Instances group problems by template, enabling reproducible evaluation sets
+    where each set contains up to 100 examples (one per template).
+    """
 
     DSET_NAME = "apple/GSM-Symbolic"
     MAX_SETS = 50
@@ -28,8 +47,7 @@ class GSMSymbolicDataset:
         test = auto()
 
     def __init__(self, variant: Variant, split: Split = Split.test):
-        """
-        Load GSM-Symbolic dataset
+        """Load GSM-Symbolic dataset
 
         Args:
             variant: Dataset variant - 'main' (default) / 'p1' / 'p2' / 'GSM8K' (constructed from 'main').
