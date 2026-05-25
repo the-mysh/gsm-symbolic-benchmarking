@@ -1,13 +1,14 @@
 from pathlib import Path
 import pandas as pd
-from IPython.display import display
 from dataclasses import dataclass
 import numpy as np
 from functools import cached_property
+from statsmodels.stats.multitest import multipletests
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.prompt_effect_analyser import PromptEffectAnalyser
-from gsm_benchmarker.results_analyser.plotting_utils import plot_glmm, plot_acc_change_distribution, Colour
+from gsm_benchmarker.results_analyser.plotting_utils import (plot_glmm, plot_acc_change_distribution, Colour,
+                                                             plot_prompt_comparison, plot_prompt_acc_evolution)
 from gsm_benchmarker.results_analyser.utils import pandas_to_latex, correct_p_values
 
 
@@ -18,7 +19,7 @@ class PromptResult:
     full_label: str
     short_label: str | None = None
     models: list[str] | None = None
-    metric: str | None = None
+    metric: str = None
     save_dest: Path | None = None
     mres: MultiVariantMultiModelResultsAnalyser = None
     baseline: MultiVariantMultiModelResultsAnalyser | None = None
@@ -37,9 +38,7 @@ class PromptResult:
 
     @cached_property
     def variant_effect(self) -> pd.DataFrame:
-        assert self.mres is not None
-        return self.mres.analyse_variant_effect(
-            variant='main', metric=self.metric, models=self.models)
+        return self.mres.analyse_variant_effect(variant='main', metric=self.metric, models=self.models)
 
     def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
         df = self.variant_effect.copy()
@@ -195,3 +194,98 @@ class PromptResult:
         if self.models:
             df = df[[col for col in df.columns if col in self.models]]
         return df
+
+
+class MultiPromptResult:
+    def __init__(self, prompt_results: dict[str, PromptResult], save_prefix=None):
+        self.prompt_results = prompt_results
+        self.summary = pd.concat(
+            [r.summary() for r in prompt_results.values()],
+            keys=[r.short_label for r in prompt_results.values()],
+            names=['prompt', 'quantity']
+        )
+        self.save_prefix = save_prefix
+
+    def plot_prompt_comparison(self, models: list[str] | None = None, **kwargs):
+        fig = plot_prompt_comparison(
+            self.summary,
+            colours={r.short_label: r.colour.lighten(factor=0.3).value for r in self.prompt_results.values()},
+            models=models,
+            save_prefix=self.save_prefix,
+            **kwargs
+        )
+        return fig
+
+    def plot_prompt_acc_evolution(self, models: list[str] | None = None, **kwargs):
+        fig = plot_prompt_acc_evolution(
+            self.summary,
+            colours={r.short_label: r.colour.value for r in self.prompt_results.values()},
+            models=models,
+            save_prefix=self.save_prefix,
+            **kwargs
+        )
+        return fig
+
+    def number_effect_to_latex(self, v="number_effect", models: list[str] | None = None):
+        def get_q(name):
+            return self.summary[models].xs(name, level='quantity').T
+
+        odds_ratios = get_q(f'{v}_or')
+        p_values = get_q(f'{v}_p_value')
+        p_values_corrected = p_values.apply(
+            lambda col: multipletests(col, alpha=0.05, method='holm')[1],
+            axis=1,
+            result_type='broadcast'
+        )
+
+        # Create an empty DataFrame with the same shape
+        df_combined = pd.DataFrame(index=odds_ratios.index, columns=odds_ratios.columns)
+
+        # Iterate and apply formatting
+        for col in df_combined.columns:
+            for idx in df_combined.index:
+                df_combined.at[idx, col] = self.format_cell(
+                    odds_ratios.at[idx, col],
+                    p_values.at[idx, col],
+                    p_values_corrected.at[idx, col]
+                )
+
+        # Calculate column format: 'l' for index, 'c' for each column
+        col_format = "l" + "c" * len(df_combined.columns)
+
+        # Export to LaTeX. escape=False is crucial here so pandas doesn't break our LaTeX tags.
+        latex_table = df_combined.to_latex(
+            escape=False,
+            column_format=col_format,
+            caption="Odds ratios and significance of the number effect across models and prompt formats. Formatted as: Odds Ratio \\\\ Raw $p$ / Corrected $p$.",
+            label="tab:number_effect_odds",
+        )
+
+        print(latex_table)
+
+    @staticmethod
+    def format_p_value(p):
+        """Formats a single p-value according to the rules."""
+        # Check if p-value is less than 0.001
+        if p < 0.001:
+            # Use math mode for the less-than sign in LaTeX
+            base_str = r"$< \delta$"
+        else:
+            # Format to 3 decimal places
+            base_str = f"{p:.3f}"
+
+        # Apply bold if under 0.05 threshold
+        if p < 0.05:
+            return f"\\textbf{{{base_str}}}"
+
+        return base_str
+
+    @staticmethod
+    def format_cell(or_val, p_raw, p_corr):
+        """Combines OR, raw p, and corrected p into a LaTeX makecell string."""
+        or_str = f"{or_val:.2f}"
+        p_raw_str = MultiPromptResult.format_p_value(p_raw)
+        p_corr_str = MultiPromptResult.format_p_value(p_corr)
+
+        # \\\\ tells makecell to break the line inside the table cell
+        return f"\\makecell{{{or_str} \\\\ {p_raw_str} / {p_corr_str}}}"
