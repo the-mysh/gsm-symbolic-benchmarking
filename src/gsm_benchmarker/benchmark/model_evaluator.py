@@ -1,3 +1,9 @@
+"""Model evaluation framework.
+
+Provides ModelEvaluator for running a single model across one or more datasets,
+handling prompt creation, inference, and answer extraction.
+"""
+
 import os
 import traceback
 from tqdm.auto import tqdm
@@ -12,7 +18,6 @@ from time import time
 from gsm_benchmarker.benchmark.benchmark_config import BenchmarkConfig
 from gsm_benchmarker.benchmark.answer_extractor import AnswerExtractor
 from gsm_benchmarker.model_wrappers.models_config_parser import SingleModelConfig
-from gsm_benchmarker.input_data_management.shot_manager import GSMShotManager
 from gsm_benchmarker.utils.path_ops import confirm_or_create_folder, make_name_path_friendly, remove_intermediate_results_folder
 from gsm_benchmarker.model_wrappers import APIModelWrapper, HFModelWrapper, BaseModelWrapper
 from gsm_benchmarker.input_data_management.prompt_config import PromptConfig
@@ -24,10 +29,24 @@ logger = logging.getLogger(__name__)
 
 
 class ModelEvaluator:
-    """Evaluate models using HuggingFace transformers"""
+    """Evaluate a single model on one or more datasets.
+
+    The ModelEvaluator manages the complete evaluation lifecycle for a model:
+    (1) loading the model wrapper (HF or API), (2) creating prompts, (3) running
+    inference, (4) extracting answers, and (5) comparing against ground truth.
+    It supports both single-dataset and batch evaluations with intermediate
+    storage for robustness.
+    """
 
     def __init__(self, model_spec: SingleModelConfig, config: BenchmarkConfig,
                  prompt_config: PromptConfig | None = None):
+        """Initialize the model evaluator.
+
+        Args:
+            model_spec: Configuration specifying the model to load.
+            config: Benchmark configuration (memory, inference params, etc.).
+            prompt_config: Prompt format configuration (uses defaults if None).
+        """
         self.model_wrapper = self._make_model_wrapper(model_spec, config)
         self.prompt_config = prompt_config or PromptConfig.default()
         self.answer_extractor = AnswerExtractor(code=self.prompt_config.code_type_answer)
@@ -50,22 +69,34 @@ class ModelEvaluator:
         return make_name_path_friendly(self.model_name)
 
     def create_prompt(self, question: str) -> str:
-        """Create 8-shot CoT prompt following paper's format (and possibly other specs)."""
+        """Create a few-shot prompt with the question appended.
+
+        Formats the question using the configured prompt template and
+        shot examples.
+
+        Args:
+            question: The problem question to include in the prompt.
+
+        Returns:
+            Full prompt text ready for model inference.
+        """
 
         return self.prompt_config(question)
 
     def evaluate_dataset(self, dataset: Dataset, leave_progressbar: bool = True) -> pd.DataFrame:
-        """
-        Evaluate model on a dataset
+        """Evaluate model on a single dataset.
+
+        For each example, generates a prompt, runs inference, extracts the answer,
+        and compares against ground truth.
 
         Args:
-            dataset             :   A Dataset of examples to evaluate.
-                                    Required fields: 'question', 'answer', 'numerical_result'.
-            leave_progressbar   :   If True, let the shown progress bar remain on the screen after completion.
-                                    Otherwise, remove it when done.
+            dataset: A Dataset of examples. Required fields: 'question', 'answer',
+                'numerical_result'.
+            leave_progressbar: If True, leave the progress bar visible after completion.
 
         Returns:
-            Pandas DataFrame with detailed results, including all columns from the dataset.
+            DataFrame with all dataset columns plus: predicted_numerical_result,
+            correct, detected_result_pattern, full_response, inference_time.
         """
 
         results = []
@@ -105,7 +136,24 @@ class ModelEvaluator:
             remove_intermediate_results: bool = True,
             leave_progressbar: bool = True,
         ) -> tuple[pd.DataFrame | None, list[Exception]]:
-        """Evaluate model on a set of datasets. Return results in a combined dataframe."""
+        """Evaluate model on multiple datasets and combine results.
+
+        Evaluates the model on each dataset separately, optionally storing
+        intermediate results for each. Returns a combined DataFrame or None
+        if all evaluations fail.
+
+        Args:
+            datasets: List of datasets to evaluate.
+            intermediate_storage_path: Directory to store intermediate results
+                (one parquet per dataset), or None to skip.
+            remove_intermediate_results: If True, delete intermediate storage
+                after combining results.
+            leave_progressbar: If True, leave progress bars visible.
+
+        Returns:
+            Tuple of (combined_results_dataframe, list_of_exceptions). The
+            combined_results_dataframe is None if all evaluations fail.
+        """
 
         if intermediate_storage_path is None:
             logger.debug("No intermediate storage path provided; intermediate results will not be stored")
@@ -142,7 +190,7 @@ class ModelEvaluator:
     def _establish_storage_dir(self, storage_path: Path | str) -> Path:
         storage_path = confirm_or_create_folder(storage_path)
 
-        results_folder = f"{self.path_friendly_model_name}_{datetime.now().strftime("%Y%m%d_%H%M%S")}"
+        results_folder = f"{self.path_friendly_model_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         full_storage_path = storage_path/results_folder
         logger.debug(f"Creating folder for results from current execution: {full_storage_path}")
         os.makedirs(full_storage_path)

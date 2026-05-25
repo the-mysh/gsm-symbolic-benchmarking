@@ -1,3 +1,10 @@
+"""Benchmark runner orchestration.
+
+Provides the main BenchmarkRunner class that coordinates multi-model evaluation
+across dataset variants. Manages model loading, answer extraction, results
+storage, and error tracking.
+"""
+
 import numpy as np
 import logging
 import pandas as pd
@@ -7,8 +14,6 @@ from functools import cached_property
 from dataclasses import dataclass
 import traceback
 from datasets import Dataset
-import socket
-import json
 from time import time
 
 from gsm_benchmarker.input_data_management.dataset_wrapper import GSMSymbolicDataset
@@ -24,6 +29,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelLoadingFailure:
+    """Failure record when a model cannot be loaded.
+
+    Attributes:
+        model: Name of the model that failed to load.
+        exception: The exception that occurred.
+        exception_traceback: Full traceback of the error.
+    """
     model: str
     exception: Exception
     exception_traceback: str
@@ -31,6 +43,14 @@ class ModelLoadingFailure:
 
 @dataclass
 class EvaluationFailure:
+    """Failure record when evaluating a model on a dataset variant.
+
+    Attributes:
+        model: Name of the model being evaluated.
+        variant: Name of the dataset variant.
+        exception: The exception that occurred.
+        exception_traceback: Full traceback of the error.
+    """
     model: str
     variant: str
     exception: Exception
@@ -38,6 +58,15 @@ class EvaluationFailure:
 
 
 class BenchmarkRunner:
+    """Orchestrate multi-model evaluation across dataset variants.
+
+    The BenchmarkRunner coordinates the complete evaluation pipeline:
+    (1) loading models, (2) evaluating each model on each dataset variant,
+    (3) extracting and comparing answers, (4) storing results, and (5)
+    tracking failures. It manages intermediate storage for robustness and
+    generates summary reports.
+    """
+
     def __init__(
             self,
             models: list[str | SingleModelConfig],
@@ -46,6 +75,15 @@ class BenchmarkRunner:
             config: BenchmarkConfig | None = None,
             prompt_config: PromptConfig | None = None
     ):
+        """Initialize the benchmark runner.
+
+        Args:
+            models: List of model names or SingleModelConfig objects to evaluate.
+            dset_variants: List of dataset variants to test.
+            storage_path: Path to store intermediate and final results.
+            config: Benchmark configuration (uses defaults if None).
+            prompt_config: Prompt configuration (uses defaults if None).
+        """
 
         self._models = models
         self._dset_variants = dset_variants
@@ -98,6 +136,17 @@ class BenchmarkRunner:
 
     def load_datasets(self, n_sets: int | None = None, n_per_set: int | None = None
                       ) -> tuple[dict[GSMSymbolicDataset.Variant, list[Dataset]], dict[GSMSymbolicDataset.Variant, str]]:
+        """Load all specified dataset variants as evaluation sets.
+
+        Args:
+            n_sets: Number of evaluation sets to create per variant (None = all).
+            n_per_set: Number of examples per set (None = default).
+
+        Returns:
+            Tuple of (datasets_dict, dataset_names_dict) where datasets_dict maps
+            variants to lists of Dataset objects, and dataset_names_dict maps
+            variants to human-readable names.
+        """
 
         dsets = {}
         dset_names = {}
@@ -112,7 +161,15 @@ class BenchmarkRunner:
         return dsets, dset_names
 
     @staticmethod
-    def format_time_diff(td: float):
+    def format_time_diff(td: float) -> str:
+        """Format a time duration into a human-readable HH:MM:SS string.
+
+        Args:
+            td: Time delta in seconds.
+
+        Returns:
+            Formatted string like "1:23:45" or "12:30" if < 1 hour.
+        """
         minutes, seconds = divmod(td, 60)
         hours, minutes = divmod(minutes, 60)
 
@@ -120,6 +177,19 @@ class BenchmarkRunner:
 
     def run(self, n_sets: int | None = None, n_per_set: int | None = None,
             remove_intermediate_results: bool = True) -> dict[GSMSymbolicDataset.Variant, dict[str, pd.DataFrame]]:
+        """Execute the benchmark: evaluate all models on all dataset variants.
+
+        For each model, loads it once, then evaluates it on each dataset variant.
+        Results are stored incrementally; failures are tracked separately.
+
+        Args:
+            n_sets: Number of evaluation sets to create per variant (None = all).
+            n_per_set: Number of examples per set (None = default).
+            remove_intermediate_results: If True, delete intermediate storage after completion.
+
+        Returns:
+            Dictionary mapping (variant -> (model_name -> results_dataframe)).
+        """
 
         tt = time()   # t0 for total evaluation time
 
@@ -218,6 +288,11 @@ class BenchmarkRunner:
         logger.debug(f"Model x variant results stored to: {fname}")
 
     def summarise_results(self) -> pd.DataFrame:
+        """Aggregate accuracy metrics across all models and variants.
+
+        Returns:
+            DataFrame with columns ['variant', 'model', 'accuracy'].
+        """
         summaries = []
         for variant_name, variant_results in self._results.items():
             for model_name, result in variant_results.items():
@@ -233,6 +308,11 @@ class BenchmarkRunner:
         return pd.DataFrame(summaries)
 
     def summarise_failures(self) -> str:
+        """Generate a human-readable report of model loading and evaluation failures.
+
+        Returns:
+            Summary string listing each failure with model/variant and exception details.
+        """
         if not self._failures:
             return "No evaluation/model loading failures recorded"
 
