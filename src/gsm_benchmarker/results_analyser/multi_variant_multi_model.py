@@ -1,3 +1,11 @@
+"""Analysis helpers for collections of dataset variants across models.
+
+This module supports comparing a baseline dataset variant (GSM8K) with one or
+more GSM-Symbolic variants. It provides statistical tests (Wilcoxon,
+GLMM-based) and utilities for plotting transitions and number-counts that
+appear in questions.
+"""
+
 import os
 import logging
 import re
@@ -32,6 +40,14 @@ VARIANT_LABELS = {
 
 
 class MultiVariantMultiModelResultsAnalyser:
+    """Compare multiple dataset variants (GSM8K, main, p1, p2) across many models.
+
+    The class expects a directory where each subdirectory corresponds to a
+    dataset variant and contains per-model parquet results. The analyser can
+    compute accuracy deltas, run statistical tests and produce plots that
+    visualise transitions between baseline and variant results.
+    """
+
     VARIANT_NAME_PATTERN = re.compile(r"(?P<variant>\w+)_test")
     NUMBER_PATTERN = re.compile(r'\d+(?:\.\d+)?')
     BASELINE_VARIANT = 'GSM8K'
@@ -42,14 +58,17 @@ class MultiVariantMultiModelResultsAnalyser:
 
     @property
     def summary_data(self):
+        """Return the concatenated summary DataFrame for all variants."""
         return self._summary_data
 
     @property
     def variants(self):
+        """Return a mapping of variant name -> MultiModelResultsAnalyser."""
         return self._variants
 
     @property
     def models(self) -> list[str]:
+        """List of model identifiers present in the summary data."""
         return self._summary_data.index.tolist()
 
     @classmethod
@@ -94,6 +113,7 @@ class MultiVariantMultiModelResultsAnalyser:
                              f"- choose a different variant to compare it to")
 
     def get_accuracy_summary(self, variant: str, metric: str | None = None):
+        """Return a DataFrame with baseline and variant accuracies and their difference."""
         self._check_variant(variant)
 
         baseline_accuracies = self._variants[self.BASELINE_VARIANT].get_accuracies_per_model_and_template_id(metric=metric)
@@ -108,6 +128,11 @@ class MultiVariantMultiModelResultsAnalyser:
         return acc_data
 
     def get_baseline_comparison_df(self, variant: str, model: str | None = None):
+        """Return a merged DataFrame comparing variant rows to the baseline.
+
+        The returned DataFrame contains per-example rows with baseline columns
+        left-joined on model and template id.
+        """
         self._check_variant(variant)
 
         baseline_subset = self._variants[self.BASELINE_VARIANT].full_data[['model', 'id', 'correct', 'result_class']]
@@ -127,8 +152,10 @@ class MultiVariantMultiModelResultsAnalyser:
         return merged
 
     def run_gap_analysis(self, metric: str = 'correct', variant: str = 'main'):
-        """
-        Run one-tailed Wilcoxon signed-rank test (per model) to check whether accuracy drop is significant.
+        """Run one-sided Wilcoxon test per model to detect accuracy drops.
+
+        For each model, compute per-template mean scores and test whether the
+        baseline (GSM8K) score is significantly higher than the variant.
         """
 
         df_gsm8k = self._variants[self.BASELINE_VARIANT].full_data
@@ -204,6 +231,11 @@ class MultiVariantMultiModelResultsAnalyser:
         return percentages_matrix, labels_matrix
 
     def plot_baseline_transition_matrices(self, variant: str, subtitle: str | None = None, model: str | None = None):
+        """Plot heatmaps showing transitions between baseline and variant results.
+
+        Produces a pair of heatmaps for numerical correctness and result class
+        transitions. Returns a matplotlib Figure containing the two plots.
+        """
         df = self.get_baseline_comparison_df(variant, model=model)
 
         correct_tm, correct_labels = self._make_transition_matrix(df, [True, False], 'correct')
@@ -266,6 +298,11 @@ class MultiVariantMultiModelResultsAnalyser:
 
     @do_for_metrics
     def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None):
+        """Analyse the effect of a dataset variant on accuracy using GLMM.
+
+        Returns a DataFrame with GLMM coefficient estimates and p-values per
+        model. If R is not available an error is raised.
+        """
         models = self._validate_models(models, variant)
 
         if GLMMRunner is None:
@@ -319,6 +356,11 @@ class MultiVariantMultiModelResultsAnalyser:
 
     @do_for_metrics
     def analyse_number_effect(self, variant: str, metric: str, models: list[str] | None = None):
+        """Analyse the effect of numeric quantities in questions on correctness.
+
+        Fits a GLMM that includes a covariate derived from the log10 of numbers
+        appearing in the question text (sum of logs of integer tokens).
+        """
         if models is not None:
             models = self._validate_models(models, variant)
 

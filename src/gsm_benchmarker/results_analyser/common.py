@@ -1,3 +1,10 @@
+"""Common utilities used by result analysis tools.
+
+This module wraps R-based GLMM fitting logic and provides decorators used to
+run analysis for multiple metrics. It centralises helpers that are shared
+between different analyser classes.
+"""
+
 import pandas as pd
 import logging
 from typing import TYPE_CHECKING
@@ -21,12 +28,26 @@ logger = logging.getLogger(__name__)
 
 
 class GLMMFitError(RuntimeError):
+    """Raised when fitting a GLMM model fails at the R level.
+
+    The wrapper code intentionally captures R runtime errors and raises this
+    Python exception in cases where no R model object is available.
+    """
     pass
 
 
 METRIC_LABELS = {'correct': 'standard', 'correct_strict': 'discounted'}
 
+
 def do_for_metrics(func):
+    """Decorator to run an analysis function for multiple predefined metrics.
+
+    If the wrapped function is called with metric=None, it will be executed
+    for all metrics defined in METRIC_LABELS and the results concatenated into
+    a single DataFrame with a top-level index named 'metric'. If metric is
+    provided, the original function is called unchanged.
+    """
+
     def wrapper(*args, metric: str | None = None, **kwargs):
 
         if metric is None:
@@ -39,16 +60,32 @@ def do_for_metrics(func):
             return df_results
         else:
             return func(*args, metric=metric, **kwargs)
+
     return wrapper
 
 
 class GLMMRunner:
+    """Helper for fitting Generalised Linear Mixed Models (GLMMs) via R.
+
+    This class builds a glmer formula from a provided fixed effects term and
+    an optional random-effects term. It exposes convenience methods to prepare
+    data and run per-model fits, returning coefficients and p-values in a
+    pandas.DataFrame.
+    """
+
     def __init__(self, fixed_effects_term: str, random_effects_term: str = "(1 | id)"):
         self._formula = f'is_correct ~ {fixed_effects_term} + {random_effects_term}'
         self._fixed_effects_term = fixed_effects_term
         self._labels = list(set(set(re.findall(r"[\w\:]+", fixed_effects_term))))
 
     def fit_df(self, df: pd.DataFrame):
+        """Fit a GLMM on a prepared DataFrame and return coefficient table.
+
+        The DataFrame must be suitable for passing directly to pymer4.glmer
+        (i.e. contains the response and predictor columns used in the
+        formula). Returns the coefficients summary as a pandas.DataFrame.
+        """
+
         glmm_model = glmer(
             self._formula,
             data=df,
@@ -71,6 +108,14 @@ class GLMMRunner:
         return coefs_df
 
     def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
+        """Prepare a combined DataFrame for GLMM fitting from two analysers.
+
+        The `ras` mapping should map integer labels (e.g. 0, 1) to
+        MultiModelResultsAnalyser instances. The method extracts per-example
+        metric values and creates columns required by the GLMM (is_correct and
+        the fixed effect flag).
+        """
+
         if len(self._labels) > 1:
             raise RuntimeError("Cannot automatically prep df with multiple fixed effects")
 
@@ -87,6 +132,13 @@ class GLMMRunner:
         return df
 
     def run(self, df: pd.DataFrame, models: list[str] | None = None, simplify=False):
+        """Run per-model GLMM fits on data grouped by 'model'.
+
+        Returns a DataFrame with coefficient estimates and statistics for each
+        model. If `simplify` is True and there is only one variable in the
+        results, the returned DataFrame is simplified to have model as index.
+        """
+
         glmm_results = {}
 
         for model_name, group_df in df.groupby('model'):

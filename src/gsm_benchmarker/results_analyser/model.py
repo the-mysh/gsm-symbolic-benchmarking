@@ -1,3 +1,11 @@
+"""Single-model results loading and convenience accessors.
+
+This module provides a thin wrapper around a parquet results file, offering
+convenience methods to compute per-instance and per-template accuracies and
+to extract example rows. The wrapper also augments the raw results with a
+few derived columns (e.g. 'babbling', 'result_class').
+"""
+
 import logging
 import pandas as pd
 from pathlib import Path
@@ -10,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 class ModelResultsAnalyser:
+    """Load and analyse a single model's results file.
+
+    Parameters
+    ----------
+    file_path:
+        Path to a parquet file containing per-example results.
+    """
+
     def __init__(self, file_path: str | Path):
         self._file_path = Path(file_path)
 
@@ -24,7 +40,12 @@ class ModelResultsAnalyser:
 
     @staticmethod
     def _enhance_data(data):
-        """Insert additional information in the data."""
+        """Insert additional derived columns into the results DataFrame.
+
+        Adds boolean column 'babbling', stricter correctness 'correct_strict'
+        (which discounts babbling answers) and a categorical 'result_class'
+        labeling each example as CORRECT, BABBLING, INCORRECT, or FAILED.
+        """
 
         # add 'babbling' column
         def b(s: str) -> bool:
@@ -89,13 +110,22 @@ class ModelResultsAnalyser:
         return data.groupby(col).ok.mean() * 100
 
     def get_accuracy_per_instance(self, strict: bool = False) -> pd.Series:
+        """Return accuracy per instance number (in percent).
+
+        If strict is True, babbling answers are treated as incorrect.
+        """
+
         return self._get_accuracy_per('instance', strict=strict)
 
     def get_accuracy_per_template_id(self, strict: bool = False) -> pd.Series:
         return self._get_accuracy_per('id', strict=strict)
 
     def get_total_accuracy_and_std(self, strict: bool = False) -> tuple[float, float | None]:
-        """Compute mean of accuracies per set and the corresponding standard deviation (if more than 1 set)."""
+        """Compute mean accuracy and standard deviation across instances.
+
+        Returns (mean, std). If only a single instance is present, std is
+        returned as None.
+        """
 
         accuracies = self.get_accuracy_per_instance(strict=strict)
         mean_acc = float(accuracies.mean())
@@ -111,12 +141,23 @@ class ModelResultsAnalyser:
         return self.data.id.unique().tolist()
 
     def filter(self, **pairs: Any) -> pd.DataFrame:
+        """Filter the results DataFrame by equality of given column/value pairs.
+
+        Example: filter(model='gemma-2-2b', id=12)
+        """
+
         df = self._data
         for (column, value) in pairs.items():
             df = df[df[column] == value]
         return df
 
     def get_example(self, id: int, instance: int) -> dict[str, Any] | None:
+        """Return a single example (row) for a given template id and instance.
+
+        Raises informative errors when the requested id or instance is not
+        present. Returns the row as a dictionary when found.
+        """
+
         df = self.filter(id=id, instance=instance)
 
         if not len(df):

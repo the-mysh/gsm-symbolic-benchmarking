@@ -1,3 +1,9 @@
+"""Plotting utilities used by the results analyser.
+
+This module provides a set of reusable plotting functions and small helper
+classes used for consistent visualisations across the benchmarking analysis.
+"""
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -13,7 +19,6 @@ from typing import NamedTuple
 import logging
 
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -23,8 +28,14 @@ VARIANT_COLOURS = {
 }
 
 
-
 def save_plot(*labels):
+    """Decorator to optionally save figures returned by a plotting function.
+
+    The decorated function can return one or more matplotlib Figure objects
+    (or other values). Figures are saved to disk using the provided labels
+    when `save_prefix` is passed to the call.
+    """
+
     def decorator(func):
         def wrapper(*args, save_prefix: str | Path | None = None, save_ext: str = "png", **kwargs):
             ret = func(*args, **kwargs)
@@ -54,6 +65,12 @@ def save_plot(*labels):
 
 
 class Colour:
+    """Small colour helper that stores a matplotlib colour and emits hex strings.
+
+    Provides convenience methods to lighten or darken a colour for aesthetic
+    variations in plots.
+    """
+
     def __init__(self, c: str):
         self._value = to_rgb(c)
 
@@ -87,6 +104,15 @@ class Colour:
 
 
 class SignificancePoint(NamedTuple):
+    """Descriptor for plotting significance legend entries.
+
+    Fields are:
+    - threshold: p-value threshold
+    - is_drop: whether the effect corresponds to a drop (True) or rise (False)
+    - colour: plotting colour
+    - label: text label template
+    """
+
     threshold: float | None
     is_drop: bool | None
     colour: str
@@ -109,6 +135,11 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          bar_colour: str | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None, value_label: str | None = None):
+    """Create side-by-side bar plots showing effect magnitude and p-values.
+
+    Returns a Figure containing two horizontally aligned subplots: the left
+    shows the magnitude (value_col) and the right the p-values for each model.
+    """
 
     bar_colour = bar_colour or 'teal'
 
@@ -165,6 +196,12 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
 
 def add_bar_labels(ax, precision: int = 3, fontsize: int = 7):
+    """Add numeric labels to bars in a matplotlib Axes.
+
+    The precision parameter controls formatting; precision==0 yields integer
+    labels, positive values produce fixed-point formatting and very small
+    numbers use scientific notation.
+    """
     if precision == 0:
         fmt = lambda v: f"{v:d}"
     elif precision > 0:
@@ -183,6 +220,11 @@ def add_bar_labels(ax, precision: int = 3, fontsize: int = 7):
 
 
 def plot_stats(cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None, title: str | None = None):
+    """Plot summary pie charts for improvement / deterioration statistics.
+
+    Returns a tuple (figure, transformed_dataframe) where the dataframe has the
+    counts used to create the plot.
+    """
     colors =['limegreen', 'indianred', 'lightsteelblue']
 
     cs['not significant'] = n_models - cs.significant
@@ -275,6 +317,11 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
 def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None,
                             model_order: list[str] | None = None, sort_models: bool = False,
                             title: str | None = None):
+    """Plot log odds ratios with 95% CI for each model.
+
+    Returns a tuple (figure, model_order) where model_order is the effective
+    order of models used to generate the plot.
+    """
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
         df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
@@ -327,6 +374,13 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
 
 
 def plot_for_metrics(func):
+    """Decorator that runs plotting functions separately for each metric level.
+
+    If the supplied DataFrame has a 'metric' level in its index, the wrapped
+    function will be executed once per-metric and return a list of figures.
+    Otherwise the function is called once with metric=None.
+    """
+
     def wrapper(df: pd.DataFrame, *args, **kwargs):
         save_prefix_in_kwargs = 'save_prefix' in kwargs and kwargs['save_prefix'] is not None
         save_prefix = kwargs.pop('save_prefix', None)
@@ -351,7 +405,11 @@ def plot_for_metrics(func):
 @plot_for_metrics
 def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, metric: str | None = None,
               bar_colour: str | None = None, title: str | None = None, save_prefix: str | Path | None = None,
-              model_order: list[str] | None = None, **kwargs):
+               model_order: list[str] | None = None, **kwargs):
+    """Compose GLMM plots: odds ratios and bar/p-value panels.
+
+    Returns a tuple of Figures (odds ratios figure, bar/p-value figure).
+    """
 
     metric_text = f"\n{metric} accuracy" if metric else ""
 
@@ -373,6 +431,10 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
 @save_plot("acc_change_distribution")
 def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', label: str | None = None, metric: str | None = None,
                                  models: list[str] | None = None, color: str | None = None):
+    """Plot per-model distributions of accuracy change as small multiples.
+
+    Returns the matplotlib Figure created by seaborn's displot.
+    """
     if metric is not None:
         df = df.xs(metric, level='metric')
 
@@ -406,6 +468,11 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
 def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
                            hatch_lw: int = 2, add_bar_labels: bool = False, x_labels_rotation: float = 0,
                            x_labels_ha='center'):
+    """Plot two summary figures comparing prompt formats and effects.
+
+    Returns two Figures: one showing accuracy and delta statistics, another
+    showing log-odds and number-effect statistics.
+    """
     if models:
         all_prompts_summary = all_prompts_summary[models]
 
@@ -500,9 +567,15 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
     return fig1, fig2
 
+
 @save_plot("prompt_acc_evolution")
 def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], models: list[str] | None = None,
                               n_cols: int = 2, sharex='all', sharey='all', equal_aspect: bool = True, figsize=(10, 8), bottom_margin=.05):
+    """Plot prompt-level accuracy evolution per model as small multiples.
+
+    Returns a Figure with subplots arranged in a grid showing for each model
+    how prompt formats compare (GSM-Base accuracy vs variant delta).
+    """
     if models:
         all_prompts_summary = all_prompts_summary[models]
     else:
@@ -553,6 +626,10 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
 
 @save_plot("number_counts")
 def plot_number_counts(raw_counts_df: pd.DataFrame, binned_counts_df: pd.DataFrame, cum_cap: float = 100):
+    """Plot binned percentage bars of extracted numbers and their cumulative curves.
+
+    Returns a matplotlib Figure.
+    """
     plot_bin_positions = np.arange(len(binned_counts_df))
     plot_bin_centers = plot_bin_positions + 0.5
     variants = list(binned_counts_df.columns)

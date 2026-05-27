@@ -1,3 +1,11 @@
+"""Tools for analysing prompt-format effects by comparing two collections.
+
+This module compares a baseline MultiVariantMultiModelResultsAnalyser against
+an experimental one and provides statistical tests and plotting helpers to
+assess whether prompt-format changes produce significant model performance
+differences.
+"""
+
 from scipy import stats
 import pandas as pd
 import logging
@@ -16,6 +24,18 @@ except (ValueError, ImportError) as exc:
 
 
 class PromptEffectAnalyser:
+    """Compare prompt-level effects between a baseline and a (prompt) experiment.
+
+    Parameters
+    ----------
+    baseline_mres:
+        MultiVariantMultiModelResultsAnalyser for the baseline dataset (e.g. GSM prompt).
+    experiment_mres:
+        MultiVariantMultiModelResultsAnalyser for the experimental variant (e.g. code prompt).
+    experiment_label:
+        Optional human-readable label used in plot titles.
+    """
+
     def __init__(
             self,
             baseline_mres: MultiVariantMultiModelResultsAnalyser,
@@ -28,6 +48,12 @@ class PromptEffectAnalyser:
 
 
     def compare_core_stats(self, variant: str, alpha=0.05, detailed_output: bool = False):
+        """Compute paired t-tests for a set of core statistics across models.
+
+        The method compares per-instance means (correct, correct_strict,
+        babbling) between the baseline and the experiment and returns either a
+        detailed DataFrame with test statistics or a summarized count table.
+        """
 
         orig = self._baseline_mres.variants[variant].get_core_stats()
         new = self._experiment_mres.variants[variant].get_core_stats()
@@ -76,6 +102,7 @@ class PromptEffectAnalyser:
         return combined_df[['significant', 'success', 'failure']].astype(int).groupby(column).sum()
 
     def plot_core_stats(self, variant: str, title: str | None = None, **kwargs):
+        """Plot summary pie charts for per-model core statistic comparisons."""
         titles = {'babbling': 'Babbling factor', 'correct': 'Accuracy (standard)', 'correct_strict': 'Accuracy (discounted)'}
 
         cs = self.compare_core_stats(variant, **kwargs, detailed_output=False)
@@ -87,9 +114,10 @@ class PromptEffectAnalyser:
     @do_for_metrics
     def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None,
                                              metric: str | None = None):
-        """
-        Run two-tailed GLMM test (per model) to check whether accuracy change between experiment and baseline
-        on a given variant is significant.
+        """Run GLMM-based two-tailed tests per model to assess accuracy change.
+
+        Returns a DataFrame indexed by model with GLMM estimates, p-values and
+        a computed column with the plain mean accuracy difference.
         """
 
         if metric is None:

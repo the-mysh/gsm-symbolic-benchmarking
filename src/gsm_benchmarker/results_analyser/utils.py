@@ -1,8 +1,22 @@
+"""Small utilities used for exporting tables and adjusting p-values."""
+
 import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 
 def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, **kwargs) -> str:
+    """Return a LaTeX representation of a pandas DataFrame.
+
+    Parameters
+    ----------
+    tab:
+        DataFrame to convert.
+    position:
+        LaTeX float position argument (default: 't')
+    clean_header:
+        If True, sanitize column and index labels by escaping underscores.
+    Additional keyword arguments are forwarded to pandas styling .to_latex.
+    """
     tab = tab.copy()
 
     if clean_header:
@@ -25,6 +39,11 @@ def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool =
 
 
 def correct_p_values(p_values):
+    """Apply Holm multiple-testing correction to a sequence of p-values.
+
+    Returns the corrected p-values as a numpy array or pandas Series (matching
+    the input type).
+    """
     _, p_corrected, _, _ = multipletests(p_values, is_sorted=False, returnsorted=False, method='holm')
     if isinstance(p_values, pd.Series):
         p_corrected = pd.Series(p_corrected, index=p_values.index)

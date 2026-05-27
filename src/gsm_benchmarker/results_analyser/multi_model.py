@@ -1,3 +1,10 @@
+"""Utilities for analysing results for multiple models stored in a folder.
+
+This module aggregates single-model parquet results into summary tables and
+offers convenience plotting and filtering utilities that operate over the
+entire collection of models residing in a directory.
+"""
+
 import os
 import logging
 from functools import cached_property
@@ -15,6 +22,17 @@ logger = logging.getLogger(__name__)
 
 
 class MultiModelResultsAnalyser:
+    """Aggregate and analyse results from a directory of model result files.
+
+    Parameters
+    ----------
+    dir_path:
+        Directory containing per-model parquet result files.
+    load_full_data:
+        If True, load each model's full DataFrame into memory; otherwise only
+        summary statistics are computed.
+    """
+
     def __init__(self, dir_path: str | Path, load_full_data: bool = False):
         self._dir_path = Path(dir_path).resolve()
 
@@ -61,6 +79,11 @@ class MultiModelResultsAnalyser:
         return summary_data_dict, full_data_dict
 
     def get_core_stats(self):
+        """Return mean values of key columns grouped by model and instance.
+
+        The returned DataFrame is useful for per-model paired comparisons.
+        """
+
         return self.full_data.groupby(['model', 'instance'])[['correct', 'correct_strict', 'babbling']].mean()
 
     def get_accuracies_per_model_and_template_id(self, metric: str | None = None):
@@ -70,6 +93,13 @@ class MultiModelResultsAnalyser:
         return self.get_accuracies_grouped('model', metric=metric)
 
     def get_accuracies_grouped(self, groups: str | list[str], metric: str | None = None):
+        """Compute mean accuracies grouped by the provided columns.
+
+        If `metric` is None, returns both 'standard' and 'discounted'
+        (correct and correct_strict) accuracies concatenated under a top-level
+        index named 'metric'. Values are returned as percentages.
+        """
+
         if metric:
             res = self.full_data.groupby(groups)[metric].mean()
         else:
@@ -137,6 +167,13 @@ class MultiModelResultsAnalyser:
         return df.to_dict(orient='index')[df.index[0]]
 
     def get_babbler_counts(self) -> pd.DataFrame:
+        """Return counts and percentages of 'babbling' answers per model.
+
+        The DataFrame contains summary statistics augmented with:
+        - 'babbler count': absolute number of babbling examples
+        - 'babbler percentage': fraction of examples flagged as babbling
+        """
+
         babbler_examples = self.full_data[self.full_data.babbling]
 
         babbler_counts = babbler_examples["model"].value_counts()
@@ -152,6 +189,11 @@ class MultiModelResultsAnalyser:
         return b
 
     def plot_babblers_by_family(self, b: pd.DataFrame | None = None, strict: bool = False):
+        """Scatter plot of babbler percentage vs accuracy split by family.
+
+        Returns a matplotlib Figure instance.
+        """
+
         if b is None:
             b = self.get_babbler_counts()
 
