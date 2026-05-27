@@ -1,3 +1,13 @@
+"""CLI utilities and entry point for running GSM-Symbolic benchmarks.
+
+This module contains helper functions used by the benchmark runner script
+(`BenchmarkRunner`) together with a command-line entry point that parses
+arguments, configures logging, and launches a benchmark run.
+
+Functions exposed here are small helpers for logging setup, HuggingFace
+login, model/dataset selection, and configuration construction.
+"""
+
 import os
 from datetime import datetime
 from pathlib import Path
@@ -22,6 +32,20 @@ logger = logging.getLogger(__name__)
 
 
 def setup_logs(logs_path, log_level=logging.INFO):
+    """Configure logging for the benchmark run.
+
+    This silences noisy third-party loggers, installs a coloured logger for
+    console output and configures the dataset/transformers progress bars.
+
+    Parameters
+    ----------
+    logs_path:
+        Path where run logs should be written (used by the project's
+        file-based handler).
+    log_level:
+        Logging level for console output (defaults to logging.INFO).
+    """
+
     for log_name in (
             'urllib3', 'fsspec', 'filelock', 'h5py', 'httpcore', 'httpx', 'google_genai', 'jax',
             'root', 'bitsandbytes', 'transformers_modules'
@@ -43,6 +67,14 @@ def setup_logs(logs_path, log_level=logging.INFO):
 
 
 def hf_login():
+    """Log in to the HuggingFace Hub using the HUGGINGFACEHUB_API_TOKEN env var.
+
+    Raises
+    ------
+    RuntimeError
+        If the environment variable is not set.
+    """
+
     t = 'HUGGINGFACEHUB_API_TOKEN'
     hf_api_token = os.environ.get(t, None)
     if hf_api_token is None:
@@ -60,6 +92,13 @@ def hf_login():
 
 
 def choose_models(model_names: list[str]):
+    """Resolve model names into configured model objects.
+
+    If `model_names` is empty or None, returns all "open" models from the
+    project's `ModelsConfig`. Otherwise validates each requested name and
+    returns a list of model configuration objects.
+    """
+
     models_config = ModelsConfig()
 
     if not model_names:
@@ -75,6 +114,13 @@ def choose_models(model_names: list[str]):
 
 
 def choose_dataset_variants(variant_names: list[str]):
+    """Return a list of dataset variant enum members from requested names.
+
+    If `variant_names` is empty, returns the default set used by the
+    benchmark (GSM8K, main, p1, p2). Validates names against the
+    `GSMSymbolicDataset.Variant` enumeration and raises on unknown values.
+    """
+
     vs = GSMSymbolicDataset.Variant
 
     if not variant_names:
@@ -89,6 +135,13 @@ def choose_dataset_variants(variant_names: list[str]):
     return variants
 
 def get_paths(output_root_path: str | Path | None = None, run_folder_name: str | None = None):
+    """Return (logs_path, results_path) for the run.
+
+    If `output_root_path` is omitted, the function infers a project-local
+    `data/gsm-symbolic` directory by walking up from this file. The
+    `run_folder_name` defaults to a timestamped folder.
+    """
+
     if output_root_path is None:
         output_root_path = Path(__file__).resolve()
         for i in range(6):
@@ -106,6 +159,13 @@ def get_paths(output_root_path: str | Path | None = None, run_folder_name: str |
 
 
 def make_config(pargs: Namespace):
+    """Build a `BenchmarkConfig` from parsed CLI arguments.
+
+    The function translates CLI names into the parameter names expected by
+    `BenchmarkConfig`, handles GPU selection flags and optionally loads a
+    machine preset.
+    """
+
     kwargs: dict[str, Any] = dict(trust_remote_code_global=True)
 
     def add_to_kwargs(name, new_name=None):
@@ -140,6 +200,13 @@ def make_config(pargs: Namespace):
 
 
 def make_prompt_config(preset_name: str | None = None, file_path: str | None = None) -> PromptConfig:
+    """Load or build a `PromptConfig`.
+
+    Preference order: explicit `file_path` &gt; named `preset_name` &gt; the
+    package default. The prompt configuration is logged with an example
+    invocation for quick sanity checks.
+    """
+
     if file_path is not None:
         pc = PromptConfig.from_file(file_path)
 
@@ -155,6 +222,13 @@ def make_prompt_config(preset_name: str | None = None, file_path: str | None = N
 
 
 def make_parser() -> ArgumentParser:
+    """Return an ArgumentParser configured for the benchmark CLI.
+
+    The parser mirrors options used by the original benchmark scripts such
+    as machine presets, resource limits, selected models/variants and prompt
+    format selection.
+    """
+
     parser = ArgumentParser("GSM-Symbolic Benchmark Reproduction")
     parser.add_argument('--no-machine-preset', dest='no_machine_preset', action='store_true', default=False)
 
