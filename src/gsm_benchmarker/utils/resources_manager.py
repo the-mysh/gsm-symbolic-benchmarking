@@ -1,3 +1,12 @@
+"""Helpers for loading bundled resources and dynamic solution modules.
+
+This module centralises access to JSON resources shipped with the package as
+well as dynamic loading of the 8-shot solution modules used by the
+benchmarking notebooks. The dynamic loader imports a module from the
+resources directory and optionally returns source code for each solution
+function.
+"""
+
 import logging
 from importlib.resources import files
 import json
@@ -14,6 +23,19 @@ _RESOURCES_PATH = files("gsm_benchmarker")/"resources"
 
 
 def load_resource_json(file_name: str) -> dict[str, Any]:
+    """Load a JSON resource shipped with the package.
+
+    Parameters
+    ----------
+    file_name:
+        Name of the resource file located under `gsm_benchmarker/resources`.
+
+    Returns
+    -------
+    dict:
+        Parsed JSON content as a dictionary.
+    """
+
     full_path = _RESOURCES_PATH / file_name
     logger.debug(f"Loading resource from file: {Path(full_path).resolve()}")
     data_bytes = full_path.read_bytes()
@@ -22,12 +44,22 @@ def load_resource_json(file_name: str) -> dict[str, Any]:
 
 
 def load_json_file(file_name: str | Path) -> dict[str, Any]:
+    """Load a JSON file from an arbitrary filesystem path."""
+
     with open(file_name, "r") as f:
         data_dict = json.load(f)
     return data_dict
 
 
 def load_8shot_solutions(solutions_name: str, code: bool = False):
+    """Dynamically load a solutions module from packaged 8-shot resources.
+
+    The function imports a module named `<solutions_name>.py` from the
+    package's `resources/solutions_8shot` directory and returns either the
+    objects from its SOLUTIONS list or the source code for each solution
+    function when `code=True`.
+    """
+
     target_file_path = str(_RESOURCES_PATH / "solutions_8shot" / (solutions_name + ".py"))
 
     # 1. Dynamic Import Setup

@@ -1,3 +1,10 @@
+"""Filesystem helper utilities used by the benchmarking pipeline.
+
+This module contains helpers to ensure output folders exist, sanitise names
+for use in paths and to remove intermediate result folders when cleaning up
+between runs.
+"""
+
 import os
 from pathlib import Path
 import logging
@@ -8,6 +15,26 @@ logger = logging.getLogger(__name__)
 
 
 def confirm_or_create_folder(folder_path: Path | str) -> Path:
+    """Ensure a folder exists, creating it (and parents) if necessary.
+
+    Parameters
+    ----------
+    folder_path:
+        Path or string specifying the directory to confirm/create.
+
+    Returns
+    -------
+    Path
+        A resolved Path object for the directory.
+
+    Raises
+    ------
+    TypeError:
+        If `folder_path` is not a string or Path.
+    RuntimeError:
+        If the provided path points to an existing file.
+    """
+
     if isinstance(folder_path, str):
         folder_path = Path(folder_path)
 
@@ -27,6 +54,11 @@ def confirm_or_create_folder(folder_path: Path | str) -> Path:
 
 
 def make_name_path_friendly(name: str) -> str:
+    """Sanitise a string so it is safe to use as a file/folder name.
+
+    Replaces path separators and dots with an underscore.
+    """
+
     repl = '_'
 
     for char in ('/', '\\', '.'):
@@ -36,6 +68,12 @@ def make_name_path_friendly(name: str) -> str:
 
 
 def remove_intermediate_results_folder(storage_path: Path) -> None:
+    """Remove an intermediate results folder, logging on failure.
+
+    The function catches any exception (for robustness during cleanup) and
+    logs an error rather than raising.
+    """
+
     try:
         logger.debug("Removing intermediate results")
         rmtree(storage_path)
