@@ -1,13 +1,13 @@
-"""Common utilities used by result analysis tools.
+"""GLMM helpers that depend on R (rpy2 / pymer4).
 
-This module wraps R-based GLMM fitting logic and provides decorators used to
-run analysis for multiple metrics. It centralises helpers that are shared
-between different analyser classes.
+This module contains the GLMM runner wrapper and related exceptions. It
+isolates R-dependent code so other parts of the package can import
+non-R utilities without requiring rpy2 to be available.
 """
 
-import pandas as pd
 import logging
 from typing import TYPE_CHECKING
+import pandas as pd
 import numpy as np
 import re
 
@@ -34,34 +34,6 @@ class GLMMFitError(RuntimeError):
     Python exception in cases where no R model object is available.
     """
     pass
-
-
-METRIC_LABELS = {'correct': 'standard', 'correct_strict': 'discounted'}
-
-
-def do_for_metrics(func):
-    """Decorator to run an analysis function for multiple predefined metrics.
-
-    If the wrapped function is called with metric=None, it will be executed
-    for all metrics defined in METRIC_LABELS and the results concatenated into
-    a single DataFrame with a top-level index named 'metric'. If metric is
-    provided, the original function is called unchanged.
-    """
-
-    def wrapper(*args, metric: str | None = None, **kwargs):
-
-        if metric is None:
-            res = {}
-            for metric, metric_label in METRIC_LABELS.items():
-                res[metric_label] = func(*args, metric=metric, **kwargs)
-
-            df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
-            df_results = df_results.swaplevel().sort_index()
-            return df_results
-        else:
-            return func(*args, metric=metric, **kwargs)
-
-    return wrapper
 
 
 class GLMMRunner:
@@ -176,3 +148,4 @@ class GLMMRunner:
                     logger.warning(f"No data for model {requested_model_name}")
 
         return glmm_results_df
+

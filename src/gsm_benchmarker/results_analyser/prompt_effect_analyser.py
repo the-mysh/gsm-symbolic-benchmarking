@@ -15,8 +15,10 @@ from gsm_benchmarker.results_analyser.plotting_utils import plot_stats
 
 logger = logging.getLogger(__name__)
 
+from gsm_benchmarker.results_analyser.utils import do_for_metrics
+
 try:
-    from gsm_benchmarker.results_analyser.common import GLMMRunner, do_for_metrics
+    from gsm_benchmarker.results_analyser.glmm import GLMMRunner
 except (ValueError, ImportError) as exc:
     logger.warning("R not configured, some functions will not be available")
     logger.warning(exc)

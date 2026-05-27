@@ -4,6 +4,36 @@ import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 
+# Labels used by higher-level analysers when running metrics for both
+# standard and discounted correctness definitions.
+METRIC_LABELS = {'correct': 'standard', 'correct_strict': 'discounted'}
+
+
+def do_for_metrics(func):
+    """Decorator to run an analysis function for multiple predefined metrics.
+
+    If the wrapped function is called with metric=None, it will be executed
+    for all metrics defined in METRIC_LABELS and the results concatenated into
+    a single DataFrame with a top-level index named 'metric'. If metric is
+    provided, the original function is called unchanged.
+    """
+
+    def wrapper(*args, metric: str | None = None, **kwargs):
+
+        if metric is None:
+            res = {}
+            for metric, metric_label in METRIC_LABELS.items():
+                res[metric_label] = func(*args, metric=metric, **kwargs)
+
+            df_results = pd.concat(res.values(), keys=res.keys(), names=('metric', 'model'))
+            df_results = df_results.swaplevel().sort_index()
+            return df_results
+        else:
+            return func(*args, metric=metric, **kwargs)
+
+    return wrapper
+
+
 def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, **kwargs) -> str:
     """Return a LaTeX representation of a pandas DataFrame.
 
