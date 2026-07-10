@@ -49,6 +49,20 @@ class PromptResult:
         if self.short_label is None:
             self.short_label = self.full_label.split(' ')[0]
 
+    def get_clean_data_object(self, full_label=None, short_label=None, colour=None, models=None):
+        return PromptResult(
+            path=self.path,
+            colour=colour or self.colour,
+            full_label=full_label or (self.full_label + " filtered"),
+            short_label=short_label or (self.short_label + "_filtered"),
+            models=models or self.models,
+            metric=self.metric,
+            save_dest=self.save_dest,
+            mres=self.mres.get_clean_data_object(),
+            baseline=self.baseline.get_clean_data_object() if self.baseline is not None else None,
+            pea=None # pea created from the new mres and baseline
+        )
+
     @cached_property
     def variant_effect(self) -> pd.DataFrame:
         """Compute and cache the GLMM-based variant effect table for the prompt.

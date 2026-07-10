@@ -33,12 +33,23 @@ class MultiModelResultsAnalyser:
         summary statistics are computed.
     """
 
-    def __init__(self, dir_path: str | Path, load_full_data: bool = False):
+    def __init__(self, dir_path: str | Path, load_full_data: bool = False, full_data_df: pd.DataFrame | None = None):
+
         self._dir_path = Path(dir_path).resolve()
 
-        summary_data_dict, full_data_dict = self._load_data(self._dir_path, load_full_data=load_full_data)
-        self._summary_data = self._make_summary_df(summary_data_dict)
-        self._full_data = self._make_full_df(full_data_dict) if full_data_dict else None
+        if full_data_df is not None:
+            self._full_data = full_data_df
+            self._summary_data = None
+        else:
+            summary_data_dict, full_data_dict = self._load_data(self._dir_path, load_full_data=load_full_data)
+            self._summary_data = self._make_summary_df(summary_data_dict)
+            self._full_data = self._make_full_df(full_data_dict) if full_data_dict else None
+
+    def get_clean_data_object(self) -> 'MultiModelResultsAnalyser':
+        return MultiModelResultsAnalyser(
+            dir_path=self._dir_path,
+            full_data_df=self.full_data[~np.isnan(self.full_data.predicted_numerical_result)]
+        )
 
     @cached_property
     def full_data(self) -> pd.DataFrame:

@@ -52,9 +52,14 @@ class MultiVariantMultiModelResultsAnalyser:
     NUMBER_PATTERN = re.compile(r'\d+(?:\.\d+)?')
     BASELINE_VARIANT = 'GSM8K'
 
-    def __init__(self, dir_path: str | Path):
+    def __init__(self, dir_path: str | Path, summary_data: pd.DataFrame | None = None, variants: dict | None = None):
         self._dir_path = Path(dir_path).resolve()
-        self._summary_data, self._variants = self._load_data(self._dir_path)
+
+        if variants is None:
+            self._summary_data, self._variants = self._load_data(self._dir_path)
+        else:
+            self._summary_data = summary_data
+            self._variants = variants
 
     @property
     def summary_data(self):
@@ -425,3 +430,11 @@ class MultiVariantMultiModelResultsAnalyser:
     def plot_number_counts(self, model: str | None = None, bin_edges: list[int | float] | None = None, **kwargs):
         raw_counts_df, binned_counts_df = self.get_number_counts(model=model, bin_edges=bin_edges)
         return plot_number_counts(raw_counts_df, binned_counts_df, **kwargs)
+
+    def get_clean_data_object(self):
+        return MultiVariantMultiModelResultsAnalyser(
+            dir_path=self._dir_path,
+            summary_data=None,
+            variants={k: v.get_clean_data_object() for k, v in self._variants.items()}
+        )
+
