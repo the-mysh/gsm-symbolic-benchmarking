@@ -76,8 +76,16 @@ class GLMMRunner:
         # Then extract coefficients as a DataFrame
         with localconverter(ro.default_converter + pandas2ri.converter):
             coefs_df = ro.r('as.data.frame(coef(summary(r_model)))')
+            ranef_var_df = ro.r('as.data.frame(VarCorr(r_model))')
+            is_singular = ro.r('isSingular(r_model)')[0]  # True/False
 
-        return coefs_df
+            conv_check = ro.r('''
+                msgs <- r_model@optinfo$conv$lme4$messages
+                if (is.null(msgs)) "" else paste(msgs, collapse = "; ")
+            ''')
+            convergence_messages = str(conv_check[0])  # empty string means no convergence warnings
+
+        return coefs_df, ranef_var_df, is_singular, convergence_messages
 
     def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
         """Prepare a combined DataFrame for GLMM fitting from two analysers.
@@ -106,12 +114,15 @@ class GLMMRunner:
     def run(self, df: pd.DataFrame, models: list[str] | None = None, simplify=False):
         """Run per-model GLMM fits on data grouped by 'model'.
 
-        Returns a DataFrame with coefficient estimates and statistics for each
-        model. If `simplify` is True and there is only one variable in the
-        results, the returned DataFrame is simplified to have model as index.
+        Returns a tuple of (results_df, diagnostics_df). results_df has
+        coefficient estimates and statistics for each model. If `simplify`
+        is True and there is only one variable in the results, results_df
+        is simplified to have model as index. diagnostics_df has one row
+        per model with convergence status and random-effect variance info.
         """
 
         glmm_results = {}
+        diagnostics_records = []
 
         for model_name, group_df in df.groupby('model'):
             if models is not None and model_name not in models:
@@ -126,14 +137,37 @@ class GLMMRunner:
             group_df = group_df[[c for c in group_df.columns if c != 'model']]
 
             try:
-                coefs_df = self.fit_df(group_df)
+                coefs_df, ranef_var_df, is_singular, convergence_messages = self.fit_df(group_df)
             except GLMMFitError as err:
                 logger.warning(f"{model_name}: {err}")
                 res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan, 'z_value': np.nan}
                 coefs_df = pd.DataFrame(len(self._labels) * [res], index=self._labels)
+                diagnostics_records.append({
+                    'model': model_name,
+                    'fit_failed': True,
+                    'is_singular': np.nan,
+                    'convergence_messages': str(err),
+                    'ranef_variance': np.nan,
+                    'ranef_sd': np.nan,
+                })
             else:
-                coefs_df.rename(columns={'Estimate': 'estimate', 'Pr(>|z|)': 'p_value', 'Std. Error': 'std_err', 'z value': 'z_value' }, inplace=True)
+                if convergence_messages:
+                    logger.warning(f"{model_name} - convergence messages: {convergence_messages}")
+
+                coefs_df.rename(columns={'Estimate': 'estimate', 'Pr(>|z|)': 'p_value', 'Std. Error': 'std_err',
+                                         'z value': 'z_value'}, inplace=True)
                 coefs_df.drop('(Intercept)', axis=0, inplace=True)
+
+                # ranef_var_df is expected to have one row per grouping factor (here, just 'Id')
+                ranef_row = ranef_var_df.iloc[0]
+                diagnostics_records.append({
+                    'model': model_name,
+                    'fit_failed': False,
+                    'is_singular': is_singular,
+                    'convergence_messages': convergence_messages,
+                    'ranef_variance': ranef_row.get('vcov', np.nan),
+                    'ranef_sd': ranef_row.get('sdcor', np.nan),
+                })
 
             glmm_results[model_name] = coefs_df
 
@@ -147,5 +181,6 @@ class GLMMRunner:
                 if requested_model_name not in models_with_results:
                     logger.warning(f"No data for model {requested_model_name}")
 
-        return glmm_results_df
+        diagnostics_df = pd.DataFrame(diagnostics_records).set_index('model')
 
+        return glmm_results_df, diagnostics_df

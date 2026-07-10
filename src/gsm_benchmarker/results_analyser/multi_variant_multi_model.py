@@ -321,13 +321,13 @@ class MultiVariantMultiModelResultsAnalyser:
                 1: self.variants[variant]
         })
 
-        glmm_results_df = glmm_runner.run(df=data_df, models=models, simplify=True)
+        glmm_results_df, diagnostics_df = glmm_runner.run(df=data_df, models=models, simplify=True)
         self._add_odds_changes(glmm_results_df)
 
         # add plain accuracy drops
         glmm_results_df = glmm_results_df.join(self.get_mean_accuracy_summary(metric=metric))
 
-        return glmm_results_df
+        return glmm_results_df, diagnostics_df
 
     def _get_number_effect_glmm_data(self, variant: str, metric: str):
         number_pattern = re.compile(r'\d*\.?\d+')
@@ -375,9 +375,9 @@ class MultiVariantMultiModelResultsAnalyser:
         glmm_data = self._get_number_effect_glmm_data(variant=variant, metric=metric)
 
         glmm_runner = GLMMRunner("is_variant + sum_logs_c")
-        glmm_results_df = glmm_runner.run(df=glmm_data, models=models)
+        glmm_results_df, diagnostics_df = glmm_runner.run(df=glmm_data, models=models)
         self._add_odds_changes(glmm_results_df)
-        return glmm_results_df
+        return glmm_results_df, diagnostics_df
 
     @staticmethod
     def _add_odds_changes(df):

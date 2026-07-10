@@ -148,12 +148,12 @@ class PromptEffectAnalyser:
                 1: self._experiment_mres.variants[variant]
             })
 
-        glmm_results_df = glmm_runner.run(df=data_df, models=models_validated, simplify=True)
+        glmm_results_df, diagnostics_df = glmm_runner.run(df=data_df, models=models_validated, simplify=True)
 
         # add plain accuracy change
         glmm_results_df['acc_diff'] = self.get_mean_accuracy_change(metric=metric, variant=variant)
 
-        return glmm_results_df
+        return glmm_results_df, diagnostics_df
 
     def get_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
         baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)

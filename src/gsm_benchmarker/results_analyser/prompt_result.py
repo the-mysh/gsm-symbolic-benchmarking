@@ -64,7 +64,7 @@ class PromptResult:
         )
 
     @cached_property
-    def variant_effect(self) -> pd.DataFrame:
+    def variant_effect(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Compute and cache the GLMM-based variant effect table for the prompt.
 
         The table contains coefficient estimates, p-values and derived odds
@@ -73,7 +73,7 @@ class PromptResult:
         return self.mres.analyse_variant_effect(variant='main', metric=self.metric, models=self.models)
 
     def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
-        df = self.variant_effect.copy()
+        df = self.variant_effect[0].copy()
 
         if self.models is not None:
             df = df[df.index.isin(self.models)]
@@ -143,21 +143,21 @@ class PromptResult:
             variant=variant, models=self.models, metric=self.metric)
 
     @cached_property
-    def prompt_effect_main(self) -> pd.DataFrame:
+    def prompt_effect_main(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         return self._make_prompt_effect_df('main')
 
     @cached_property
-    def prompt_effect_gsm8k(self) -> pd.DataFrame:
+    def prompt_effect_gsm8k(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         return self._make_prompt_effect_df('GSM8K')
 
     @cached_property
-    def number_effect(self) -> pd.DataFrame:
+    def number_effect(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         return self.mres.analyse_number_effect('main', metric=self.metric, models=self.models)
 
     def plot_variant_effect(self, **kwargs):
         """Produce GLMM visualisations for the variant effect of this prompt."""
         figs = plot_glmm(
-            self.variant_effect,
+            self.variant_effect[0],
             'acc_diff',
             "Variant performance delta, pp",
             bar_colour=self.colour.value,
@@ -170,7 +170,7 @@ class PromptResult:
     def plot_prompt_effect(self, **kwargs):
         """Produce GLMM visualisations for the prompt effect (experiment vs baseline)."""
         figs = plot_glmm(
-            self.prompt_effect_main,
+            self.prompt_effect_main[0],
             'acc_diff',
             "Prompt performance delta, pp",
             bar_colour=self.colour.value,
@@ -195,7 +195,7 @@ class PromptResult:
         return fig
 
     def get_significant_models(self, alpha: float, drop_only: bool = False):
-        df = self.variant_effect
+        df = self.variant_effect[0]
         if drop_only:
             df = df[df.acc_diff < 0]
         models = df[df.p_value < alpha].sort_values('estimate', ascending=True).index.tolist()
@@ -203,17 +203,19 @@ class PromptResult:
 
     def summary(self, alpha: float = 0.05):
 
+        variant_effect_df, variant_effect_diagnostics_df = self.variant_effect
+
         d = {
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
             'main_acc': self.mres.variants['main'].get_accuracies_per_model(metric=self.metric),
-            'delta_symb_acc_diff': self.variant_effect['acc_diff'],
-            'delta_symb_log_or': self.variant_effect['estimate'],
-            'delta_symb_or': self.variant_effect['odds_ratio'],
-            'delta_symb_p_value': self.variant_effect['p_value'],
-            'delta_symb_significant': self.variant_effect['p_value'] < alpha
+            'delta_symb_acc_diff': variant_effect['acc_diff'],
+            'delta_symb_log_or': variant_effect['estimate'],
+            'delta_symb_or': variant_effect['odds_ratio'],
+            'delta_symb_p_value': variant_effect['p_value'],
+            'delta_symb_significant': variant_effect['p_value'] < alpha
         }
 
-        number_effect_df = self.number_effect
+        number_effect_df, number_effect_diagnostics_df = self.number_effect
         for (variable, variable_label) in (('sum_logs_c', 'number_effect'), ('is_variant', 'delta_symb_ne')):
             df_ne = number_effect_df.xs(variable, level='variable')
 
@@ -223,6 +225,8 @@ class PromptResult:
                 f'{variable_label}_p_value': df_ne['p_value'],
                 f'{variable_label}_significant': df_ne['p_value'] < alpha
             }
+
+        # TODO: add diagnostics for variant and number effects
 
         df = pd.DataFrame(d).transpose()
         if self.models:
