@@ -208,11 +208,11 @@ class PromptResult:
         d = {
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
             'main_acc': self.mres.variants['main'].get_accuracies_per_model(metric=self.metric),
-            'delta_symb_acc_diff': variant_effect['acc_diff'],
-            'delta_symb_log_or': variant_effect['estimate'],
-            'delta_symb_or': variant_effect['odds_ratio'],
-            'delta_symb_p_value': variant_effect['p_value'],
-            'delta_symb_significant': variant_effect['p_value'] < alpha
+            'delta_symb_acc_diff': variant_effect_df['acc_diff'],
+            'delta_symb_log_or': variant_effect_df['estimate'],
+            'delta_symb_or': variant_effect_df['odds_ratio'],
+            'delta_symb_p_value': variant_effect_df['p_value'],
+            'delta_symb_significant': variant_effect_df['p_value'] < alpha
         }
 
         number_effect_df, number_effect_diagnostics_df = self.number_effect
