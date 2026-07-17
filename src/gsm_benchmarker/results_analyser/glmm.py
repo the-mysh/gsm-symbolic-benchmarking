@@ -6,10 +6,15 @@ non-R utilities without requiring rpy2 to be available.
 """
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple, Any
 import pandas as pd
 import numpy as np
+import numpy.typing as npt
 import re
+import time
+from pathlib import Path
+from tqdm import tqdm
+import pickle
 
 from rpy2.rinterface_lib.embedded import RRuntimeError
 import rpy2.robjects as ro
@@ -34,6 +39,20 @@ class GLMMFitError(RuntimeError):
     Python exception in cases where no R model object is available.
     """
     pass
+
+
+class FitResult(NamedTuple):
+    coefs_df: pd.DataFrame
+    ranef_var_df: pd.DataFrame
+    is_singular: bool
+    convergence_messages: str
+
+
+class BootstrapFitResult(NamedTuple):
+    clean_estimates: npt.NDArray[np.floating]
+    singular_esitmates: npt.NDArray[np.floating]
+    n_failed: int
+    n_nonconverged: int
 
 
 class GLMMRunner:
@@ -85,7 +104,12 @@ class GLMMRunner:
             ''')
             convergence_messages = str(conv_check[0])  # empty string means no convergence warnings
 
-        return coefs_df, ranef_var_df, is_singular, convergence_messages
+        return FitResult(
+            coefs_df=coefs_df,
+            ranef_var_df=ranef_var_df,
+            is_singular=is_singular,
+            convergence_messages=convergence_messages
+        )
 
     def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
         """Prepare a combined DataFrame for GLMM fitting from two analysers.
@@ -137,7 +161,7 @@ class GLMMRunner:
             group_df = group_df[[c for c in group_df.columns if c != 'model']]
 
             try:
-                coefs_df, ranef_var_df, is_singular, convergence_messages = self.fit_df(group_df)
+                fit_result = self.fit_df(group_df)
             except GLMMFitError as err:
                 logger.warning(f"{model_name}: {err}")
                 res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan, 'z_value': np.nan}
@@ -151,20 +175,27 @@ class GLMMRunner:
                     'ranef_sd': np.nan,
                 })
             else:
-                if convergence_messages:
-                    logger.warning(f"{model_name} - convergence messages: {convergence_messages}")
+                if fit_result.convergence_messages:
+                    logger.warning(f"{model_name} - convergence messages: {fit_result.convergence_messages}")
 
-                coefs_df.rename(columns={'Estimate': 'estimate', 'Pr(>|z|)': 'p_value', 'Std. Error': 'std_err',
-                                         'z value': 'z_value'}, inplace=True)
+                coefs_df = fit_result.coefs_df
+                coefs_df.rename(
+                    columns={
+                        'Estimate': 'estimate',
+                        'Pr(>|z|)': 'p_value',
+                        'Std. Error': 'std_err',
+                        'z value': 'z_value'},
+                    inplace=True
+                )
                 coefs_df.drop('(Intercept)', axis=0, inplace=True)
 
                 # ranef_var_df is expected to have one row per grouping factor (here, just 'Id')
-                ranef_row = ranef_var_df.iloc[0]
+                ranef_row = fit_result.ranef_var_df.iloc[0]
                 diagnostics_records.append({
                     'model': model_name,
                     'fit_failed': False,
-                    'is_singular': is_singular,
-                    'convergence_messages': convergence_messages,
+                    'is_singular': fit_result.is_singular,
+                    'convergence_messages': fit_result.convergence_messages,
                     'ranef_variance': ranef_row.get('vcov', np.nan),
                     'ranef_sd': ranef_row.get('sdcor', np.nan),
                 })
@@ -184,3 +215,173 @@ class GLMMRunner:
         diagnostics_df = pd.DataFrame(diagnostics_records).set_index('model')
 
         return glmm_results_df, diagnostics_df
+
+    def bootstrap_fit_df(self, df: pd.DataFrame, n_boot: int = 1000, cluster_col: str = 'id', seed: int = None
+                         ) -> BootstrapFitResult:
+        rng = np.random.default_rng(seed)
+        unique_ids = df[cluster_col].unique()
+        n_clusters = len(unique_ids)
+
+        clean_estimates = []        # converged, non-singular estimates
+        singular_estimates = []     # converged but boundary/singular fit
+        n_failed = 0                # number of 'hard' errors (GLMMFitError; not expecting any of these)
+        n_nonconverged = 0          # number of estimates with convergence warnings - excluded from estimate pools
+
+
+        for i in range(n_boot):
+            # randomly sample ids with replacement
+            sampled_ids = rng.choice(unique_ids, size=n_clusters, replace=True)
+
+            # rebuild resampled df, keeping all rows per sampled id, with duplicate ids relabeled
+            # so lme4 doesn't collapse repeated cluster labels into one group
+            resampled_frames = []
+            for new_idx, orig_id in enumerate(sampled_ids):
+                chunk = df[df[cluster_col] == orig_id].copy()
+                chunk[cluster_col] = f"{orig_id}_{new_idx}"  # relabel to keep clusters distinct
+                resampled_frames.append(chunk)
+            boot_df = pd.concat(resampled_frames, ignore_index=True)
+
+            try:
+                fit_result = self.fit_df(boot_df)
+                estimate = fit_result.coefs_df.loc['is_variant', 'Estimate']
+            except GLMMFitError:
+                n_failed += 1
+                continue
+
+            if fit_result.convergence_messages:
+                n_nonconverged += 1
+                continue  # discard estimate - unreliable
+
+            if fit_result.is_singular:
+                singular_estimates.append(estimate)
+            else:
+                clean_estimates.append(estimate)
+
+        return BootstrapFitResult(
+            clean_estimates=np.array(clean_estimates),
+            singular_esitmates=np.array(singular_estimates),
+            n_failed=n_failed,
+            n_nonconverged=n_nonconverged
+        )
+
+    def run_bootstrap(self, df: pd.DataFrame, models: list[str] | None = None, n_boot: int = 1000,
+                      cluster_col: str = 'id', seed: int = 42, checkpoint_path: str | Path | None = None,
+                      ignore_previous_checkpoints: bool = False) -> dict:
+
+        n_models = len(models) if models is not None else df.model.unique().size
+        logger.info(f"RUNNING FULL BOOTSTRAP for {n_models} models")
+
+        checkpoint_file, results = self._load_bootstrap_checkpoint(checkpoint_path, ignore_previous_checkpoints)
+
+        mi = 0
+
+        for model_name, model_df in tqdm(df.groupby('model')):
+            if models is not None and model_name not in models:
+                continue
+
+            mi += 1
+
+            if model_name in results:
+                logger.debug(f"Skipping {model_name} (already in checkpoint).")
+                continue
+
+            logger.debug(f"Running bootstrap [{mi+1}/{n_models}]: {model_name} ({n_boot} resamples)...")
+            start = time.time()
+
+            model_result = self.bootstrap_fit_df(
+                model_df, n_boot=n_boot, cluster_col=cluster_col, seed=seed
+            )
+
+            results[model_name] = self._summarise_model_bootstrap(
+                model_name, model_result, n_boot, elapsed=time.time() - start)
+
+            self._update_bootstrap_checkpoint(checkpoint_file, results)  # checkpoint after every model
+
+        return results
+
+    @staticmethod
+    def _update_bootstrap_checkpoint(checkpoint_file: Path | None, results: dict) -> None:
+        if checkpoint_file is None:
+            return
+
+        with open(checkpoint_file, 'wb') as f:
+            logger.debug(f"Updating bootstrap checkpoint file at {checkpoint_file}")
+            pickle.dump(results, f)
+
+    @staticmethod
+    def _load_bootstrap_checkpoint(checkpoint_path: str | Path | None, ignore_previous_checkpoints: bool = False
+                                   ) -> tuple[Path | None, dict]:
+
+        # Load existing results if resuming from a checkpoint
+
+        results = {}
+
+        if checkpoint_path is None:
+            checkpoint_file = None
+        else:
+            checkpoint_file = Path(checkpoint_path).resolve()
+            if not ignore_previous_checkpoints and checkpoint_file.exists():
+                with open(checkpoint_file, 'rb') as f:
+                    results = pickle.load(f)
+                logger.info(f"Resuming from checkpoint: {len(results)} models already done.")
+
+        return checkpoint_file, results
+
+    @staticmethod
+    def _summarise_model_bootstrap(model_name: str, model_result: BootstrapFitResult, n_boot: int,
+                                   elapsed: float) -> dict:
+
+        model_summary = {'model': model_name}
+
+        for estimates, label in (
+                (model_result.clean_estimates, 'clean'),
+                (np.concatenate((model_result.singular_esitmates, model_result.clean_estimates)), 'inclusive')
+        ):
+            if len(estimates):
+                ci_lower, ci_upper = np.percentile(estimates, [2.5, 97.5])
+                boot_se = np.std(estimates, ddof=1)
+                boot_mean = np.mean(estimates)
+            else:
+                ci_lower = ci_upper = boot_se = boot_mean = np.nan
+            model_summary.update({
+                f"estimates_{label}": estimates,
+                f"ci_upper_{label}": ci_upper,
+                f"ci_lower_{label}": ci_lower,
+                f"boot_se_{label}": boot_se,
+                f"boot_mean_{label}": boot_mean,
+            })
+
+        model_summary.update({
+            'n_boot_requested': n_boot,
+            'n_failed': model_result.n_failed,
+            'n_nonconverged': model_result.n_nonconverged,
+            'elapsed_seconds': elapsed,
+        })
+
+        logger.debug(f"  Done in {elapsed:.1f}s. CI (inclusive): [{ci_lower:.3f}, {ci_upper:.3f}]; "
+                     f"{model_result.n_failed} failed fits, {model_result.n_nonconverged} not converged.")
+
+        return model_summary
+
+    @staticmethod
+    def summarize_bootstrap_results(results: dict, original_estimates_df=None):
+        """
+        Turn the results dict into a tidy summary DataFrame.
+
+        Optionally, compare against original (non-bootstrap) point estimates.
+        """
+
+        rows = []
+        for model_name, res in results.items():
+            row = {k: v for k, v in res.items() if ('estimates' not in k and 'elapsed' not in k)}
+            rows.append(row)
+
+        summary_df = pd.DataFrame(rows).set_index('model')
+
+        if original_estimates_df is not None:
+            summary_df['original_estimate'] = original_estimates_df['Estimate']
+            summary_df['ci_contains_zero'] = (
+                    (summary_df['ci_lower'] <= 0) & (summary_df['ci_upper'] >= 0)
+            )
+
+        return summary_df
