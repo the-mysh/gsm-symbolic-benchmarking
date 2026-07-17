@@ -59,7 +59,10 @@ def main():
         ignore_previous_checkpoints=pargs.ignore_previous_checkpoints
     )
 
-    summary_df = glmm.summarize_bootstrap_results(bs_results)
+    logger.info("Adding single GLMM estimates (non-bootstrapped) for comparison")
+    original_results, original_info = mres.analyse_variant_effect(variant=pargs.variant, metric=pargs.metric)
+
+    summary_df = glmm.summarize_bootstrap_results(bs_results, original_results, original_info)
     summary_df.to_csv(output_path)
     logger.info(f"Bootstrap summary saved to {output_path}")
 

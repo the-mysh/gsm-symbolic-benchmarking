@@ -341,7 +341,8 @@ class GLMMRunner:
         return model_summary
 
     @staticmethod
-    def summarize_bootstrap_results(results: dict, original_estimates_df=None):
+    def summarize_bootstrap_results(results: dict, single_estimates_df: pd.DataFrame | None = None,
+                                    single_info_df: pd.DataFrame | None = None) -> pd.DataFrame:
         """
         Turn the results dict into a tidy summary DataFrame.
 
@@ -355,10 +356,20 @@ class GLMMRunner:
 
         summary_df = pd.DataFrame(rows).set_index('model')
 
-        if original_estimates_df is not None:
-            summary_df['original_estimate'] = original_estimates_df['Estimate']
-            summary_df['ci_contains_zero'] = (
-                    (summary_df['ci_lower'] <= 0) & (summary_df['ci_upper'] >= 0)
-            )
+        if single_estimates_df is not None:
+            sest = single_estimates_df['estimate']
+            summary_df['single_estimate'] = sest
+
+            z_crit = 1.959964
+            sse = single_estimates_df['std_err']
+            summary_df['single_ci_lower'] = sest - z_crit * sse
+            summary_df['single_ci_upper'] = sest + z_crit * sse
+
+            summary_df['single_p_value'] = single_estimates_df['p_value']
+
+            if single_info_df is not None:
+                summary_df['single_singular'] = single_info_df['is_singular']
+                summary_df['single_nonconvergent'] = single_info_df['convergence_messages'].astype(bool)
+                summary_df['single_fit_failed'] = single_info_df['fit_failed']
 
         return summary_df
