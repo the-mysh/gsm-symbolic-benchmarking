@@ -113,48 +113,6 @@ class PromptEffectAnalyser:
         return plot_stats(cs, n_models=n_models, titles=titles,
                           title=title or f"{self._experiment_label} - per-model performance improvement on '{variant}' variant)")
 
-    @do_for_metrics
-    def analyse_accuracy_change_significance(self, variant: str = 'main', models: list[str] | None = None,
-                                             metric: str | None = None):
-        """Run GLMM-based two-tailed tests per model to assess accuracy change.
-
-        Returns a DataFrame indexed by model with GLMM estimates, p-values and
-        a computed column with the plain mean accuracy difference.
-        """
-
-        if metric is None:
-            raise ValueError("Metric must be specified")
-
-        if GLMMRunner is None:
-            raise RuntimeError("R not available")
-
-        glmm_runner = GLMMRunner('is_experiment')
-
-        if models is None:
-            models = list(set(self._experiment_mres.models) | set(self._baseline_mres.models))
-
-        models_validated = []
-        assert models is not None
-        for model in models:
-            if model not in self._experiment_mres.models or model not in self._baseline_mres.models:
-                logger.warning(f"No data for model {model}")
-            else:
-                models_validated.append(model)
-
-        data_df = glmm_runner.prep_df_with_bool_labels(
-            metric=metric,
-            ras={
-                0: self._baseline_mres.variants[variant],
-                1: self._experiment_mres.variants[variant]
-            })
-
-        glmm_results_df, diagnostics_df = glmm_runner.run(df=data_df, models=models_validated, simplify=True)
-
-        # add plain accuracy change
-        glmm_results_df['acc_diff'] = self.get_mean_accuracy_change(metric=metric, variant=variant)
-
-        return glmm_results_df, diagnostics_df
-
     def get_accuracy_change(self, variant: str = 'main', metric: str | None = None) -> pd.DataFrame:
         baseline_accuracies = self._baseline_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)
         experiment_accuracies = self._experiment_mres.variants[variant].get_accuracies_per_model_and_template_id(metric=metric)

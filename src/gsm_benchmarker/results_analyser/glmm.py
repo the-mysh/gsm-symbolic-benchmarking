@@ -111,30 +111,6 @@ class GLMMRunner:
             convergence_messages=convergence_messages
         )
 
-    def prep_df_with_bool_labels(self, metric: str, ras: dict[int, "MultiModelResultsAnalyser"]) -> pd.DataFrame:
-        """Prepare a combined DataFrame for GLMM fitting from two analysers.
-
-        The `ras` mapping should map integer labels (e.g. 0, 1) to
-        MultiModelResultsAnalyser instances. The method extracts per-example
-        metric values and creates columns required by the GLMM (is_correct and
-        the fixed effect flag).
-        """
-
-        if len(self._labels) > 1:
-            raise RuntimeError("Cannot automatically prep df with multiple fixed effects")
-
-        def _prep(label_value: bool, ra: "MultiModelResultsAnalyser"):
-            res = ra.full_data
-            res = res[['model', 'id', metric]][:]
-            res[self._fixed_effects_term] = [label_value] * len(res)
-            res['is_correct'] = res[metric].astype(int)
-            res = res.drop(metric, axis=1)
-            return res
-
-        df = pd.concat([_prep(key, value) for key, value in ras.items()]).reset_index(drop=True)
-
-        return df
-
     def run(self, df: pd.DataFrame, models: list[str] | None = None, simplify=False):
         """Run per-model GLMM fits on data grouped by 'model'.
 
@@ -285,7 +261,7 @@ class GLMMRunner:
                 logger.debug(f"Skipping {model_name} (already in checkpoint).")
                 continue
 
-            logger.debug(f"Running bootstrap [{mi+1}/{n_models}]: {model_name} ({n_boot} resamples)...")
+            logger.debug(f"Running bootstrap [{mi}/{n_models}]: {model_name} ({n_boot} resamples)...")
             start = time.time()
 
             model_result = self.bootstrap_fit_df(
@@ -345,6 +321,7 @@ class GLMMRunner:
                 ci_lower = ci_upper = boot_se = boot_mean = np.nan
             model_summary.update({
                 f"estimates_{label}": estimates,
+                f"n_estimates_{label}": len(estimates),
                 f"ci_upper_{label}": ci_upper,
                 f"ci_lower_{label}": ci_lower,
                 f"boot_se_{label}": boot_se,
@@ -373,7 +350,7 @@ class GLMMRunner:
 
         rows = []
         for model_name, res in results.items():
-            row = {k: v for k, v in res.items() if ('estimates' not in k and 'elapsed' not in k)}
+            row = {k: v for k, v in res.items() if not (k.startswith('estimates') or k.startswith('elapsed'))}
             rows.append(row)
 
         summary_df = pd.DataFrame(rows).set_index('model')

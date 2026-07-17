@@ -52,6 +52,10 @@ class MultiVariantMultiModelResultsAnalyser:
     NUMBER_PATTERN = re.compile(r'\d+(?:\.\d+)?')
     BASELINE_VARIANT = 'GSM8K'
 
+    # fixed effect formulations for GLMM
+    VARIANT_EFFECT = 'is_variant'
+    NUMBER_EFFECT = 'is_variant + sum_logs_c'
+
     def __init__(self, dir_path: str | Path, summary_data: pd.DataFrame | None = None, variants: dict | None = None):
         self._dir_path = Path(dir_path).resolve()
 
@@ -156,51 +160,6 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return merged
 
-    def run_gap_analysis(self, metric: str = 'correct', variant: str = 'main'):
-        """Run one-sided Wilcoxon test per model to detect accuracy drops.
-
-        For each model, compute per-template mean scores and test whether the
-        baseline (GSM8K) score is significantly higher than the variant.
-        """
-
-        df_gsm8k = self._variants[self.BASELINE_VARIANT].full_data
-        df_variant = self._variants[variant].full_data
-
-        results = []
-
-        for model in df_gsm8k.model.unique():
-
-            # filter by model, aggregate by template id
-            scores_gsm8k = df_gsm8k[df_gsm8k.model == model].groupby('id')[metric].mean()
-            scores_variant = df_variant[df_variant.model == model].groupby('id')[metric].mean()
-
-            # pair the corresponding attempts by template id
-            # inner join - only compare ids present in both sets
-            paired = pd.concat([scores_gsm8k, scores_variant], axis=1, join='inner')
-            paired.columns = ['gsm8k', 'variant']
-
-            # 4. Calculate Stats
-            mean_gsm8k = paired['gsm8k'].mean()
-            mean_variant = paired['variant'].mean()
-            gap = mean_gsm8k - mean_variant
-
-            # one-sided Wilcoxon test
-            # H0: median(gsm8k - variant) <= 0
-            # H1: median(gsm8k - variant) > 0  (the drop is real)
-            if gap:
-                stat, p_value = stats.wilcoxon(
-                    x=paired['gsm8k'],
-                    y=paired['variant'],
-                    alternative='greater'
-                )
-            else:
-                p_value = 1.0
-                stat = np.nan
-
-            results.append({'model': model, 'p_value': p_value, 'gap': gap, 'stat': stat})
-
-        return pd.DataFrame(results)
-
     @staticmethod
     def _make_transition_matrix(data, order, column, margins_name='total'):
         order = order + [margins_name]
@@ -278,7 +237,6 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return fig
 
-
     def _validate_models(self, models: list[str] | None, variant: str):
         baseline_models = self.variants[self.BASELINE_VARIANT].models
         variant_models = self.variants[variant].models
@@ -301,6 +259,22 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return models_validated
 
+    def prep_variant_effect(self, variant: str, metric: str):
+        if GLMMRunner is None:
+            raise RuntimeError("R not available")
+
+        glmm_runner = GLMMRunner(self.VARIANT_EFFECT)
+        data_df = self.get_number_effect_glmm_data(variant=variant, metric=metric)
+        return glmm_runner, data_df
+
+    def prep_number_effect(self, variant: str, metric: str):
+        if GLMMRunner is None:
+            raise RuntimeError("R not available")
+
+        glmm_runner = GLMMRunner(self.NUMBER_EFFECT)
+        data_df = self.get_number_effect_glmm_data(variant=variant, metric=metric)
+        return glmm_runner, data_df
+
     @do_for_metrics
     def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None):
         """Analyse the effect of a dataset variant on accuracy using GLMM.
@@ -310,16 +284,7 @@ class MultiVariantMultiModelResultsAnalyser:
         """
         models = self._validate_models(models, variant)
 
-        if GLMMRunner is None:
-            raise RuntimeError("R not available")
-
-        glmm_runner = GLMMRunner('is_variant')
-        data_df = glmm_runner.prep_df_with_bool_labels(
-            metric=metric,
-            ras={
-                0: self.variants[self.BASELINE_VARIANT],
-                1: self.variants[variant]
-        })
+        glmm_runner, data_df = self.prep_variant_effect(variant=variant, metric=metric)
 
         glmm_results_df, diagnostics_df = glmm_runner.run(df=data_df, models=models, simplify=True)
         self._add_odds_changes(glmm_results_df)
@@ -329,7 +294,23 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return glmm_results_df, diagnostics_df
 
-    def _get_number_effect_glmm_data(self, variant: str, metric: str):
+    def get_variant_effect_glmm_data(self, variant: str, metric: str):
+
+        def prep_df(variant_name: str, value: bool):
+            data = self.variants[variant_name].full_data
+            data = data[['model', 'id', metric]][:]
+            data[self.VARIANT_EFFECT] = [value] * len(data)
+            data['is_correct'] = data[metric].astype(int)
+            data = data.drop(metric, axis=1)
+            return data
+
+        baseline_data = prep_df(self.BASELINE_VARIANT, 0)
+        variant_data = prep_df(variant, 1)
+
+        df = pd.concat([baseline_data, variant_data]).reset_index(drop=True)
+        return df
+
+    def get_number_effect_glmm_data(self, variant: str, metric: str):
         number_pattern = re.compile(r'\d*\.?\d+')
 
         def extract_sum_logs(text):
@@ -343,7 +324,7 @@ class MultiVariantMultiModelResultsAnalyser:
 
         def _prep(res, variant_label: bool):
             data = res.full_data[['model', 'id', metric, 'question']][:].reset_index(drop=True)
-            data['is_variant'] = [int(variant_label)] * len(data)
+            data[self.VARIANT_EFFECT] = [int(variant_label)] * len(data)
             data['is_correct'] = data[metric]
             data['id'] = data['id']
             data['sum_logs'] = data.question.apply(extract_sum_logs)
@@ -369,12 +350,8 @@ class MultiVariantMultiModelResultsAnalyser:
         if models is not None:
             models = self._validate_models(models, variant)
 
-        if GLMMRunner is None:
-            raise RuntimeError("R not available")
+        glmm_runner, data_df = self.prep_number_effect(variant=variant, metric=metric)
 
-        glmm_data = self._get_number_effect_glmm_data(variant=variant, metric=metric)
-
-        glmm_runner = GLMMRunner("is_variant + sum_logs_c")
         glmm_results_df, diagnostics_df = glmm_runner.run(df=glmm_data, models=models)
         self._add_odds_changes(glmm_results_df)
         return glmm_results_df, diagnostics_df

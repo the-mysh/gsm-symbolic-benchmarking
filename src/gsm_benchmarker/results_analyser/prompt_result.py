@@ -138,18 +138,6 @@ class PromptResult:
             raise ValueError(f"Prompt effect analysis not possible for baseline prompt ({self.full_label})")
         return self.pea
 
-    def _make_prompt_effect_df(self, variant):
-        return self._check_pea().analyse_accuracy_change_significance(
-            variant=variant, models=self.models, metric=self.metric)
-
-    @cached_property
-    def prompt_effect_main(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        return self._make_prompt_effect_df('main')
-
-    @cached_property
-    def prompt_effect_gsm8k(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        return self._make_prompt_effect_df('GSM8K')
-
     @cached_property
     def number_effect(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         return self.mres.analyse_number_effect('main', metric=self.metric, models=self.models)
@@ -162,19 +150,6 @@ class PromptResult:
             "Variant performance delta, pp",
             bar_colour=self.colour.value,
             save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
-            **kwargs
-        )
-
-        return figs
-
-    def plot_prompt_effect(self, **kwargs):
-        """Produce GLMM visualisations for the prompt effect (experiment vs baseline)."""
-        figs = plot_glmm(
-            self.prompt_effect_main[0],
-            'acc_diff',
-            "Prompt performance delta, pp",
-            bar_colour=self.colour.value,
-            save_prefix=self.save_dest/(self.short_label + "_pe") if self.save_dest is not None else None,
             **kwargs
         )
 
