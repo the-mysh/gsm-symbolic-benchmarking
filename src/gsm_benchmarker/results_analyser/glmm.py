@@ -13,7 +13,7 @@ import numpy.typing as npt
 import re
 import time
 from pathlib import Path
-from tqdm import tqdm
+from tqdm import trange
 import pickle
 
 from rpy2.rinterface_lib.embedded import RRuntimeError
@@ -204,7 +204,7 @@ class GLMMRunner:
         n_nonconverged = 0          # number of estimates with convergence warnings - excluded from estimate pools
 
 
-        for i in range(n_boot):
+        for i in trange(n_boot):
             # randomly sample ids with replacement
             sampled_ids = rng.choice(unique_ids, size=n_clusters, replace=True)
 
@@ -258,7 +258,7 @@ class GLMMRunner:
 
         mi = 0
 
-        for model_name, model_df in tqdm(df.groupby('model')):
+        for model_name, model_df in df.groupby('model'):
             if models is not None and model_name not in models:
                 continue
 
