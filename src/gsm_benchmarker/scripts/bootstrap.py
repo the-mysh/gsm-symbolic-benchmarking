@@ -1,10 +1,9 @@
 from argparse import ArgumentParser
 from pathlib import Path
 import logging
-import os
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
-from gsm_benchmarker.utils.logging_setup import install_colored_logger
+from gsm_benchmarker.utils.logging_setup import install_colored_logger, setup_log_file_handler
 
 logger = logging.getLogger(__file__)
 
@@ -31,16 +30,16 @@ def main():
     pargs = make_parser().parse_args()
     install_colored_logger(level=pargs.log_level)
 
+    output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
+    setup_log_file_handler(output_folder / 'logs')
+
+    logger.info(f"Outputs will be saved to folder: {output_folder}")
+    output_filename = (pargs.output_filename or f"boot{pargs.n_boot}") + ".csv"
+    output_path = output_folder/output_filename
+
     logger.info(f"Loading data from {pargs.data_path}")
     mres = MultiVariantMultiModelResultsAnalyser(pargs.data_path)
     logger.debug("Data loaded")
-
-    output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
-    os.makedirs(output_folder, exist_ok=True)
-    logger.info(f"Outputs will be saved to folder: {output_folder}")
-
-    output_filename = (pargs.output_filename or f"boot{pargs.n_boot}") + ".csv"
-    output_path = output_folder/output_filename
 
     if pargs.save_checkpoints:
         checkpoint_filename = (pargs.checkpoint_filename or f"boot{pargs.n_boot}_checkpoints") + ".pkl"
@@ -62,7 +61,7 @@ def main():
     logger.info("Adding single GLMM estimates (non-bootstrapped) for comparison")
     original_results, original_info = mres.analyse_variant_effect(variant=pargs.variant, metric=pargs.metric)
 
-    summary_df = glmm.summarize_bootstrap_results(bs_results, original_results, original_info)
+    summary_df = glmm.summarise_bootstrap_results(bs_results, original_results, original_info)
     summary_df.to_csv(output_path)
     logger.info(f"Bootstrap summary saved to {output_path}")
 

@@ -6,7 +6,7 @@ non-R utilities without requiring rpy2 to be available.
 """
 
 import logging
-from typing import TYPE_CHECKING, NamedTuple, Any
+from typing import NamedTuple
 import pandas as pd
 import numpy as np
 import numpy.typing as npt
@@ -26,8 +26,6 @@ ro.conversion.set_conversion(pandas2ri.converter + ro.default_converter)
 
 from pymer4.models import glmer  # needs to go after the converter setting
 
-if TYPE_CHECKING:
-    from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
 
 logger = logging.getLogger(__name__)
 
@@ -50,9 +48,11 @@ class FitResult(NamedTuple):
 
 class BootstrapFitResult(NamedTuple):
     clean_estimates: npt.NDArray[np.floating]
-    singular_esitmates: npt.NDArray[np.floating]
+    singular_estimates: npt.NDArray[np.floating]
     n_failed: int
     n_nonconverged: int
+    n_singular: int
+    n_clean: int
 
 
 class GLMMRunner:
@@ -225,19 +225,26 @@ class GLMMRunner:
                 continue
 
             if fit_result.convergence_messages:
+                logger.debug("Non-convergent estimate - discarding")
                 n_nonconverged += 1
                 continue  # discard estimate - unreliable
 
             if fit_result.is_singular:
+                logger.debug("Singular estimate - collecting separately")
                 singular_estimates.append(estimate)
             else:
                 clean_estimates.append(estimate)
 
+        logger.debug(f"Bootstrap loop finished; encountered {n_failed} failed fits, "
+                     f"{n_nonconverged} non-convergent estimates, and {len(singular_estimates)} singular estimates")
+
         return BootstrapFitResult(
             clean_estimates=np.array(clean_estimates),
-            singular_esitmates=np.array(singular_estimates),
+            singular_estimates=np.array(singular_estimates),
             n_failed=n_failed,
-            n_nonconverged=n_nonconverged
+            n_nonconverged=n_nonconverged,
+            n_singular=len(singular_estimates),
+            n_clean=len(clean_estimates)
         )
 
     def run_bootstrap(self, df: pd.DataFrame, models: list[str] | None = None, n_boot: int = 1000,
@@ -311,7 +318,7 @@ class GLMMRunner:
 
         for estimates, label in (
                 (model_result.clean_estimates, 'clean'),
-                (np.concatenate((model_result.singular_esitmates, model_result.clean_estimates)), 'inclusive')
+                (np.concatenate((model_result.singular_estimates, model_result.clean_estimates)), 'inclusive')
         ):
             if len(estimates):
                 ci_lower, ci_upper = np.percentile(estimates, [2.5, 97.5])
@@ -321,7 +328,6 @@ class GLMMRunner:
                 ci_lower = ci_upper = boot_se = boot_mean = np.nan
             model_summary.update({
                 f"estimates_{label}": estimates,
-                f"n_estimates_{label}": len(estimates),
                 f"ci_upper_{label}": ci_upper,
                 f"ci_lower_{label}": ci_lower,
                 f"boot_se_{label}": boot_se,
@@ -332,16 +338,24 @@ class GLMMRunner:
             'n_boot_requested': n_boot,
             'n_failed': model_result.n_failed,
             'n_nonconverged': model_result.n_nonconverged,
+            'n_singular': model_result.n_singular,
+            'n_clean': model_result.n_clean,
+            'n_inclusive': len(estimates),  # second iteration of the for-loop -> inclusive estimates
             'elapsed_seconds': elapsed,
         })
 
-        logger.debug(f"  Done in {elapsed:.1f}s. CI (inclusive): [{ci_lower:.3f}, {ci_upper:.3f}]; "
-                     f"{model_result.n_failed} failed fits, {model_result.n_nonconverged} not converged.")
+        ms = model_summary
+
+        logger.debug(
+            f"Done in {elapsed:.1f}s. "
+            f"CI from {ms['n_clean']} clean estimates: "
+            f"[{ms['ci_lower_clean']:.3f}, {ms['ci_upper_clean']:.3f}]"
+        )
 
         return model_summary
 
     @staticmethod
-    def summarize_bootstrap_results(results: dict, single_estimates_df: pd.DataFrame | None = None,
+    def summarise_bootstrap_results(results: dict, single_estimates_df: pd.DataFrame | None = None,
                                     single_info_df: pd.DataFrame | None = None) -> pd.DataFrame:
         """
         Turn the results dict into a tidy summary DataFrame.
