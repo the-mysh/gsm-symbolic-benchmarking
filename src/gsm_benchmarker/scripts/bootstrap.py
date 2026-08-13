@@ -22,6 +22,8 @@ def make_parser():
     parser.add_argument('--variant', type=str, default='main')
     parser.add_argument('--metric', type=str, default='correct')
 
+    parser.add_argument('--effect', type=str, choices=['variant', 'number'], required=True)
+
     parser.add_argument('--log-level', type=int, default=logging.INFO)
     return parser
 
@@ -33,8 +35,9 @@ def main():
     output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
     setup_log_file_handler(output_folder / 'logs')
 
+    run_info = f"n_boot_{pargs.n_boot}__{pargs.effect}_effect"
     logger.info(f"Outputs will be saved to folder: {output_folder}")
-    output_filename = (pargs.output_filename or f"boot{pargs.n_boot}") + ".csv"
+    output_filename = (pargs.output_filename or run_info) + ".csv"
     output_path = output_folder/output_filename
 
     logger.info(f"Loading data from {pargs.data_path}")
@@ -42,14 +45,15 @@ def main():
     logger.debug("Data loaded")
 
     if pargs.save_checkpoints:
-        checkpoint_filename = (pargs.checkpoint_filename or f"boot{pargs.n_boot}_checkpoints") + ".pkl"
+        checkpoint_filename = (pargs.checkpoint_filename or f"{run_info}__checkpoints") + ".pkl"
         checkpoint_path = output_folder / checkpoint_filename
         logger.info(f"Checkpoint path is: {checkpoint_path}")
 
     else:
         checkpoint_path = None
 
-    glmm, data_df = mres.prep_variant_effect(variant=pargs.variant, metric=pargs.metric)
+    prep_func = getattr(mres, f"prep_{pargs.effect}_effect")
+    glmm, data_df = prep_func(variant=pargs.variant, metric=pargs.metric)
 
     bs_results = glmm.run_bootstrap(
         data_df,
@@ -59,7 +63,7 @@ def main():
     )
 
     logger.info("Adding single GLMM estimates (non-bootstrapped) for comparison")
-    original_results, original_info = mres.analyse_variant_effect(variant=pargs.variant, metric=pargs.metric)
+    original_results, original_info = glmm.run(data_df)
 
     summary_df = glmm.summarise_bootstrap_results(bs_results, original_results, original_info)
     summary_df.to_csv(output_path)

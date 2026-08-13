@@ -6,10 +6,9 @@ non-R utilities without requiring rpy2 to be available.
 """
 
 import logging
-from typing import NamedTuple
+from typing import NamedTuple, Any
 import pandas as pd
 import numpy as np
-import numpy.typing as npt
 import re
 import time
 from pathlib import Path
@@ -47,8 +46,8 @@ class FitResult(NamedTuple):
 
 
 class BootstrapFitResult(NamedTuple):
-    clean_estimates: npt.NDArray[np.floating]
-    singular_estimates: npt.NDArray[np.floating]
+    clean_estimates: pd.DataFrame
+    singular_estimates: pd.DataFrame
     n_failed: int
     n_nonconverged: int
     n_singular: int
@@ -189,8 +188,16 @@ class GLMMRunner:
                     logger.warning(f"No data for model {requested_model_name}")
 
         diagnostics_df = pd.DataFrame(diagnostics_records).set_index('model')
+        self._add_odds_changes(glmm_results_df)
 
         return glmm_results_df, diagnostics_df
+
+    @staticmethod
+    def _add_odds_changes(df):
+        odds_ratio = np.exp(df.estimate)
+        df['odds_ratio'] = odds_ratio
+        df['odds_change'] = odds_ratio - 1  # change in odds
+        return df
 
     def bootstrap_fit_df(self, df: pd.DataFrame, n_boot: int = 1000, cluster_col: str = 'id', seed: int = None
                          ) -> BootstrapFitResult:
@@ -219,7 +226,7 @@ class GLMMRunner:
 
             try:
                 fit_result = self.fit_df(boot_df)
-                estimate = fit_result.coefs_df.loc['is_variant', 'Estimate']
+                estimate = fit_result.coefs_df.loc[:, 'Estimate'].to_dict()
             except GLMMFitError:
                 n_failed += 1
                 continue
@@ -239,8 +246,8 @@ class GLMMRunner:
                      f"{n_nonconverged} non-convergent estimates, and {len(singular_estimates)} singular estimates")
 
         return BootstrapFitResult(
-            clean_estimates=np.array(clean_estimates),
-            singular_estimates=np.array(singular_estimates),
+            clean_estimates=pd.DataFrame(clean_estimates),
+            singular_estimates=pd.DataFrame(singular_estimates),
             n_failed=n_failed,
             n_nonconverged=n_nonconverged,
             n_singular=len(singular_estimates),
@@ -310,49 +317,53 @@ class GLMMRunner:
 
         return checkpoint_file, results
 
-    @staticmethod
-    def _summarise_model_bootstrap(model_name: str, model_result: BootstrapFitResult, n_boot: int,
+    def _summarise_model_bootstrap(self, model_name: str, model_result: BootstrapFitResult, n_boot: int,
                                    elapsed: float) -> dict:
 
-        model_summary = {'model': model_name}
+        clean_estimates = model_result.clean_estimates
+        inclusive_estimates = model_result.clean_estimates.join(model_result.singular_estimates)
 
-        for estimates, label in (
-                (model_result.clean_estimates, 'clean'),
-                (np.concatenate((model_result.singular_estimates, model_result.clean_estimates)), 'inclusive')
-        ):
-            if len(estimates):
-                ci_lower, ci_upper = np.percentile(estimates, [2.5, 97.5])
-                boot_se = np.std(estimates, ddof=1)
-                boot_mean = np.mean(estimates)
-            else:
-                ci_lower = ci_upper = boot_se = boot_mean = np.nan
-            model_summary.update({
-                f"estimates_{label}": estimates,
-                f"ci_upper_{label}": ci_upper,
-                f"ci_lower_{label}": ci_lower,
-                f"boot_se_{label}": boot_se,
-                f"boot_mean_{label}": boot_mean,
+        full_summary = {}
+        for glmm_label in self._labels:
+            glmm_label_summary: dict[str, Any] = {'model': model_name}
+
+            for estimates, inclusivity_label in (
+                    (clean_estimates.loc[:, glmm_label], 'clean'),
+                    (inclusive_estimates.loc[:, glmm_label], 'inclusive')
+            ):
+                if n_estimates := len(estimates):
+                    ci_lower, ci_upper = np.percentile(estimates, [2.5, 97.5])
+                    boot_se = np.std(estimates, ddof=1)
+                    boot_mean = np.mean(estimates)
+                else:
+                    ci_lower = ci_upper = boot_se = boot_mean = np.nan
+                glmm_label_summary.update({
+                    f"estimates_{inclusivity_label}": estimates,
+                    f"ci_upper_{inclusivity_label}": ci_upper,
+                    f"ci_lower_{inclusivity_label}": ci_lower,
+                    f"boot_se_{inclusivity_label}": boot_se,
+                    f"boot_mean_{inclusivity_label}": boot_mean,
+                })
+
+            glmm_label_summary.update({
+                'n_boot_requested': n_boot,
+                'n_failed': model_result.n_failed,
+                'n_nonconverged': model_result.n_nonconverged,
+                'n_singular': model_result.n_singular,
+                'n_clean': model_result.n_clean,
+                'n_inclusive': n_estimates,  # second iteration of the for-loop -> inclusive estimates
+                'elapsed_seconds': elapsed,
             })
 
-        model_summary.update({
-            'n_boot_requested': n_boot,
-            'n_failed': model_result.n_failed,
-            'n_nonconverged': model_result.n_nonconverged,
-            'n_singular': model_result.n_singular,
-            'n_clean': model_result.n_clean,
-            'n_inclusive': len(estimates),  # second iteration of the for-loop -> inclusive estimates
-            'elapsed_seconds': elapsed,
-        })
-
-        ms = model_summary
+            full_summary[glmm_label] = glmm_label_summary
 
         logger.debug(
             f"Done in {elapsed:.1f}s. "
-            f"CI from {ms['n_clean']} clean estimates: "
-            f"[{ms['ci_lower_clean']:.3f}, {ms['ci_upper_clean']:.3f}]"
+            f"Obtained {len(model_result.clean_estimates)} clean estimates "
+            f"and {len(model_result.singular_estimates)} singular estimates."
         )
 
-        return model_summary
+        return full_summary
 
     @staticmethod
     def summarise_bootstrap_results(results: dict, single_estimates_df: pd.DataFrame | None = None,
