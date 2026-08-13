@@ -46,8 +46,8 @@ class FitResult(NamedTuple):
 
 
 class BootstrapFitResult(NamedTuple):
-    clean_estimates: pd.DataFrame
-    singular_estimates: pd.DataFrame
+    clean_estimates: pd.Series
+    singular_estimates: pd.Series
     n_failed: int
     n_nonconverged: int
     n_singular: int
@@ -66,7 +66,11 @@ class GLMMRunner:
     def __init__(self, fixed_effects_term: str, random_effects_term: str = "(1 | id)"):
         self._formula = f'is_correct ~ {fixed_effects_term} + {random_effects_term}'
         self._fixed_effects_term = fixed_effects_term
-        self._labels = list(set(set(re.findall(r"[\w\:]+", fixed_effects_term))))
+        self._fixed_effects_labels = list(set(set(re.findall(r"[\w\:]+", fixed_effects_term))))
+
+    @property
+    def fixed_effect_labels(self):
+        return self._fixed_effects_labels[:]  # return copy
 
     def fit_df(self, df: pd.DataFrame):
         """Fit a GLMM on a prepared DataFrame and return coefficient table.
@@ -127,7 +131,7 @@ class GLMMRunner:
             if models is not None and model_name not in models:
                 continue
 
-            for label in self._labels:
+            for label in self._fixed_effects_labels:
                 try:
                     group_df = group_df.dropna(subset=[label])  # make sure there are no NaNs
                 except KeyError:
@@ -140,7 +144,7 @@ class GLMMRunner:
             except GLMMFitError as err:
                 logger.warning(f"{model_name}: {err}")
                 res = {'estimate': np.nan, 'p_value': 1, 'std_err': np.nan, 'z_value': np.nan}
-                coefs_df = pd.DataFrame(len(self._labels) * [res], index=self._labels)
+                coefs_df = pd.DataFrame(len(self._fixed_effects_labels) * [res], index=self._fixed_effects_labels)
                 diagnostics_records.append({
                     'model': model_name,
                     'fit_failed': True,
@@ -320,42 +324,37 @@ class GLMMRunner:
     def _summarise_model_bootstrap(self, model_name: str, model_result: BootstrapFitResult, n_boot: int,
                                    elapsed: float) -> dict:
 
-        clean_estimates = model_result.clean_estimates
-        inclusive_estimates = model_result.clean_estimates.join(model_result.singular_estimates)
+        estimates = model_result.clean_estimates.loc[:, self._fixed_effects_labels]
 
-        full_summary = {}
-        for glmm_label in self._labels:
-            glmm_label_summary: dict[str, Any] = {'model': model_name}
+        full_summary: dict[str, Any] = {'model': model_name, 'estimates': estimates}
 
-            for estimates, inclusivity_label in (
-                    (clean_estimates.loc[:, glmm_label], 'clean'),
-                    (inclusive_estimates.loc[:, glmm_label], 'inclusive')
-            ):
-                if n_estimates := len(estimates):
-                    ci_lower, ci_upper = np.percentile(estimates, [2.5, 97.5])
-                    boot_se = np.std(estimates, ddof=1)
-                    boot_mean = np.mean(estimates)
-                else:
-                    ci_lower = ci_upper = boot_se = boot_mean = np.nan
-                glmm_label_summary.update({
-                    f"estimates_{inclusivity_label}": estimates,
-                    f"ci_upper_{inclusivity_label}": ci_upper,
-                    f"ci_lower_{inclusivity_label}": ci_lower,
-                    f"boot_se_{inclusivity_label}": boot_se,
-                    f"boot_mean_{inclusivity_label}": boot_mean,
-                })
+        stats = {}
+        for effect_label in self._fixed_effects_labels:
+            effect_estimates = estimates.loc[:, effect_label]
+            if len(effect_estimates):
+                ci_lower, ci_upper = np.percentile(effect_estimates, [2.5, 97.5])
+                boot_se = np.std(effect_estimates, ddof=1)
+                boot_mean = np.mean(effect_estimates)
+            else:
+                ci_lower = ci_upper = boot_se = boot_mean = np.nan
 
-            glmm_label_summary.update({
+            stats[effect_label] = {
+                f"ci_upper": ci_upper,
+                f"ci_lower": ci_lower,
+                f"boot_se": boot_se,
+                f"boot_mean": boot_mean,
+            }
+
+        full_summary['stats'] = pd.DataFrame(stats)
+
+        full_summary['info'] = {
                 'n_boot_requested': n_boot,
                 'n_failed': model_result.n_failed,
                 'n_nonconverged': model_result.n_nonconverged,
                 'n_singular': model_result.n_singular,
                 'n_clean': model_result.n_clean,
-                'n_inclusive': n_estimates,  # second iteration of the for-loop -> inclusive estimates
                 'elapsed_seconds': elapsed,
-            })
-
-            full_summary[glmm_label] = glmm_label_summary
+            }
 
         logger.debug(
             f"Done in {elapsed:.1f}s. "
