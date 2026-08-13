@@ -4,67 +4,54 @@ import pandas as pd
 from pathlib import Path
 import logging
 
+from gsm_benchmarker.scripts.bootstrap import make_names
 
 logger = logging.getLogger(__name__)
 
 
-def pick_version(attr_fmt: str = "{}_combined"):
-    def decorator(func):
-        def wrapper(inst, inclusive: bool = False, **kwargs):
-            attr_name = attr_fmt.format('inclusive' if inclusive else 'clean')
-            bsc = getattr(inst, attr_name)
-            return func(inst, bsc, **kwargs)
-        return wrapper
-    return decorator
-
-
 class BootstrapResult:
-    def __init__(self, data_path: Path | str, n_boot: int):
+    def __init__(self, data_path: Path | str, n_boot: int, effect: str):
         self.data_path = Path(data_path)
         self.n_boot = n_boot
 
-        self.summary_df = self._load_summary(self.data_path / f'boot{n_boot}.csv')
+        output_filename, checkpoints_filename = make_names(n_boot, effect)
+
+        self.summary_df = self._load_summary(self.data_path / output_filename)
 
         try:
-            self.full_results = pd.read_pickle(self.data_path / f'boot{n_boot}_checkpoints.pkl')
+            self.full_results = pd.read_pickle(self.data_path / checkpoints_filename)
         except FileNotFoundError:
             logger.warning("Full results not available")
 
     def _load_summary(self, summary_path):
 
-        summary_df = pd.read_csv(summary_path, index_col=0)
+        summary_df = pd.read_pickle(summary_path)
 
-        s_sig = summary_df['single_significant'] = summary_df['single_p_value'] < 0.05  # bring in your Table 2/3 p-values per model
+        s_sig = summary_df['single_significant'] = summary_df['single_p_value'] < 0.05
         s_width = summary_df['single_ci_width'] = summary_df['single_ci_upper'] - summary_df['single_ci_lower']
         s_est = summary_df['single_estimate']
 
-        for label in ('clean', 'inclusive'):
-            ci_contains_zero = (summary_df[f'ci_lower_{label}'] <= 0) & (summary_df[f'ci_upper_{label}'] >= 0)
-            b_sig = summary_df[f'significant_{label}'] = ~ci_contains_zero
+        ci_contains_zero = (summary_df[f'boot_ci_lower'] <= 0) & (summary_df[f'boot_ci_upper'] >= 0)
+        b_sig = summary_df[f'boot_significant'] = ~ci_contains_zero
 
-            summary_df[f'bias_{label}'] = summary_df[f'boot_mean_{label}'] - s_est
+        summary_df[f'bias'] = summary_df[f'boot_mean'] - s_est
 
-            summary_df[f'ci_width_{label}'] = summary_df[f'ci_upper_{label}'] - summary_df[f'ci_lower_{label}']
-            summary_df[f'width_ratio_{label}'] = summary_df[f'ci_width_{label}'] / s_width
+        summary_df[f'boot_ci_width'] = summary_df[f'boot_ci_upper'] - summary_df[f'boot_ci_lower']
+        summary_df[f'width_ratio'] = summary_df[f'boot_ci_width'] / s_width
 
-            summary_df[f'agreement_{label}'] = (s_sig == b_sig)
-
+        summary_df[f'agreement'] = (s_sig == b_sig)
 
         return summary_df
 
     @cached_property
     def summary_numbers(self):
-        return self._stripped_summary('n_', is_prefix=True, no_strip=True)
+        return self._make_summary('boot_n_')
 
-    def _stripped_summary(self, label: str, is_prefix: bool = False, no_strip: bool = False):
-        nc = len(label)
+    def _make_summary(self, prefix: str, no_strip: bool = False):
+        nc = len(prefix)
 
-        if is_prefix:
-            cond = lambda s: s.startswith(label)
-            trim = slice(nc, None)
-        else:
-            cond = lambda s: s.endswith(label)
-            trim = slice(0, -nc)
+        cond = lambda s: s.startswith(prefix)
+        trim = slice(nc, None)
 
         if no_strip:
             trim = slice(0, None)
@@ -74,60 +61,49 @@ class BootstrapResult:
         return self.summary_df[cols].rename(columns=mapping).rename(columns={'n': 'n_estimates'})
 
     @cached_property
-    def summary_clean(self):
-        return self._stripped_summary('_clean')
+    def summary_boot(self):
+        return self._make_summary('boot_')
 
     def _get_single_not_stripped(self):
-        return self._stripped_summary('single_', is_prefix=True, no_strip=True)
-
-    @cached_property
-    def clean_combined(self):
-        return self.summary_clean.join(self._get_single_not_stripped())
-
-    @cached_property
-    def summary_inclusive(self):
-        return self._stripped_summary('_inclusive')
-
-    @cached_property
-    def inclusive_combined(self):
-        return self.summary_inclusive.join(self._get_single_not_stripped())
+        return self._make_summary('single_', no_strip=True)
 
     @cached_property
     def summary_single(self):
-        return self._stripped_summary('single_', is_prefix=True)
+        return self._make_summary('single_')
 
     def _get_one_field_from_full_results(self, field: str):
         return {k: v[field] for k, v in self.full_results.items()}
 
     @cached_property
-    def clean_estimates(self):
-        return self._get_one_field_from_full_results('estimates_clean')
+    def estimates(self):
+        return self._get_one_field_from_full_results('estimates')
 
-    @cached_property
-    def inclusive_estimates(self):
-        return self._get_one_field_from_full_results('estimates_inclusive')
-
-    @pick_version()
-    def disagreements_check(self, bsc):
-        agreement = bsc.agreement
+    def disagreements_check(self):
+        agreement = self.summary_df.agreement
         print(f"Agreement: {agreement.sum()} / {len(agreement)} models")
 
-        return bsc[~agreement][['ci_lower', 'ci_upper', 'single_ci_lower', 'single_ci_upper', 'single_p_value', 'single_nonconvergent']]  # show any disagreements directly
+        # show any disagreements directly
+        return self.summary_df[~agreement][[
+            'boot_ci_lower',
+            'boot_ci_upper',
+            'single_ci_lower',
+            'single_ci_upper',
+            'single_p_value',
+            'single_nonconvergent'
+        ]]
 
-    @pick_version()
-    def bias_check(self, bsc):
-        return bsc.sort_values('bias', key=abs, ascending=False)[[f'bias', 'boot_mean', 'single_estimate', 'single_ci_lower', 'single_ci_upper']]
+    def bias_check(self):
+        return self.summary_df.sort_values('bias', key=abs, ascending=False)[
+            ['bias', 'boot_mean', 'single_estimate', 'single_ci_lower', 'single_ci_upper']]
 
-    @pick_version()
-    def ci_width_check(self, bsc):
-        return bsc[~bsc.index.isin(self.nonconvergent_models)][['width_ratio']].describe()
+    def ci_width_check(self):
+        return self.summary_df[~self.summary_df.index.isin(self.nonconvergent_models)][['width_ratio']].describe()
 
-    @pick_version("{}_estimates")
-    def skew_check(self, estimates, threshold: float = 0.5):
+    def skew_check(self, variable: str, threshold: float = 0.5):
 
         skews = {}
-        for model_name, res in estimates.items():
-            skew = pd.Series(res).skew()
+        for model_name, res in self.estimates.items():
+            skew = res[variable].skew()
             if abs(skew) > 0.5:  # flag anything notably skewed
                 skews[model_name] = skew
 
@@ -142,25 +118,22 @@ class BootstrapResult:
     def nonconvergent_models(self):
         return self.summary_single[self.summary_single.nonconvergent].index.tolist()
 
-    def plot_nonagreeing_estimates(self, inclusive: bool = False):
-        if inclusive:
-            agreement = self.inclusive_combined.agreement
-            estimates = self.inclusive_estimates
-        else:
-            agreement = self.clean_combined.agreement
-            estimates = self.clean_estimates
+    def plot_nonagreeing_estimates(self, variable):
+        summary = self.summary_df.xs(variable, level=1)
+        agreement = summary.agreement
+        estimates = self.estimates
 
-        nonagreeing_models = self.summary_df[~agreement].index.tolist()
+        nonagreeing_models = summary[~agreement].index.tolist()
 
         for m in self.nonconvergent_models:
             if m in nonagreeing_models:
                 nonagreeing_models.remove(m)
 
         for model_name in nonagreeing_models:
-            m_est = estimates[model_name]
+            m_est = estimates[model_name][variable]
             plt.hist(m_est, bins=40)
             plt.axvline(0, color='red', linestyle='--')
             plt.title(model_name)
             plt.show()
-            print(f"{model_name}: skew={pd.Series(m_est).skew():.2f}, "
+            print(f"{model_name} / '{variable}': skew={m_est.skew():.2f}, "
                   f"% of resamples > 0: {(m_est > 0).mean()*100:.1f}%")
