@@ -28,6 +28,11 @@ def make_parser():
     return parser
 
 
+def make_names(n_boot: int, effect: str, ext='.pkl'):
+    run_info = f"n_boot_{n_boot}__{effect}_effect"
+    return run_info + '.pkl', f"{run_info}__checkpoints" + ext
+
+
 def main():
     pargs = make_parser().parse_args()
     install_colored_logger(level=pargs.log_level)
@@ -35,9 +40,10 @@ def main():
     output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
     setup_log_file_handler(output_folder / 'logs')
 
-    run_info = f"n_boot_{pargs.n_boot}__{pargs.effect}_effect"
+    output_filename_default, checkpoints_filename_default = make_names(pargs.n_boot, pargs.effect)
+
     logger.info(f"Outputs will be saved to folder: {output_folder}")
-    output_filename = (pargs.output_filename or run_info) + ".csv"
+    output_filename = pargs.output_filename or output_filename_default
     output_path = output_folder/output_filename
 
     logger.info(f"Loading data from {pargs.data_path}")
@@ -45,7 +51,7 @@ def main():
     logger.debug("Data loaded")
 
     if pargs.save_checkpoints:
-        checkpoint_filename = (pargs.checkpoint_filename or f"{run_info}__checkpoints") + ".pkl"
+        checkpoint_filename = pargs.checkpoint_filename or checkpoints_filename_default
         checkpoint_path = output_folder / checkpoint_filename
         logger.info(f"Checkpoint path is: {checkpoint_path}")
 
@@ -66,7 +72,7 @@ def main():
     original_results, original_info = glmm.run(data_df)
 
     summary_df = glmm.summarise_bootstrap_results(bs_results, original_results, original_info)
-    summary_df.to_csv(output_path)
+    summary_df.to_pickle(output_path)
     logger.info(f"Bootstrap summary saved to {output_path}")
 
     print("Bootstrap summary:")

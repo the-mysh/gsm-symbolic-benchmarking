@@ -46,8 +46,8 @@ class FitResult(NamedTuple):
 
 
 class BootstrapFitResult(NamedTuple):
-    clean_estimates: pd.Series
-    singular_estimates: pd.Series
+    clean_estimates: pd.DataFrame
+    singular_estimates: pd.DataFrame
     n_failed: int
     n_nonconverged: int
     n_singular: int
@@ -339,8 +339,8 @@ class GLMMRunner:
                 ci_lower = ci_upper = boot_se = boot_mean = np.nan
 
             stats[effect_label] = {
-                f"ci_upper": ci_upper,
-                f"ci_lower": ci_lower,
+                f"boot_ci_upper": ci_upper,
+                f"boot_ci_lower": ci_lower,
                 f"boot_se": boot_se,
                 f"boot_mean": boot_mean,
             }
@@ -348,12 +348,12 @@ class GLMMRunner:
         full_summary['stats'] = pd.DataFrame(stats)
 
         full_summary['info'] = {
-                'n_boot_requested': n_boot,
-                'n_failed': model_result.n_failed,
-                'n_nonconverged': model_result.n_nonconverged,
-                'n_singular': model_result.n_singular,
-                'n_clean': model_result.n_clean,
-                'elapsed_seconds': elapsed,
+                'boot_n_requested': n_boot,
+                'boot_n_failed': model_result.n_failed,
+                'boot_n_nonconverged': model_result.n_nonconverged,
+                'boot_n_singular': model_result.n_singular,
+                'boot_n_clean': model_result.n_clean,
+                'boot_elapsed_seconds': elapsed,
             }
 
         logger.debug(
@@ -373,12 +373,14 @@ class GLMMRunner:
         Optionally, compare against original (non-bootstrap) point estimates.
         """
 
-        rows = []
+        rows = {}
         for model_name, res in results.items():
-            row = {k: v for k, v in res.items() if not (k.startswith('estimates') or k.startswith('elapsed'))}
-            rows.append(row)
+            stats = res['stats']
+            info = res['info']
+            info_df = pd.DataFrame({v: info for v in stats.columns})
+            rows[model_name] = stats.T.join(info_df.T)
 
-        summary_df = pd.DataFrame(rows).set_index('model')
+        summary_df = pd.concat(rows)
 
         if single_estimates_df is not None:
             sest = single_estimates_df['estimate']
@@ -392,6 +394,9 @@ class GLMMRunner:
             summary_df['single_p_value'] = single_estimates_df['p_value']
 
             if single_info_df is not None:
+                glmm_variables = summary_df.index.get_level_values(1).unique()
+                single_info_df = pd.concat({k: single_info_df for k in glmm_variables}).swaplevel()
+
                 summary_df['single_singular'] = single_info_df['is_singular']
                 summary_df['single_nonconvergent'] = single_info_df['convergence_messages'].astype(bool)
                 summary_df['single_fit_failed'] = single_info_df['fit_failed']
