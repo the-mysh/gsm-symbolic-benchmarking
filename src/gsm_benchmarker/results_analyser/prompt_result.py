@@ -145,7 +145,7 @@ class PromptResult:
     def plot_variant_effect(self, **kwargs):
         """Produce GLMM visualisations for the variant effect of this prompt."""
         figs = plot_glmm(
-            self.variant_effect[0],
+            *self.variant_effect,
             'acc_diff',
             "Variant performance delta, pp",
             bar_colour=self.colour.value,
@@ -187,7 +187,9 @@ class PromptResult:
             'delta_symb_log_or': variant_effect_df['estimate'],
             'delta_symb_or': variant_effect_df['odds_ratio'],
             'delta_symb_p_value': variant_effect_df['p_value'],
-            'delta_symb_significant': variant_effect_df['p_value'] < alpha
+            'delta_symb_significant': variant_effect_df['p_value'] < alpha,
+            'delta_symb_converged': ~variant_effect_diagnostics_df['convergence_messages'].astype(bool),
+            'delta_symb_singular': variant_effect_diagnostics_df['is_singular'],
         }
 
         number_effect_df, number_effect_diagnostics_df = self.number_effect
@@ -198,10 +200,10 @@ class PromptResult:
                 f'{variable_label}_log_or': df_ne['estimate'],
                 f'{variable_label}_or': df_ne['odds_ratio'],
                 f'{variable_label}_p_value': df_ne['p_value'],
-                f'{variable_label}_significant': df_ne['p_value'] < alpha
+                f'{variable_label}_significant': df_ne['p_value'] < alpha,
+                f'{variable_label}_converged': ~number_effect_diagnostics_df['convergence_messages'].astype(bool),
+                f'{variable_label}_singular': number_effect_diagnostics_df['is_singular'],
             }
-
-        # TODO: add diagnostics for variant and number effects
 
         df = pd.DataFrame(d).transpose()
         if self.models:

@@ -184,8 +184,8 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
         ax.axvline(0, color='k', lw=1, zorder=1)
         ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
-    add_bar_labels(axes[0], precision=1, fontsize=7)
-    add_bar_labels(axes[1], precision=3, fontsize=7)
+    label_bars(axes[0], precision=1, fontsize=7)
+    label_bars(axes[1], precision=3, fontsize=7)
 
     if title:
         fig.suptitle(title)
@@ -195,7 +195,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
     return fig
 
 
-def add_bar_labels(ax, precision: int = 3, fontsize: int = 7):
+def label_bars(ax, precision: int = 3, fontsize: int = 7):
     """Add numeric labels to bars in a matplotlib Axes.
 
     The precision parameter controls formatting; precision==0 yields integer
@@ -264,8 +264,9 @@ def _define_significance_points(projected_alpha: float | None):
 
 
 
-def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, projected_alpha: float | None = None,
-                              model_order: list[str] | None = None, sort_models: bool = False
+def _prepare_odds_ratios_data(df: pd.DataFrame, diagnostic_df: pd.DataFrame, metric: str | None = None,
+                              projected_alpha: float | None = None, model_order: list[str] | None = None,
+                              sort_models: bool = False
                               ) -> tuple[pd.DataFrame, dict[str, SignificancePoint], list[str] | None]:
 
     p_thresholds = _define_significance_points(projected_alpha)
@@ -273,6 +274,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
     if metric is not None:
         df = df.xs(metric, level='metric')
     df_plot = df.copy()
+    df_plot['convergent'] = ~diagnostic_df['convergence_messages'].astype(bool)
 
     def get_colour(row):
         default_colour = p_thresholds["not_significant"].colour
@@ -314,7 +316,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None, proje
 
 
 @save_plot("odds_ratios")
-def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None,
+def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projected_alpha: float | None = None,
                             model_order: list[str] | None = None, sort_models: bool = False,
                             title: str | None = None):
     """Plot log odds ratios with 95% CI for each model.
@@ -324,7 +326,9 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     """
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
-        df, metric=metric, projected_alpha=projected_alpha, model_order=model_order, sort_models=sort_models)
+        df, diagnostic_df, metric=metric, projected_alpha=projected_alpha,
+        model_order=model_order, sort_models=sort_models
+    )
 
     fig, ax = plt.subplots(figsize=_get_fig_size(len(df_plot)))
     ci_colour = 'darkgrey'
@@ -338,11 +342,15 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
             continue
 
         # draw CIs
-        ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2)
+        ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2,
+                  ls='-' if row['convergent'] else '--')
         ax.plot([row['ci_lower_log_or'], row['ci_upper_log_or']], [y, y], '|', c=ci_colour, ms=15)
 
-        # draw the dot using the dynamically assigned colour
-        ax.scatter(x=row['estimate'], y=y, color=row['colour'], s=80, zorder=2, ec='black', lw=0.5)
+        # draw the dot using the dynamically assigned colour (depending on significance) and edge style (convergence)
+        ax.scatter(
+            x=row['estimate'], y=y, color=row['colour'], s=80, zorder=2, ec='black', lw=0.5,
+            ls='-' if row['convergent'] else '--'
+        )
 
     ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
@@ -403,9 +411,9 @@ def plot_for_metrics(func):
 
 
 @plot_for_metrics
-def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None, metric: str | None = None,
-              bar_colour: str | None = None, title: str | None = None, save_prefix: str | Path | None = None,
-               model_order: list[str] | None = None, **kwargs):
+def plot_glmm(df: pd.DataFrame, diagnostic_df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None,
+              metric: str | None = None, bar_colour: str | None = None, title: str | None = None,
+              save_prefix: str | Path | None = None, model_order: list[str] | None = None, **kwargs):
     """Compose GLMM plots: odds ratios and bar/p-value panels.
 
     Returns a tuple of Figures (odds ratios figure, bar/p-value figure).
@@ -414,7 +422,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
     metric_text = f"\n{metric} accuracy" if metric else ""
 
     f1, model_order = plot_models_odds_ratios(
-        df, metric, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
+        df, diagnostic_df, metric, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
         title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 
@@ -464,10 +472,20 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
     return g.figure
 
 
+def _dash_bar(bar):
+    bar.set_edgecolor('black')
+    bar.set_linewidth(1)
+    bar.set_linestyle('--')
+
+
+def _hatch_bar(bar):
+    bar.set_hatch('///')
+
+
 @save_plot("prompts_variant_effect", "prompts_number_effect")
 def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
                            hatch_lw: int = 2, add_bar_labels: bool = False, x_labels_rotation: float = 0,
-                           x_labels_ha='center'):
+                           x_labels_ha='center', figsize=(10, 10), bottom=0.35, second_legend_offset=0.25):
     """Plot two summary figures comparing prompt formats and effects.
 
     Returns two Figures: one showing accuracy and delta statistics, another
@@ -485,12 +503,15 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         data = data.transpose()
         return data
 
-    def plot_quantity(quantity, ax, title, mask_quantity=None, precision: int = 3, ylabel: str | None = None, **kwargs):
+    def plot_quantity(quantity, ax, title, hatch_mask_quantity=None, dash_mask_quantity=None, precision: int = 3,
+                      ylabel: str | None = None, **kwargs):
         data = prep_data(quantity)
-        mask = prep_data(mask_quantity) if mask_quantity else None
+        ones =  pd.DataFrame(True, data.index, columns=data.columns)
+        hatch_mask = prep_data(hatch_mask_quantity) if hatch_mask_quantity else ones
+        dash_mask = prep_data(dash_mask_quantity) if dash_mask_quantity else ones
 
         with rc_context({'hatch.linewidth': hatch_lw}):
-            data.plot.bar(ax=ax, legend=False, **kwargs, edgecolor='white')
+            data.plot.bar(ax=ax, legend=False, color=colours, **kwargs, edgecolor='white')
 
             for i, container in enumerate(ax.containers):
                 if add_bar_labels:
@@ -499,10 +520,12 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
                               in heights]
                     ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
-                if mask is not None:
-                    for bar, sig in zip(container.patches, mask[mask.columns[i]]):
-                        if not sig:
-                            bar.set_hatch('///')
+                c = data.columns[i]
+                for bar, no_hatch, no_dash in zip(container.patches, hatch_mask[c], dash_mask[c]):
+                    if not no_hatch:
+                        _hatch_bar(bar)
+                    if not no_dash:
+                        _dash_bar(bar)
 
             ax.set_title(title)
             ax.axhline(0, c='k', lw=0.5)
@@ -511,7 +534,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
                 ax.set_ylabel(ylabel, fontsize=8)
 
     # Reusable figure builder
-    def create_figure(specs, figsize, bottom_rect, legend_title=None):
+    def create_figure(specs):
         fig, axes = plt.subplots(len(specs), 1, figsize=figsize, sharex='all')
 
         # Ensure axes is iterable even if there's only 1 subplot
@@ -525,45 +548,97 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         axes[-1].set_xticklabels(axes[-1].get_xticklabels(), rotation=x_labels_rotation, ha=x_labels_ha)
         axes[-1].set_xlabel("Model")
 
-        # Create standard handles/labels and append the shared hatch patch
-        handles, labels = axes[0].get_legend_handles_labels()
+        # Add legends
+        ax_bottom = axes[-1]
+
+        # first legend
+        legend1 = ax_bottom.legend(
+            handles=axes[0].get_legend_handles_labels()[0],
+            loc='upper center',
+            bbox_to_anchor=(0.5, -bottom),  # below bottom axis
+            ncol=5,
+            title="Prompt formats",
+            frameon=True
+        )
+        ax_bottom.add_artist(legend1)  # prevent the first legend from being overwritten
+
+        # second legend
         with rc_context({'hatch.linewidth': hatch_lw}):
-            hatch_patch = Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"effect n.s. (p > .05)")
-        handles.append(hatch_patch)
-        labels.append(hatch_patch.get_label())
+            diagnostic_handles = [
+                Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"effect not significant (p > .05)"),
+                Patch(facecolor='lightgrey', edgecolor='black', lw=1, ls='--', label="GLMM convergence warning")
+            ]
+        ax_bottom.legend(
+            handles=diagnostic_handles,
+            loc='upper center',
+            bbox_to_anchor=(0.5, -bottom - second_legend_offset),  # below the first legend
+            ncol=2,
+            title="Effect significance and GLMM diagnostics",
+            frameon=True
+        )
 
-        fig.legend(handles, labels, title=legend_title, loc='lower center', ncol=6, frameon=True)
-
-        # We adjust bottom_rect slightly depending on subplot count to leave room for the legend
-        fig.tight_layout(rect=(0, bottom_rect, 1, 1))
+        # Optional: Adjust bottom layout so the legends aren't cut off
+        fig.tight_layout()
+        fig.subplots_adjust(bottom=bottom)
 
         return fig
 
     # Configuration for the first plot (2 subplots)
     plot1_specs = [
-        dict(quantity='GSM8K_acc', title='Mean accuracy on GSM-Base', color=colours, precision=1, ylabel="Accuracy, %"),
-        dict(quantity='main_acc', title='Mean accuracy on GSM-Variants', color=colours, precision=1,
-             ylabel="Accuracy, %"),
-        dict(quantity='delta_symb_acc_diff', title=r'Variant performance delta', color=colours,
-             mask_quantity='delta_symb_significant', precision=2, ylabel="Accuracy change, pp"),
+        dict(
+            quantity='GSM8K_acc',
+            title='Mean accuracy on GSM-Base',
+            precision=1,
+            ylabel="Accuracy, %"
+        ),
+        dict(
+            quantity='main_acc',
+            title='Mean accuracy on GSM-Variants',
+            precision=1,
+            ylabel="Accuracy, %"
+        ),
+        dict(
+            quantity='delta_symb_acc_diff',
+            title=r'Variant performance delta',
+            hatch_mask_quantity='delta_symb_significant',
+            dash_mask_quantity='delta_symb_converged',
+            precision=2,
+            ylabel="Accuracy change, pp"
+        ),
     ]
 
     # Configuration for the second plot (3 subplots)
     plot2_specs = [
-        dict(quantity='delta_symb_log_or', title=r'Variant effect - log odds ratio', color=colours,
-             mask_quantity='delta_symb_significant', precision=2, ylabel=or_label),
-        dict(quantity='number_effect_log_or', title=r'Number effect - log odds ratio', color=colours,
-             mask_quantity='number_effect_significant', precision=2, ylabel=or_label),
-        dict(quantity='delta_symb_ne_log_or', title=r'Number-effect-corrected variant effect - log odds ratio',
-             color=colours,
-             mask_quantity='delta_symb_ne_significant', precision=2, ylabel=or_label)
+        dict(
+            quantity='delta_symb_log_or',
+            title=r'Variant effect - log odds ratio',
+            hatch_mask_quantity='delta_symb_significant',
+            dash_mask_quantity='delta_symb_converged',
+            precision=2,
+            ylabel=or_label
+        ),
+        dict(
+            quantity='number_effect_log_or',
+            title=r'Number effect - log odds ratio',
+            hatch_mask_quantity='number_effect_significant',
+            dash_mask_quantity='number_effect_converged',
+            precision=2,
+            ylabel=or_label
+        ),
+        dict(
+            quantity='delta_symb_ne_log_or',
+            title=r'Number-effect-corrected variant effect - log odds ratio',
+            hatch_mask_quantity='delta_symb_ne_significant',
+            dash_mask_quantity='delta_symb_ne_converged',
+            precision=2,
+            ylabel=or_label
+        )
     ]
 
+
     # Generate both figures with adjusted heights and bottom margins
-    fig1 = create_figure(plot1_specs, figsize=(10, 8), bottom_rect=0.06,
-                         legend_title='Prompt formats & significance of variant effect')
-    fig2 = create_figure(plot2_specs, figsize=(10, 8), bottom_rect=0.06,
-                         legend_title='Prompt formats & significance of variant and number effects')
+    fig1 = create_figure(plot1_specs)
+    fig2 = create_figure(plot2_specs)
 
     return fig1, fig2
 

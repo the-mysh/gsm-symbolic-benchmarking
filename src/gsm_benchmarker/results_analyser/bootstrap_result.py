@@ -78,12 +78,13 @@ class BootstrapResult:
     def estimates(self):
         return self._get_one_field_from_full_results('estimates')
 
-    def disagreements_check(self):
-        agreement = self.summary_df.agreement
+    def disagreements_check(self, variable: str | None = None):
+        summary_df = self._get_variable_summary(variable)
+        agreement = summary_df.agreement
         print(f"Agreement: {agreement.sum()} / {len(agreement)} models")
 
         # show any disagreements directly
-        return self.summary_df[~agreement][[
+        return summary_df[~agreement][[
             'boot_ci_lower',
             'boot_ci_upper',
             'single_ci_lower',
@@ -92,12 +93,18 @@ class BootstrapResult:
             'single_nonconvergent'
         ]]
 
-    def bias_check(self):
-        return self.summary_df.sort_values('bias', key=abs, ascending=False)[
+    def _get_variable_summary(self, variable: str | None = None):
+        if variable is None:
+            return self.summary_df
+        return self.summary_df.xs(variable, level=1)
+
+    def bias_check(self, variable: str | None = None):
+        return self._get_variable_summary(variable).sort_values('bias', key=abs, ascending=False)[
             ['bias', 'boot_mean', 'single_estimate', 'single_ci_lower', 'single_ci_upper']]
 
-    def ci_width_check(self):
-        return self.summary_df[~self.summary_df.index.isin(self.nonconvergent_models)][['width_ratio']].describe()
+    def ci_width_check(self, variable: str | None = None):
+        df = self._get_variable_summary(variable)
+        return df[~df.index.isin(self.get_nonconvergent_models(variable))][['width_ratio']].describe()
 
     def skew_check(self, variable: str, threshold: float = 0.5):
 
@@ -114,18 +121,20 @@ class BootstrapResult:
         else:
             print(f"No models with absolute skew > {threshold}")
 
-    @property
-    def nonconvergent_models(self):
-        return self.summary_single[self.summary_single.nonconvergent].index.tolist()
+    def get_nonconvergent_models(self, variable: str | None = None):
+        s = self.summary_single
+        if variable is not None:
+            s = s.xs(variable, level=1)
+        return s[s.nonconvergent].index.tolist()
 
     def plot_nonagreeing_estimates(self, variable):
-        summary = self.summary_df.xs(variable, level=1)
+        summary = self._get_variable_summary(variable)
         agreement = summary.agreement
         estimates = self.estimates
 
         nonagreeing_models = summary[~agreement].index.tolist()
 
-        for m in self.nonconvergent_models:
+        for m in self.get_nonconvergent_models(variable):
             if m in nonagreeing_models:
                 nonagreeing_models.remove(m)
 

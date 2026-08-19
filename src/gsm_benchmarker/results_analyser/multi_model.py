@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from gsm_benchmarker.results_analyser.model import ModelResultsAnalyser
-from gsm_benchmarker.results_analyser.plotting_utils import add_bar_labels
+from gsm_benchmarker.results_analyser.plotting_utils import label_bars
 
 
 logger = logging.getLogger(__name__)
@@ -295,7 +295,7 @@ class MultiModelResultsAnalyser:
                 label.set_ha('right')
 
         if bar_labels:
-            add_bar_labels(bar_ax, precision=0, fontsize=7)
+            label_bars(bar_ax, precision=0, fontsize=7)
 
         if include_pie:
             counts_df.sum().plot(
