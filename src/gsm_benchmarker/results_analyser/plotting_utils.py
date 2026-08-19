@@ -333,6 +333,10 @@ def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projec
     fig, ax = plt.subplots(figsize=_get_fig_size(len(df_plot)))
     ci_colour = 'darkgrey'
 
+    convergent_style = dict(ls='-', lw=0.5, marker='o')
+    nonconvergent_style = dict(ls='--', lw=1, marker='D')
+    common_style = dict(ec='black', s=80, zorder=2)
+
     # plot CIs and coloured dots
     for i, row in df_plot.iterrows():
         y = row['model']
@@ -342,14 +346,13 @@ def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projec
             continue
 
         # draw CIs
-        ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2,
-                  ls='-' if row['convergent'] else '--')
+        ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2)
         ax.plot([row['ci_lower_log_or'], row['ci_upper_log_or']], [y, y], '|', c=ci_colour, ms=15)
 
         # draw the dot using the dynamically assigned colour (depending on significance) and edge style (convergence)
         ax.scatter(
-            x=row['estimate'], y=y, color=row['colour'], s=80, zorder=2, ec='black', lw=0.5,
-            ls='-' if row['convergent'] else '--'
+            x=row['estimate'], y=y, color=row['colour'], **common_style,
+            **(convergent_style if row['convergent'] else nonconvergent_style)
         )
 
     ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
@@ -367,6 +370,16 @@ def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projec
     if np.isnan(df_plot.odds_ratio).any():
         legend_elements.append(
             Line2D([0], [0], marker='x', c='k', mec='black', mew=0.5, ms=8, lw=0, label="Could not compute"))
+    if not df_plot.convergent.all():
+        # ghost marker - not in plot, just for data
+        dashed_marker = ax.scatter(
+            x=[], y=[],  # empty coordinates so it doesn't appear on the plot
+            facecolor='none',  # hollow
+            **common_style,
+            **nonconvergent_style,
+            label='Convergence warning'
+        )
+        legend_elements.append(dashed_marker)
 
     ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
 
@@ -553,7 +566,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
 
         # first legend
         legend1 = ax_bottom.legend(
-            handles=axes[0].get_legend_handles_labels()[0],
+            handles=[Patch(facecolor=colours[prompt], edgecolor='white', label=prompt) for prompt in prompts],
             loc='upper center',
             bbox_to_anchor=(0.5, -bottom),  # below bottom axis
             ncol=5,
