@@ -131,7 +131,7 @@ def _get_fig_size(n_models):
 
 
 @save_plot("bars")
-def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
+def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          bar_colour: str | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None, value_label: str | None = None):
@@ -146,10 +146,13 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
     if metric is not None:
         df = df.xs(metric, level='metric')
 
+    df = df.copy()
+    df['convergent'] = ~diagnostic_df['convergence_messages'].astype(bool)
+
     if models is not None:
         df = df[np.isin(df.index.get_level_values('model'), models)]
 
-    def prep_data(col):
+    def prep_data(col) -> pd.Series:
         d = df[col]
 
         if model_order is not None:
@@ -159,6 +162,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
     data_val = prep_data(value_col)
     df_p_values = prep_data(p_value_col)
+    convergence = prep_data('convergent')
 
     fig, axes = plt.subplots(1, 2, sharey='all', figsize=_get_fig_size(len(df)))
 
@@ -168,6 +172,17 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
 
     df_p_values.plot(ax=axes[1], kind='barh', color=bar_colour, legend=False)
 
+    for ax in axes:
+        ax.axvline(0, color='k', lw=1, zorder=1)
+        ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
+
+    for (bar, p_bar, conv) in zip(axes[0].containers[0], axes[1].containers[0], convergence):
+        if not conv:
+            _dash_bar(bar)
+            _dash_bar(p_bar)
+
+    # legend
+    handles = []
     if df_p_values.max() >= 0.001 * alpha:
         handles = [axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}')]
 
@@ -175,14 +190,16 @@ def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_
             l = axes[1].axvline(projected_alpha, ls=':', color='royalblue', lw=1,
                                 label=f'projected alpha = {projected_alpha:.2f}')
             handles.append(l)
-            axes[1].legend(frameon=True, handles=handles, fontsize=8)
+
+    if not convergence.all():
+        handles.append(Patch(facecolor='lightgrey', **DASH_BAR_STYLE, label="Convergence warning"))
+
+    if handles:
+        axes[1].legend(frameon=True, handles=handles, fontsize=8)
 
     axes[0].set_ylabel('Model')
     axes[1].set_xlabel('P value')
 
-    for ax in axes:
-        ax.axvline(0, color='k', lw=1, zorder=1)
-        ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
     label_bars(axes[0], precision=1, fontsize=7)
     label_bars(axes[1], precision=3, fontsize=7)
@@ -440,7 +457,7 @@ def plot_glmm(df: pd.DataFrame, diagnostic_df: pd.DataFrame, bars_value_col: str
     )
 
     f2 = plot_bars_and_p_bars(
-        df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
+        df, diagnostic_df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
         model_order=model_order, value_label=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
         title=f"{title} - magnitude and significance{metric_text}" if title else None,
     )
@@ -485,10 +502,13 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
     return g.figure
 
 
+DASH_BAR_STYLE = dict(ec='k', lw=1.5, ls='--')
+
+
 def _dash_bar(bar):
-    bar.set_edgecolor('black')
-    bar.set_linewidth(1)
-    bar.set_linestyle('--')
+    bar.set_edgecolor(DASH_BAR_STYLE['ec'])
+    bar.set_linewidth(DASH_BAR_STYLE['lw'])
+    bar.set_linestyle(DASH_BAR_STYLE['ls'])
 
 
 def _hatch_bar(bar):
@@ -579,7 +599,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         with rc_context({'hatch.linewidth': hatch_lw}):
             diagnostic_handles = [
                 Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"effect not significant (p > .05)"),
-                Patch(facecolor='lightgrey', edgecolor='black', lw=1, ls='--', label="GLMM convergence warning")
+                Patch(facecolor='lightgrey', **DASH_BAR_STYLE, label="GLMM convergence warning")
             ]
         ax_bottom.legend(
             handles=diagnostic_handles,
