@@ -13,7 +13,6 @@ from matplotlib.colors import to_rgb, rgb_to_hsv, hsv_to_rgb, rgb2hex
 from matplotlib.figure import Figure
 from matplotlib.patches import Patch
 import matplotlib.ticker as mtick
-from matplotlib import rc_context
 from pathlib import Path
 from typing import NamedTuple
 import logging
@@ -22,10 +21,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+DASH_BAR_STYLE = dict(ec='k', lw=1.5, ls='--')
+HATCH_LW = 2
+HATCH_STYLE = dict(hatch='///', ec='white')
+plt.rcParams['hatch.linewidth'] = 2
+
+
 VARIANT_COLOURS = {
     'GSM-Base': 'mediumslateblue',
     'GSM-Variants': 'darksalmon'
 }
+
+
+def _dash_bar(bar):
+    bar.set_edgecolor(DASH_BAR_STYLE['ec'])
+    bar.set_linewidth(DASH_BAR_STYLE['lw'])
+    bar.set_linestyle(DASH_BAR_STYLE['ls'])
+
+
+def _hatch_bar(bar):
+    bar.set_hatch(HATCH_STYLE['hatch'])
 
 
 def save_plot(*labels):
@@ -160,42 +175,50 @@ def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col
 
         return d
 
-    data_val = prep_data(value_col)
-    df_p_values = prep_data(p_value_col)
+    values = prep_data(value_col)
+    p_values = prep_data(p_value_col)
     convergence = prep_data('convergent')
+    significance = p_values < alpha
 
     fig, axes = plt.subplots(1, 2, sharey='all', figsize=_get_fig_size(len(df)))
 
-    data_val.plot(ax=axes[0], kind='barh', color=bar_colour, legend=False)
+    values.plot(ax=axes[0], kind='barh', color=bar_colour, legend=False, ec=HATCH_STYLE['ec'])
     axes[0].set_xlabel(value_label if value_label is not None else value_col.replace('_', ' ').capitalize())
     axes[0].axvline(0, color='k', lw=0.5)
 
-    df_p_values.plot(ax=axes[1], kind='barh', color=bar_colour, legend=False)
+    p_values.plot(ax=axes[1], kind='barh', color=bar_colour, legend=False, ec=HATCH_STYLE['ec'])
 
     for ax in axes:
         ax.axvline(0, color='k', lw=1, zorder=1)
         ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
-    for (bar, p_bar, conv) in zip(axes[0].containers[0], axes[1].containers[0], convergence):
+    for (bar, conv, sig) in zip(axes[0].containers[0], convergence, significance):
         if not conv:
             _dash_bar(bar)
-            _dash_bar(p_bar)
+        if not sig:
+            _hatch_bar(bar)
 
     # legend
-    handles = []
-    if df_p_values.max() >= 0.001 * alpha:
-        handles = [axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}')]
+    handles_left = []
+    handles_right = []
+    if p_values.max() >= 0.001 * alpha:
+        handles_right.append(axes[1].axvline(alpha, ls='--', color='navy', lw=1, label=f'alpha = {alpha:.2f}'))
 
         if projected_alpha is not None:
             l = axes[1].axvline(projected_alpha, ls=':', color='royalblue', lw=1,
                                 label=f'projected alpha = {projected_alpha:.2f}')
-            handles.append(l)
+            handles_right.append(l)
+
+    if not significance.all():
+        handles_left.append(Patch(facecolor='grey', **HATCH_STYLE, label=r"Effect not significant"))
 
     if not convergence.all():
-        handles.append(Patch(facecolor='lightgrey', **DASH_BAR_STYLE, label="Convergence warning"))
+        dash_patch = Patch(facecolor='none', **DASH_BAR_STYLE, label="Convergence warning")
+        handles_right.append(dash_patch)
 
-    if handles:
-        axes[1].legend(frameon=True, handles=handles, fontsize=8)
+    for i, handles in enumerate((handles_left, handles_right)):
+        if handles:
+            axes[i].legend(frameon=True, handles=handles, fontsize=8)
 
     axes[0].set_ylabel('Model')
     axes[1].set_xlabel('P value')
@@ -502,22 +525,9 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
     return g.figure
 
 
-DASH_BAR_STYLE = dict(ec='k', lw=1.5, ls='--')
-
-
-def _dash_bar(bar):
-    bar.set_edgecolor(DASH_BAR_STYLE['ec'])
-    bar.set_linewidth(DASH_BAR_STYLE['lw'])
-    bar.set_linestyle(DASH_BAR_STYLE['ls'])
-
-
-def _hatch_bar(bar):
-    bar.set_hatch('///')
-
-
 @save_plot("prompts_variant_effect", "prompts_number_effect")
 def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
-                           hatch_lw: int = 2, add_bar_labels: bool = False, x_labels_rotation: float = 0,
+                           add_bar_labels: bool = False, x_labels_rotation: float = 0,
                            x_labels_ha='center', figsize=(10, 10), bottom=0.35, second_legend_offset=0.25):
     """Plot two summary figures comparing prompt formats and effects.
 
@@ -543,28 +553,27 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         hatch_mask = prep_data(hatch_mask_quantity) if hatch_mask_quantity else ones
         dash_mask = prep_data(dash_mask_quantity) if dash_mask_quantity else ones
 
-        with rc_context({'hatch.linewidth': hatch_lw}):
-            data.plot.bar(ax=ax, legend=False, color=colours, **kwargs, edgecolor='white')
+        data.plot.bar(ax=ax, legend=False, color=colours, **kwargs, edgecolor=HATCH_STYLE['ec'])
 
-            for i, container in enumerate(ax.containers):
-                if add_bar_labels:
-                    heights = [bar.get_height() for bar in container.patches]
-                    labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height
-                              in heights]
-                    ax.bar_label(container, labels=labels, fontsize=6, padding=1)
+        for i, container in enumerate(ax.containers):
+            if add_bar_labels:
+                heights = [bar.get_height() for bar in container.patches]
+                labels = [f'{height:.{precision}f}' if not (height is None or np.isnan(height)) else '' for height
+                          in heights]
+                ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
-                c = data.columns[i]
-                for bar, no_hatch, no_dash in zip(container.patches, hatch_mask[c], dash_mask[c]):
-                    if not no_hatch:
-                        _hatch_bar(bar)
-                    if not no_dash:
-                        _dash_bar(bar)
+            c = data.columns[i]
+            for bar, no_hatch, no_dash in zip(container.patches, hatch_mask[c], dash_mask[c]):
+                if not no_hatch:
+                    _hatch_bar(bar)
+                if not no_dash:
+                    _dash_bar(bar)
 
-            ax.set_title(title)
-            ax.axhline(0, c='k', lw=0.5)
+        ax.set_title(title)
+        ax.axhline(0, c='k', lw=0.5)
 
-            if ylabel is not None:
-                ax.set_ylabel(ylabel, fontsize=8)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel, fontsize=8)
 
     # Reusable figure builder
     def create_figure(specs):
@@ -596,11 +605,10 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         ax_bottom.add_artist(legend1)  # prevent the first legend from being overwritten
 
         # second legend
-        with rc_context({'hatch.linewidth': hatch_lw}):
-            diagnostic_handles = [
-                Patch(facecolor='grey', edgecolor='white', hatch='///', label=r"effect not significant (p > .05)"),
-                Patch(facecolor='lightgrey', **DASH_BAR_STYLE, label="GLMM convergence warning")
-            ]
+        diagnostic_handles = [
+            Patch(facecolor='grey', **HATCH_STYLE, label=r"effect not significant (p > .05)"),
+            Patch(facecolor='none', **DASH_BAR_STYLE, label="GLMM convergence warning")
+        ]
         ax_bottom.legend(
             handles=diagnostic_handles,
             loc='upper center',
