@@ -72,17 +72,10 @@ class PromptResult:
         """
         return self.mres.analyse_variant_effect(variant='main', metric=self.metric, models=self.models)
 
-    def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
+    def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None,
+                                model_order: list[str] | None = None, position: str = "H"):
         df = self.variant_effect[0].copy()
         diagnostics_df = self.variant_effect[1]
-
-        if self.models is not None:
-            df = df[df.index.isin(self.models)]
-
-        if model_order is not None:
-            df = df.sort_index(
-                key=lambda c: c.map({model: index for index, model in enumerate(model_order)})
-            )
 
         df['odds_ratio'] = np.exp(df['estimate']).round(2)
         df['convergent'] = ~diagnostics_df['convergence_messages'].astype(bool)
@@ -91,6 +84,18 @@ class PromptResult:
         # The z-score for a 95% confidence interval is approx 1.96
         df['or_ci_lower'] = np.exp(df['estimate'] - (1.96 * df['std_err'])).round(2)
         df['or_ci_upper'] = np.exp(df['estimate'] + (1.96 * df['std_err'])).round(2)
+
+        # random effect variance and std. dev. of random effect
+        df['ranef_variance'] = diagnostics_df['ranef_variance']
+        df['ranef_sd'] = diagnostics_df['ranef_sd']
+
+        if self.models is not None:
+            df = df[df.index.isin(self.models)]
+
+        if model_order is not None:
+            df = df.sort_index(
+                key=lambda c: c.map({model: index for index, model in enumerate(model_order)})
+            )
 
         def fmt(precision=3):
             th = 10**(-precision)
@@ -126,17 +131,20 @@ class PromptResult:
             'Odds ratio': df.apply(lambda row: f"{row['odds_ratio']:.2f}{' $\\dagger$' if not row['convergent'] else ''}", axis=1),
             r'95\% CI': df.apply(lambda row: f"[{row['or_ci_lower']:.2f}, {row['or_ci_upper']:.2f}]", axis=1),
             'Z value': df['z_value'].apply(fmt(2)),
-            'Std. error': df['std_err'].apply(fmt(2))
+            'Std. error': df['std_err'].apply(fmt(2)),
+            'Rand. eff. variance $\pm$ std. dev': df.apply(lambda row: f"{row['ranef_variance']:.2f} $\pm$ {row['ranef_sd']:.2f}", axis=1)
         }, index=df.index)
         df2.index.name = 'Model'
 
         caption1 = f"Results of {self.full_label}"
-        df1_latex = pandas_to_latex(df1, label=f"tab:{self.short_label}-results", caption=caption1, clean_header=False)
+        df1_latex = pandas_to_latex(df1, label=f"tab:{self.short_label}-results", caption=caption1,
+                                    clean_header=False, position=position)
 
-        caption2 = f"Additional statistics for results of {self.full_label}"
+        caption2 = f"Additional statistics for results of {self.full_label}."
         if not df['convergent'].all():
-            caption2 += " The $\\dagger$ symbol indicates cases of non-convergent GLMM fits."
-        df2_latex = pandas_to_latex(df2, label=f"tab:{self.short_label}-stats", caption=caption2, clean_header=False)
+            caption2 += " Cases of non-convergent fits marked with $\\dagger$."
+        df2_latex = pandas_to_latex(df2, label=f"tab:{self.short_label}-stats", caption=caption2,
+                                    clean_header=False, position=position)
 
         print(df1_latex)
         print(df2_latex)
@@ -254,7 +262,7 @@ class MultiPromptResult:
         )
         return fig
 
-    def number_effect_to_latex(self, v="number_effect", models: list[str] | None = None):
+    def number_effect_to_latex(self, v="number_effect", models: list[str] | None = None, position='H'):
         def get_q(name):
             return self.summary[models].xs(name, level='quantity').T
 
@@ -287,7 +295,7 @@ class MultiPromptResult:
         caption = ("Odds ratios and significance of the number effect across models and prompt formats. "
                    "Formatted as: Odds Ratio \\\\ Raw $p$ / Corrected $p$.")
         if not convergent.all().all():
-            caption += "The $\\dagger$ symbol indicates cases of non-convergent GLMM fits."
+            caption += " Cases of non-convergent fits marked with $\\dagger$."
 
         # Export to LaTeX. escape=False is crucial here so pandas doesn't break our LaTeX tags.
         latex_table = df_combined.to_latex(
@@ -295,6 +303,7 @@ class MultiPromptResult:
             column_format=col_format,
             caption=caption,
             label=f"tab:glmm2_{v}_odds",
+            position=position
         )
 
         print(latex_table)
