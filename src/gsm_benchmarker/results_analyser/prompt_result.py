@@ -74,6 +74,7 @@ class PromptResult:
 
     def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None, model_order: list[str] | None = None):
         df = self.variant_effect[0].copy()
+        diagnostics_df = self.variant_effect[1]
 
         if self.models is not None:
             df = df[df.index.isin(self.models)]
@@ -84,6 +85,7 @@ class PromptResult:
             )
 
         df['odds_ratio'] = np.exp(df['estimate']).round(2)
+        df['convergent'] = ~diagnostics_df['convergence_messages'].astype(bool)
 
         # Calculate the 95% CI bounds for the log-odds, then exponentiate them
         # The z-score for a 95% confidence interval is approx 1.96
@@ -119,16 +121,22 @@ class PromptResult:
         }, index=df.index)
         df1.index.name = 'Model'
 
+
         df2 = pd.DataFrame({
-            'Odds ratio': df['odds_ratio'].apply(fmt(2)),
+            'Odds ratio': df.apply(lambda row: f"{row['odds_ratio']:.2f}{' $\\dagger$' if not row['convergent'] else ''}", axis=1),
             r'95\% CI': df.apply(lambda row: f"[{row['or_ci_lower']:.2f}, {row['or_ci_upper']:.2f}]", axis=1),
             'Z value': df['z_value'].apply(fmt(2)),
             'Std. error': df['std_err'].apply(fmt(2))
         }, index=df.index)
         df2.index.name = 'Model'
 
-        df1_latex = pandas_to_latex(df1, label=f"tab:{self.short_label}-results", caption=f"Results of {self.full_label}", clean_header=False)
-        df2_latex = pandas_to_latex(df2, label=f"tab:{self.short_label}-stats", caption=f"Additional statistics for results of {self.full_label}", clean_header=False)
+        caption1 = f"Results of {self.full_label}"
+        df1_latex = pandas_to_latex(df1, label=f"tab:{self.short_label}-results", caption=caption1, clean_header=False)
+
+        caption2 = f"Additional statistics for results of {self.full_label}"
+        if not df['convergent'].all():
+            caption2 += " The $\\dagger$ symbol indicates cases of non-convergent GLMM fits."
+        df2_latex = pandas_to_latex(df2, label=f"tab:{self.short_label}-stats", caption=caption2, clean_header=False)
 
         print(df1_latex)
         print(df2_latex)
@@ -252,6 +260,8 @@ class MultiPromptResult:
 
         odds_ratios = get_q(f'{v}_or')
         p_values = get_q(f'{v}_p_value')
+        convergent = get_q(f'{v}_converged')
+
         p_values_corrected = p_values.apply(
             lambda col: multipletests(col, alpha=0.05, method='holm')[1],
             axis=1,
@@ -266,6 +276,7 @@ class MultiPromptResult:
             for idx in df_combined.index:
                 df_combined.at[idx, col] = self.format_cell(
                     odds_ratios.at[idx, col],
+                    convergent.at[idx, col],
                     p_values.at[idx, col],
                     p_values_corrected.at[idx, col]
                 )
@@ -273,12 +284,17 @@ class MultiPromptResult:
         # Calculate column format: 'l' for index, 'c' for each column
         col_format = "l" + "c" * len(df_combined.columns)
 
+        caption = ("Odds ratios and significance of the number effect across models and prompt formats. "
+                   "Formatted as: Odds Ratio \\\\ Raw $p$ / Corrected $p$.")
+        if not convergent.all().all():
+            caption += "The $\\dagger$ symbol indicates cases of non-convergent GLMM fits."
+
         # Export to LaTeX. escape=False is crucial here so pandas doesn't break our LaTeX tags.
         latex_table = df_combined.to_latex(
             escape=False,
             column_format=col_format,
-            caption="Odds ratios and significance of the number effect across models and prompt formats. Formatted as: Odds Ratio \\\\ Raw $p$ / Corrected $p$.",
-            label="tab:number_effect_odds",
+            caption=caption,
+            label=f"tab:glmm2_{v}_odds",
         )
 
         print(latex_table)
@@ -305,13 +321,15 @@ class MultiPromptResult:
         return base_str
 
     @staticmethod
-    def format_cell(or_val, p_raw, p_corr):
+    def format_cell(or_val, convergent, p_raw, p_corr):
         """Combine OR and p-values into a LaTeX makecell string.
 
         The returned string contains the odds ratio on the first line and the
         raw/corrected p-values on the second line.
         """
         or_str = f"{or_val:.2f}"
+        if not convergent:
+            or_str += " $\\dagger$"  # add a dagger symbol for non-convergent fits
         p_raw_str = MultiPromptResult.format_p_value(p_raw)
         p_corr_str = MultiPromptResult.format_p_value(p_corr)
 
