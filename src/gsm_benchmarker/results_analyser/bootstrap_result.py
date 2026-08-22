@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 import logging
 
-from gsm_benchmarker.scripts.bootstrap import make_names
+from gsm_benchmarker.scripts.utils import make_bootstrap_names
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +14,7 @@ class BootstrapResult:
         self.data_path = Path(data_path)
         self.n_boot = n_boot
 
-        bootstrap_filename, wald_filename, checkpoints_filename = make_names(n_boot, glmm_id)
+        bootstrap_filename, wald_filename, checkpoints_filename = make_bootstrap_names(n_boot, glmm_id)
         self.boot_df = pd.read_pickle(self.data_path / bootstrap_filename)
         self.wald_df = pd.read_pickle(self.data_path / wald_filename)
 

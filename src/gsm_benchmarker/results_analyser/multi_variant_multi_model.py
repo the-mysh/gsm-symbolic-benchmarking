@@ -57,7 +57,7 @@ class MultiVariantMultiModelResultsAnalyser:
     GLMM2_FIXED_EFFECTS = 'is_variant + gamma_c'
 
     def __init__(self, dir_path: str | Path, summary_data: pd.DataFrame | None = None, variants: dict | None = None,
-                 n_boot=2000):
+                 n_boot: int | None = None):
         self._dir_path = Path(dir_path).resolve()
 
         if variants is None:
@@ -91,7 +91,14 @@ class MultiVariantMultiModelResultsAnalyser:
         return match.group('variant')
 
     @classmethod
-    def _load_data(cls, dir_path: Path, n_boot=2000) -> tuple[pd.DataFrame, dict[str, MultiModelResultsAnalyser], BootstrapResult, BootstrapResult]:
+    def _load_data(cls, dir_path: Path, n_boot: int | None = None
+                   ) -> tuple[
+        pd.DataFrame,
+        dict[str, MultiModelResultsAnalyser],
+        BootstrapResult | None,
+        BootstrapResult | None
+    ]:
+
         summary_data_dict = {}
         variants = {}
 
@@ -114,8 +121,12 @@ class MultiVariantMultiModelResultsAnalyser:
 
         df_summary = concat(summary_data_dict)
 
-        bootstrap_variant = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='variant')
-        bootstrap_number = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='number')
+        if n_boot is not None:
+            bootstrap_variant = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='1')
+            bootstrap_number = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='2')
+        else:
+            bootstrap_variant = None
+            bootstrap_number = None
 
         return df_summary, variants, bootstrap_variant, bootstrap_number
 

@@ -4,6 +4,7 @@ import logging
 
 from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalyser
 from gsm_benchmarker.utils.logging_setup import install_colored_logger, setup_log_file_handler
+from gsm_benchmarker.scripts.utils import make_bootstrap_names
 
 logger = logging.getLogger(__file__)
 
@@ -28,12 +29,6 @@ def make_parser():
     return parser
 
 
-def make_names(n_boot: int, glmm_id: str):
-    ext = "pkl"
-    run_info = f"n_boot_{n_boot}__glmm{glmm_id}"
-    return f"{run_info}.{ext}", f"{run_info}__wald.{ext}", f"{run_info}__checkpoints.{ext}"
-
-
 def main():
     pargs = make_parser().parse_args()
     install_colored_logger(level=pargs.log_level)
@@ -41,12 +36,12 @@ def main():
     output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
     setup_log_file_handler(output_folder / 'logs')
 
-    output_filename_bootstrap, output_filename_wald, checkpoints_filename = make_names(pargs.n_boot, pargs.glmm_id)
+    output_fn_bootstrap, output_fn_wald, checkpoints_fn = make_bootstrap_names(pargs.n_boot, pargs.glmm_id)
 
     logger.info(f"Outputs will be saved to folder: {output_folder}")
-    output_path_bootstrap = output_folder/output_filename_bootstrap
-    output_path_wald = output_folder/output_filename_wald
-    checkpoints_path = output_folder/checkpoints_filename
+    output_path_bootstrap = output_folder/output_fn_bootstrap
+    output_path_wald = output_folder/output_fn_wald
+    checkpoints_path = output_folder/checkpoints_fn
 
     logger.info(f"Loading data from {pargs.data_path}")
     mres = MultiVariantMultiModelResultsAnalyser(pargs.data_path)
