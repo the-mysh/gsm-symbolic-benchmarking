@@ -27,7 +27,7 @@ class BootstrapResult:
 
     def _combine_results(self, alpha=0.05):
         self.wald_df['significant'] = self.wald_df['p_value'] < alpha
-        self.boot_df['significant'] = self.boot_df['boot_p_value'] < alpha
+        self.boot_df['significant'] = self.boot_df['p_value'] < alpha
 
         self.wald_df['ci_width_log'] = self.wald_df['ci_upper_log'] - self.wald_df['ci_lower_log']
         self.boot_df['ci_width_log'] = self.boot_df['ci_upper_log'] - self.boot_df['ci_lower_log']
@@ -51,7 +51,7 @@ class BootstrapResult:
     @cached_property
     def boot_numbers(self):
         cols = [k for k in self.boot_df.columns if k.startswith('n_')]
-        return self.summary_df[cols].rename(columns={k: k[2:] for k in cols})
+        return self.boot_df[cols].rename(columns={k: k[2:] for k in cols})
 
     def _get_one_field_from_full_results(self, field: str):
         return {k: v[field] for k, v in self.full_results.items()}
