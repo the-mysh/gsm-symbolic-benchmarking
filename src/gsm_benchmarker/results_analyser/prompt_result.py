@@ -161,7 +161,7 @@ class PromptResult:
     def plot_variant_effect(self, **kwargs):
         """Produce GLMM visualisations for the variant effect of this prompt."""
         figs = plot_glmm(
-            *self.variant_effect,
+            self.variant_effect[0],
             'acc_diff',
             "Variant performance delta, pp",
             bar_colour=self.colour.value,

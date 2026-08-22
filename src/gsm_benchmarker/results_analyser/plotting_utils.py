@@ -21,7 +21,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-DASH_BAR_STYLE = dict(ec='k', lw=1.5, ls='--')
 HATCH_LW = 2
 HATCH_STYLE = dict(hatch='///', ec='white')
 plt.rcParams['hatch.linewidth'] = 2
@@ -31,12 +30,6 @@ VARIANT_COLOURS = {
     'GSM-Base': 'mediumslateblue',
     'GSM-Variants': 'darksalmon'
 }
-
-
-def _dash_bar(bar):
-    bar.set_edgecolor(DASH_BAR_STYLE['ec'])
-    bar.set_linewidth(DASH_BAR_STYLE['lw'])
-    bar.set_linestyle(DASH_BAR_STYLE['ls'])
 
 
 def _hatch_bar(bar):
@@ -146,7 +139,7 @@ def _get_fig_size(n_models):
 
 
 @save_plot("bars")
-def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col: str, p_value_col: str,
+def plot_bars_and_p_bars(df: pd.DataFrame, metric: str, value_col: str, p_value_col: str,
                          alpha: float = 0.05, projected_alpha: float | None = None, title: str | None = None,
                          bar_colour: str | None = None, models: list[str] | None = None,
                          model_order: list[str] | None = None, value_label: str | None = None):
@@ -162,7 +155,6 @@ def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col
         df = df.xs(metric, level='metric')
 
     df = df.copy()
-    df['convergent'] = ~diagnostic_df['convergence_messages'].astype(bool)
 
     if models is not None:
         df = df[np.isin(df.index.get_level_values('model'), models)]
@@ -177,7 +169,6 @@ def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col
 
     values = prep_data(value_col)
     p_values = prep_data(p_value_col)
-    convergence = prep_data('convergent')
     significance = p_values < alpha
 
     fig, axes = plt.subplots(1, 2, sharey='all', figsize=_get_fig_size(len(df)))
@@ -192,9 +183,7 @@ def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col
         ax.axvline(0, color='k', lw=1, zorder=1)
         ax.margins(x=0.1)  # make sure label of lowest bar does not overlap with y-axis labels - give more margin
 
-    for (bar, conv, sig) in zip(axes[0].containers[0], convergence, significance):
-        if not conv:
-            _dash_bar(bar)
+    for (bar, sig) in zip(axes[0].containers[0], significance):
         if not sig:
             _hatch_bar(bar)
 
@@ -211,10 +200,6 @@ def plot_bars_and_p_bars(df: pd.DataFrame, diagnostic_df, metric: str, value_col
 
     if not significance.all():
         handles_left.append(Patch(facecolor='grey', **HATCH_STYLE, label=r"Effect not significant"))
-
-    if not convergence.all():
-        dash_patch = Patch(facecolor='none', **DASH_BAR_STYLE, label="Convergence warning")
-        handles_right.append(dash_patch)
 
     for i, handles in enumerate((handles_left, handles_right)):
         if handles:
@@ -304,7 +289,7 @@ def _define_significance_points(projected_alpha: float | None):
 
 
 
-def _prepare_odds_ratios_data(df: pd.DataFrame, diagnostic_df: pd.DataFrame, metric: str | None = None,
+def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None,
                               projected_alpha: float | None = None, model_order: list[str] | None = None,
                               sort_models: bool = False
                               ) -> tuple[pd.DataFrame, dict[str, SignificancePoint], list[str] | None]:
@@ -314,7 +299,6 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, diagnostic_df: pd.DataFrame, met
     if metric is not None:
         df = df.xs(metric, level='metric')
     df_plot = df.copy()
-    df_plot['convergent'] = ~diagnostic_df['convergence_messages'].astype(bool)
 
     def get_colour(row):
         default_colour = p_thresholds["not_significant"].colour
@@ -356,7 +340,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, diagnostic_df: pd.DataFrame, met
 
 
 @save_plot("odds_ratios")
-def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projected_alpha: float | None = None,
+def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: float | None = None,
                             model_order: list[str] | None = None, sort_models: bool = False,
                             title: str | None = None):
     """Plot log odds ratios with 95% CI for each model.
@@ -366,16 +350,12 @@ def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projec
     """
 
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
-        df, diagnostic_df, metric=metric, projected_alpha=projected_alpha,
+        df, metric=metric, projected_alpha=projected_alpha,
         model_order=model_order, sort_models=sort_models
     )
 
     fig, ax = plt.subplots(figsize=_get_fig_size(len(df_plot)))
     ci_colour = 'darkgrey'
-
-    convergent_style = dict(ls='-', lw=0.5, marker='o')
-    nonconvergent_style = dict(ls='--', lw=1, marker='D')
-    common_style = dict(ec='black', s=80, zorder=2)
 
     # plot CIs and coloured dots
     for i, row in df_plot.iterrows():
@@ -389,11 +369,8 @@ def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projec
         ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2)
         ax.plot([row['ci_lower_log_or'], row['ci_upper_log_or']], [y, y], '|', c=ci_colour, ms=15)
 
-        # draw the dot using the dynamically assigned colour (depending on significance) and edge style (convergence)
-        ax.scatter(
-            x=row['estimate'], y=y, color=row['colour'], **common_style,
-            **(convergent_style if row['convergent'] else nonconvergent_style)
-        )
+        # draw the dot using the dynamically assigned colour (depending on significance)
+        ax.scatter(x=row['estimate'], y=y, color=row['colour'], ec='black', s=80, zorder=2, ls='-', lw=0.5, marker='o')
 
     ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
@@ -410,16 +387,6 @@ def plot_models_odds_ratios(df, diagnostic_df, metric: str | None = None, projec
     if np.isnan(df_plot.odds_ratio).any():
         legend_elements.append(
             Line2D([0], [0], marker='x', c='k', mec='black', mew=0.5, ms=8, lw=0, label="Could not compute"))
-    if not df_plot.convergent.all():
-        # ghost marker - not in plot, just for data
-        dashed_marker = ax.scatter(
-            x=[], y=[],  # empty coordinates so it doesn't appear on the plot
-            facecolor='none',  # hollow
-            **common_style,
-            **nonconvergent_style,
-            label='Convergence warning'
-        )
-        legend_elements.append(dashed_marker)
 
     ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
 
@@ -464,7 +431,7 @@ def plot_for_metrics(func):
 
 
 @plot_for_metrics
-def plot_glmm(df: pd.DataFrame, diagnostic_df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None,
+def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None,
               metric: str | None = None, bar_colour: str | None = None, title: str | None = None,
               save_prefix: str | Path | None = None, model_order: list[str] | None = None, **kwargs):
     """Compose GLMM plots: odds ratios and bar/p-value panels.
@@ -475,12 +442,12 @@ def plot_glmm(df: pd.DataFrame, diagnostic_df: pd.DataFrame, bars_value_col: str
     metric_text = f"\n{metric} accuracy" if metric else ""
 
     f1, model_order = plot_models_odds_ratios(
-        df, diagnostic_df, metric, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
+        df, metric, sort_models=True, save_prefix=save_prefix, model_order=model_order, **kwargs,
         title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 
     f2 = plot_bars_and_p_bars(
-        df, diagnostic_df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
+        df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
         model_order=model_order, value_label=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
         title=f"{title} - magnitude and significance{metric_text}" if title else None,
     )
@@ -546,12 +513,11 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         data = data.transpose()
         return data
 
-    def plot_quantity(quantity, ax, title, hatch_mask_quantity=None, dash_mask_quantity=None, precision: int = 3,
+    def plot_quantity(quantity, ax, title, hatch_mask_quantity=None, precision: int = 3,
                       ylabel: str | None = None, **kwargs):
         data = prep_data(quantity)
         ones =  pd.DataFrame(True, data.index, columns=data.columns)
         hatch_mask = prep_data(hatch_mask_quantity) if hatch_mask_quantity else ones
-        dash_mask = prep_data(dash_mask_quantity) if dash_mask_quantity else ones
 
         data.plot.bar(ax=ax, legend=False, color=colours, **kwargs, edgecolor=HATCH_STYLE['ec'])
 
@@ -563,11 +529,9 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
                 ax.bar_label(container, labels=labels, fontsize=6, padding=1)
 
             c = data.columns[i]
-            for bar, no_hatch, no_dash in zip(container.patches, hatch_mask[c], dash_mask[c]):
+            for bar, no_hatch in zip(container.patches, hatch_mask[c]):
                 if not no_hatch:
                     _hatch_bar(bar)
-                if not no_dash:
-                    _dash_bar(bar)
 
         ax.set_title(title)
         ax.axhline(0, c='k', lw=0.5)
@@ -607,7 +571,6 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         # second legend
         diagnostic_handles = [
             Patch(facecolor='grey', **HATCH_STYLE, label=r"effect not significant (p > .05)"),
-            Patch(facecolor='none', **DASH_BAR_STYLE, label="GLMM convergence warning")
         ]
         ax_bottom.legend(
             handles=diagnostic_handles,
@@ -642,7 +605,6 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             quantity='delta_symb_acc_diff',
             title=r'Variant performance delta',
             hatch_mask_quantity='delta_symb_significant',
-            dash_mask_quantity='delta_symb_converged',
             precision=2,
             ylabel="Accuracy change, pp"
         ),
@@ -654,7 +616,6 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             quantity='delta_symb_log_or',
             title=r'Variant effect - log odds ratio',
             hatch_mask_quantity='delta_symb_significant',
-            dash_mask_quantity='delta_symb_converged',
             precision=2,
             ylabel=or_label
         ),
@@ -662,7 +623,6 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             quantity='number_effect_log_or',
             title=r'Number effect - log odds ratio',
             hatch_mask_quantity='number_effect_significant',
-            dash_mask_quantity='number_effect_converged',
             precision=2,
             ylabel=or_label
         ),
@@ -670,7 +630,6 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             quantity='delta_symb_ne_log_or',
             title=r'Number-effect-corrected variant effect - log odds ratio',
             hatch_mask_quantity='delta_symb_ne_significant',
-            dash_mask_quantity='delta_symb_ne_converged',
             precision=2,
             ylabel=or_label
         )
