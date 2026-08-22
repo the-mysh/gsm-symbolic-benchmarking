@@ -10,34 +10,33 @@ logger = logging.getLogger(__name__)
 
 
 class BootstrapResult:
-    def __init__(self, data_path: Path | str, n_boot: int, effect: str):
+    def __init__(self, data_path: Path | str, n_boot: int, glmm_id: str, alpha=0.05):
         self.data_path = Path(data_path)
         self.n_boot = n_boot
 
-        output_filename, checkpoints_filename = make_names(n_boot, effect)
+        output_filename, checkpoints_filename = make_names(n_boot, glmm_id)
 
-        self.summary_df = self._load_summary(self.data_path / output_filename)
+        self.summary_df = self._load_summary(self.data_path / output_filename, alpha=alpha)
 
         try:
             self.full_results = pd.read_pickle(self.data_path / checkpoints_filename)
         except FileNotFoundError:
             logger.warning("Full results not available")
 
-    def _load_summary(self, summary_path):
+    def _load_summary(self, summary_path, alpha=0.05):
 
         summary_df = pd.read_pickle(summary_path)
 
-        s_sig = summary_df['single_significant'] = summary_df['single_p_value'] < 0.05
-        s_width = summary_df['single_ci_width'] = summary_df['single_ci_upper'] - summary_df['single_ci_lower']
+        s_sig = summary_df['single_significant'] = summary_df['single_p_value'] < alpha
+        s_width = summary_df['single_ci_width_log'] = summary_df['single_ci_upper_log'] - summary_df['single_ci_lower_log']
         s_est = summary_df['single_estimate']
 
-        ci_contains_zero = (summary_df[f'boot_ci_lower'] <= 0) & (summary_df[f'boot_ci_upper'] >= 0)
-        b_sig = summary_df[f'boot_significant'] = ~ci_contains_zero
+        b_sig = summary_df[f'boot_significant'] = summary_df['boot_p_value'] < alpha
 
-        summary_df[f'bias'] = summary_df[f'boot_mean'] - s_est
+        summary_df[f'bias_log'] = summary_df[f'boot_mean_log'] - s_est
 
-        summary_df[f'boot_ci_width'] = summary_df[f'boot_ci_upper'] - summary_df[f'boot_ci_lower']
-        summary_df[f'width_ratio'] = summary_df[f'boot_ci_width'] / s_width
+        summary_df[f'boot_ci_width_log'] = summary_df[f'boot_ci_upper_log'] - summary_df[f'boot_ci_lower_log']
+        summary_df[f'width_ratio_log'] = summary_df[f'boot_ci_width_log'] / s_width
 
         summary_df[f'agreement'] = (s_sig == b_sig)
 

@@ -10,7 +10,6 @@ import os
 import logging
 import re
 import numpy as np
-from scipy import stats
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
@@ -21,6 +20,7 @@ from collections import Counter
 from gsm_benchmarker.results_analyser.utils import do_for_metrics
 from gsm_benchmarker.results_analyser.multi_model import MultiModelResultsAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import plot_number_counts
+from gsm_benchmarker.results_analyser.bootstrap_result import BootstrapResult
 
 
 logger = logging.getLogger(__name__)
@@ -53,17 +53,20 @@ class MultiVariantMultiModelResultsAnalyser:
     BASELINE_VARIANT = 'GSM8K'
 
     # fixed effect formulations for GLMM
-    VARIANT_EFFECT = 'is_variant'
-    NUMBER_EFFECT = 'is_variant + sum_logs_c'
+    GLMM1_FIXED_EFFECTS = 'is_variant'
+    GLMM2_FIXED_EFFECTS = 'is_variant + gamma_c'
 
-    def __init__(self, dir_path: str | Path, summary_data: pd.DataFrame | None = None, variants: dict | None = None):
+    def __init__(self, dir_path: str | Path, summary_data: pd.DataFrame | None = None, variants: dict | None = None,
+                 n_boot=2000):
         self._dir_path = Path(dir_path).resolve()
 
         if variants is None:
-            self._summary_data, self._variants = self._load_data(self._dir_path)
+            self._summary_data, self._variants, self._bootstrap_glmm1, self._bootstrap_glmm2 = self._load_data(self._dir_path, n_boot=n_boot)
         else:
             self._summary_data = summary_data
             self._variants = variants
+        self._bootstrap_glmm1 = None
+        self._bootstrap_glmm2 = None
 
     @property
     def summary_data(self):
@@ -88,7 +91,7 @@ class MultiVariantMultiModelResultsAnalyser:
         return match.group('variant')
 
     @classmethod
-    def _load_data(cls, dir_path: Path) -> tuple[pd.DataFrame, dict[str, MultiModelResultsAnalyser]]:
+    def _load_data(cls, dir_path: Path, n_boot=2000) -> tuple[pd.DataFrame, dict[str, MultiModelResultsAnalyser], BootstrapResult, BootstrapResult]:
         summary_data_dict = {}
         variants = {}
 
@@ -111,7 +114,10 @@ class MultiVariantMultiModelResultsAnalyser:
 
         df_summary = concat(summary_data_dict)
 
-        return df_summary, variants
+        bootstrap_variant = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='variant')
+        bootstrap_number = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='number')
+
+        return df_summary, variants, bootstrap_variant, bootstrap_number
 
     def _check_variant(self, variant: str):
         if variant not in self._variants:
@@ -259,24 +265,24 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return models_validated
 
-    def prep_variant_effect(self, variant: str, metric: str):
+    def prep_glmm1(self, variant: str, metric: str):
         if GLMMRunner is None:
             raise RuntimeError("R not available")
 
-        glmm_runner = GLMMRunner(self.VARIANT_EFFECT)
-        data_df = self.get_number_effect_glmm_data(variant=variant, metric=metric)
+        glmm_runner = GLMMRunner(self.GLMM1_FIXED_EFFECTS)
+        data_df = self.get_glmm2_data(variant=variant, metric=metric)
         return glmm_runner, data_df
 
-    def prep_number_effect(self, variant: str, metric: str):
+    def prep_glmm2(self, variant: str, metric: str):
         if GLMMRunner is None:
             raise RuntimeError("R not available")
 
-        glmm_runner = GLMMRunner(self.NUMBER_EFFECT)
-        data_df = self.get_number_effect_glmm_data(variant=variant, metric=metric)
+        glmm_runner = GLMMRunner(self.GLMM2_FIXED_EFFECTS)
+        data_df = self.get_glmm2_data(variant=variant, metric=metric)
         return glmm_runner, data_df
 
     @do_for_metrics
-    def analyse_variant_effect(self, variant: str, metric: str, models: list[str] | None = None):
+    def run_glmm1(self, variant: str, metric: str, models: list[str] | None = None):
         """Analyse the effect of a dataset variant on accuracy using GLMM.
 
         Returns a DataFrame with GLMM coefficient estimates and p-values per
@@ -284,7 +290,7 @@ class MultiVariantMultiModelResultsAnalyser:
         """
         models = self._validate_models(models, variant)
 
-        glmm_runner, data_df = self.prep_variant_effect(variant=variant, metric=metric)
+        glmm_runner, data_df = self.prep_glmm1(variant=variant, metric=metric)
 
         glmm_results_df, diagnostics_df = glmm_runner.run(df=data_df, models=models, simplify=True)
 
@@ -293,12 +299,12 @@ class MultiVariantMultiModelResultsAnalyser:
 
         return glmm_results_df, diagnostics_df
 
-    def get_variant_effect_glmm_data(self, variant: str, metric: str):
+    def get_glmm1_data(self, variant: str, metric: str):
 
         def prep_df(variant_name: str, value: bool):
             data = self.variants[variant_name].full_data
             data = data[['model', 'id', metric]][:]
-            data[self.VARIANT_EFFECT] = [value] * len(data)
+            data[self.GLMM1_FIXED_EFFECTS] = [value] * len(data)
             data['is_correct'] = data[metric].astype(int)
             data = data.drop(metric, axis=1)
             return data
@@ -309,10 +315,10 @@ class MultiVariantMultiModelResultsAnalyser:
         df = pd.concat([baseline_data, variant_data]).reset_index(drop=True)
         return df
 
-    def get_number_effect_glmm_data(self, variant: str, metric: str):
+    def get_glmm2_data(self, variant: str, metric: str):
         number_pattern = re.compile(r'\d*\.?\d+')
 
-        def extract_sum_logs(text):
+        def extract_gamma(text):
             matches = number_pattern.findall(text)
             if not matches:
                 return np.nan  # Handle the rare case where a prompt has no numbers
@@ -323,10 +329,10 @@ class MultiVariantMultiModelResultsAnalyser:
 
         def _prep(res, variant_label: bool):
             data = res.full_data[['model', 'id', metric, 'question']][:].reset_index(drop=True)
-            data[self.VARIANT_EFFECT] = [int(variant_label)] * len(data)
+            data[self.GLMM1_FIXED_EFFECTS] = [int(variant_label)] * len(data)
             data['is_correct'] = data[metric]
             data['id'] = data['id']
-            data['sum_logs'] = data.question.apply(extract_sum_logs)
+            data['gamma'] = data.question.apply(extract_gamma)
 
             data = data.drop(metric, axis=1).drop('question', axis=1)
             return data
@@ -335,12 +341,12 @@ class MultiVariantMultiModelResultsAnalyser:
         variant_df = _prep(self.variants[variant], True)
 
         df = pd.concat([baseline_df, variant_df]).reset_index(drop=True)
-        df['sum_logs_c'] = df['sum_logs'] - df['sum_logs'].mean()
-        df = df.drop('sum_logs', axis=1)
+        df['gamma_c'] = df['gamma'] - df['gamma'].mean()
+        df = df.drop('gamma', axis=1)
         return df
 
     @do_for_metrics
-    def analyse_number_effect(self, variant: str, metric: str, models: list[str] | None = None):
+    def run_glmm2(self, variant: str, metric: str, models: list[str] | None = None):
         """Analyse the effect of numeric quantities in questions on correctness.
 
         Fits a GLMM that includes a covariate derived from the log10 of numbers
@@ -349,7 +355,7 @@ class MultiVariantMultiModelResultsAnalyser:
         if models is not None:
             models = self._validate_models(models, variant)
 
-        glmm_runner, data_df = self.prep_number_effect(variant=variant, metric=metric)
+        glmm_runner, data_df = self.prep_glmm2(variant=variant, metric=metric)
 
         glmm_results_df, diagnostics_df = glmm_runner.run(df=data_df, models=models)
         return glmm_results_df, diagnostics_df

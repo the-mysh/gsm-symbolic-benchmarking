@@ -335,14 +335,18 @@ class GLMMRunner:
                 ci_lower, ci_upper = np.percentile(effect_estimates, [2.5, 97.5])
                 boot_se = np.std(effect_estimates, ddof=1)
                 boot_mean = np.mean(effect_estimates)
+                boot_median = np.median(effect_estimates)
+                boot_p_value = 2 * min((effect_estimates <= 0).mean(), (effect_estimates >= 0).mean())
             else:
-                ci_lower = ci_upper = boot_se = boot_mean = np.nan
+                ci_lower = ci_upper = boot_se = boot_mean = boot_median = boot_p_value = np.nan
 
             stats[effect_label] = {
-                f"boot_ci_upper": ci_upper,
-                f"boot_ci_lower": ci_lower,
-                f"boot_se": boot_se,
-                f"boot_mean": boot_mean,
+                "boot_ci_upper_log": ci_upper,
+                "boot_ci_lower_log": ci_lower,
+                "boot_se_log": boot_se,
+                "boot_mean_log": boot_mean,
+                "boot_median_log": boot_median,
+                "boot_p_value": boot_p_value
             }
 
         full_summary['stats'] = pd.DataFrame(stats)
@@ -388,8 +392,8 @@ class GLMMRunner:
 
             z_crit = 1.959964
             sse = single_estimates_df['std_err']
-            summary_df['single_ci_lower'] = sest - z_crit * sse
-            summary_df['single_ci_upper'] = sest + z_crit * sse
+            summary_df['single_ci_lower_log'] = sest - z_crit * sse
+            summary_df['single_ci_upper_log'] = sest + z_crit * sse
 
             summary_df['single_p_value'] = single_estimates_df['p_value']
 
@@ -400,5 +404,7 @@ class GLMMRunner:
                 summary_df['single_singular'] = single_info_df['is_singular']
                 summary_df['single_nonconvergent'] = single_info_df['convergence_messages'].astype(bool)
                 summary_df['single_fit_failed'] = single_info_df['fit_failed']
+                summary_df['single_ranef_variance'] = single_info_df['ranef_variance']
+                summary_df['single_ranef_sd'] = single_info_df['ranef_sd']
 
         return summary_df

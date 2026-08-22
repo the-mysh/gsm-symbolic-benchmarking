@@ -302,8 +302,8 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None,
 
     def get_colour(row):
         default_colour = p_thresholds["not_significant"].colour
-        p = row['p_value']
-        is_drop = bool(row['estimate'] < 0)
+        p = row['boot_p_value']
+        is_drop = bool(row['boot_median'] < 0)
 
         if np.isnan(p):
             return default_colour
@@ -315,17 +315,6 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None,
         return default_colour
 
     df_plot['colour'] = df_plot.apply(get_colour, axis=1)
-
-    # compute odds ratios and 95% confidence intervals
-    estimate = df_plot.estimate
-    err = df_plot['std_err']
-    df_plot['odds_ratio_plot'] = np.where(np.isnan(df_plot.odds_ratio), 1, df_plot.odds_ratio)
-
-    f = 1.96
-    ci_lower_log = estimate - f * err
-    ci_upper_log = estimate + f * err
-    df_plot['ci_lower_log_or'] = ci_lower_log
-    df_plot['ci_upper_log_or'] = ci_upper_log
 
     if model_order is None:
         if sort_models:
@@ -361,16 +350,16 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     for i, row in df_plot.iterrows():
         y = row['model']
 
-        if np.isnan(row['estimate']):
+        if np.isnan(row['boot_median']):
             ax.scatter(x=[1], y=[y], marker='x', color='k', lw=0.5, s=50)
             continue
 
         # draw CIs
-        ax.hlines(y, xmin=row['ci_lower_log_or'], xmax=row['ci_upper_log_or'], color=ci_colour, lw=2)
-        ax.plot([row['ci_lower_log_or'], row['ci_upper_log_or']], [y, y], '|', c=ci_colour, ms=15)
+        ax.hlines(y, xmin=row['boot_ci_lower_log'], xmax=row['boot_ci_upper_log'], color=ci_colour, lw=2)
+        ax.plot([row['boot_ci_lower_log'], row['boot_ci_upper_log']], [y, y], '|', c=ci_colour, ms=15)
 
         # draw the dot using the dynamically assigned colour (depending on significance)
-        ax.scatter(x=row['estimate'], y=y, color=row['colour'], ec='black', s=80, zorder=2, ls='-', lw=0.5, marker='o')
+        ax.scatter(x=row['boot_median'], y=y, color=row['colour'], ec='black', s=80, zorder=2, ls='-', lw=0.5, marker='o')
 
     ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
@@ -447,7 +436,7 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
     )
 
     f2 = plot_bars_and_p_bars(
-        df, metric, value_col=bars_value_col, p_value_col='p_value', bar_colour=bar_colour,
+        df, metric, value_col=bars_value_col, p_value_col='boot_p_value', bar_colour=bar_colour,
         model_order=model_order, value_label=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
         title=f"{title} - magnitude and significance{metric_text}" if title else None,
     )
@@ -602,9 +591,9 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             ylabel="Accuracy, %"
         ),
         dict(
-            quantity='delta_symb_acc_diff',
+            quantity='acc_diff',
             title=r'Variant performance delta',
-            hatch_mask_quantity='delta_symb_significant',
+            hatch_mask_quantity='variant_effect_significant',
             precision=2,
             ylabel="Accuracy change, pp"
         ),
@@ -613,9 +602,9 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
     # Configuration for the second plot (3 subplots)
     plot2_specs = [
         dict(
-            quantity='delta_symb_log_or',
+            quantity='variant_effect_log_or',
             title=r'Variant effect - log odds ratio',
-            hatch_mask_quantity='delta_symb_significant',
+            hatch_mask_quantity='variant_effect_significant',
             precision=2,
             ylabel=or_label
         ),
@@ -627,9 +616,9 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             ylabel=or_label
         ),
         dict(
-            quantity='delta_symb_ne_log_or',
+            quantity='nec_variant_effect_log_or',
             title=r'Number-effect-corrected variant effect - log odds ratio',
-            hatch_mask_quantity='delta_symb_ne_significant',
+            hatch_mask_quantity='nec_variant_effect_significant',
             precision=2,
             ylabel=or_label
         )
@@ -660,8 +649,8 @@ def plot_prompt_acc_evolution(all_prompts_summary, colours: dict[str, str], mode
     n_rows = n_models // n_cols + n_models % n_cols
 
     x_data = all_prompts_summary.xs('GSM8K_acc', level='quantity')
-    y_data = all_prompts_summary.xs('delta_symb_acc_diff', level='quantity')
-    sig_data = all_prompts_summary.xs('delta_symb_significant', level='quantity')
+    y_data = all_prompts_summary.xs('acc_diff', level='quantity')
+    sig_data = all_prompts_summary.xs('variant_effect_significant', level='quantity')
 
     fig, axes = plt.subplots(n_rows, n_cols, sharex=sharex, sharey=sharey, figsize=figsize)
     for i, (ax, model) in enumerate(zip(axes.flatten(), models)):

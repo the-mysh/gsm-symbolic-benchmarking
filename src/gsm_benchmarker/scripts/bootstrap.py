@@ -22,14 +22,14 @@ def make_parser():
     parser.add_argument('--variant', type=str, default='main')
     parser.add_argument('--metric', type=str, default='correct')
 
-    parser.add_argument('--effect', type=str, choices=['variant', 'number'], required=True)
+    parser.add_argument('--glmm-id', type=str, choices=['1', '2'], required=True)
 
     parser.add_argument('--log-level', type=int, default=logging.INFO)
     return parser
 
 
-def make_names(n_boot: int, effect: str, ext='.pkl'):
-    run_info = f"n_boot_{n_boot}__{effect}_effect"
+def make_names(n_boot: int, glmm_id: str, ext='.pkl'):
+    run_info = f"n_boot_{n_boot}__glmm{glmm_id}"
     return run_info + '.pkl', f"{run_info}__checkpoints" + ext
 
 
@@ -40,7 +40,7 @@ def main():
     output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
     setup_log_file_handler(output_folder / 'logs')
 
-    output_filename_default, checkpoints_filename_default = make_names(pargs.n_boot, pargs.effect)
+    output_filename_default, checkpoints_filename_default = make_names(pargs.n_boot, pargs.glmm_id)
 
     logger.info(f"Outputs will be saved to folder: {output_folder}")
     output_filename = pargs.output_filename or output_filename_default
@@ -58,7 +58,7 @@ def main():
     else:
         checkpoint_path = None
 
-    prep_func = getattr(mres, f"prep_{pargs.effect}_effect")
+    prep_func = getattr(mres, f"prep_glmm{pargs.glmm_id}")
     glmm, data_df = prep_func(variant=pargs.variant, metric=pargs.metric)
 
     bs_results = glmm.run_bootstrap(

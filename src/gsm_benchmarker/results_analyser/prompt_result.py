@@ -64,30 +64,22 @@ class PromptResult:
         )
 
     @cached_property
-    def variant_effect(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+    def glmm1_results(self) -> tuple[pd.DataFrame, pd.DataFrame]:
         """Compute and cache the GLMM-based variant effect table for the prompt.
 
         The table contains coefficient estimates, p-values and derived odds
         ratios per model for the 'main' variant vs baseline.
         """
-        return self.mres.analyse_variant_effect(variant='main', metric=self.metric, models=self.models)
+        return self.mres.run_glmm1(variant='main', metric=self.metric, models=self.models)
 
-    def variant_effect_to_latex(self, alpha=0.05, projected_alpha: float | None = None,
-                                model_order: list[str] | None = None, position: str = "H"):
-        df = self.variant_effect[0].copy()
-        diagnostics_df = self.variant_effect[1]
+    def glmm1_results_to_latex(self, alpha=0.05, projected_alpha: float | None = None,
+                               model_order: list[str] | None = None, position: str = "H"):
+        df = self.glmm1_results[0].copy()
+        diagnostics_df = self.glmm1_results[1]
 
-        df['odds_ratio'] = np.exp(df['estimate']).round(2)
-        df['convergent'] = ~diagnostics_df['convergence_messages'].astype(bool)
-
-        # Calculate the 95% CI bounds for the log-odds, then exponentiate them
-        # The z-score for a 95% confidence interval is approx 1.96
-        df['or_ci_lower'] = np.exp(df['estimate'] - (1.96 * df['std_err'])).round(2)
-        df['or_ci_upper'] = np.exp(df['estimate'] + (1.96 * df['std_err'])).round(2)
-
-        # random effect variance and std. dev. of random effect
-        df['ranef_variance'] = diagnostics_df['ranef_variance']
-        df['ranef_sd'] = diagnostics_df['ranef_sd']
+        df['odds_ratio'] = np.exp(df['boot_median'])
+        df['boot_ci_upper'] = np.exp(df['boot_ci_upper_log'])
+        df['boot_ci_lower'] = np.exp(df['boot_ci_lower_log'])
 
         if self.models is not None:
             df = df[df.index.isin(self.models)]
@@ -121,28 +113,30 @@ class PromptResult:
             'GSM-Base acc': df['GSM8K_acc'].apply(fmt(1)),
             'GSM-Variants acc': df['main_acc'].apply(fmt(1)),
             r'$\Delta$ Acc': df['acc_diff'].apply(fmt(2)),
-            'P value': df['p_value'].apply(fmt_p_val(3)),
+            'P value':  df.apply(lambda row: f"{row['p_value']:.3f}{' $\\ddagger$' if not row['agreement'] else ''}", axis=1),
             'Corrected P value': correct_p_values(df['p_value']).apply(fmt_p_val(3))
         }, index=df.index)
         df1.index.name = 'Model'
 
 
         df2 = pd.DataFrame({
-            'Odds ratio': df.apply(lambda row: f"{row['odds_ratio']:.2f}{' $\\dagger$' if not row['convergent'] else ''}", axis=1),
-            r'95\% CI': df.apply(lambda row: f"[{row['or_ci_lower']:.2f}, {row['or_ci_upper']:.2f}]", axis=1),
-            'Z value': df['z_value'].apply(fmt(2)),
-            'Std. error': df['std_err'].apply(fmt(2)),
-            'Rand. eff. variance $\pm$ std. dev': df.apply(lambda row: f"{row['ranef_variance']:.2f} $\pm$ {row['ranef_sd']:.2f}", axis=1)
+            'Odds ratio': df.apply(lambda row: f"{row['odds_ratio']:.2f}", axis=1),
+            r'95\% CI': df.apply(lambda row: f"[{row['boot_ci_lower']:.2f}, {row['boot_ci_upper']:.2f}]", axis=1),
+            'Rand. eff. variance $\pm$ std. dev': df.apply(
+                lambda row: f"{row['single_ranef_variance']:.2f} $\pm$ {row['single_ranef_sd']:.2f}", axis=1),
+            'N estimates': df['boot_n_clean'],
         }, index=df.index)
         df2.index.name = 'Model'
 
         caption1 = f"Results of {self.full_label}"
+        if not df['agreement'].all():
+            caption1 += (" The $\\ddagger$ symbol marks cases where significance estimated with Wald method "
+                         "did not match the bootstrap estimate.")
+
         df1_latex = pandas_to_latex(df1, label=f"tab:{self.short_label}-results", caption=caption1,
                                     clean_header=False, position=position)
 
         caption2 = f"Additional statistics for results of {self.full_label}."
-        if not df['convergent'].all():
-            caption2 += " Cases of non-convergent fits marked with $\\dagger$."
         df2_latex = pandas_to_latex(df2, label=f"tab:{self.short_label}-stats", caption=caption2,
                                     clean_header=False, position=position)
 
@@ -155,13 +149,13 @@ class PromptResult:
         return self.pea
 
     @cached_property
-    def number_effect(self) -> tuple[pd.DataFrame, pd.DataFrame]:
-        return self.mres.analyse_number_effect('main', metric=self.metric, models=self.models)
+    def glmm2_results(self) -> tuple[pd.DataFrame, pd.DataFrame]:
+        return self.mres.run_glmm2('main', metric=self.metric, models=self.models)
 
-    def plot_variant_effect(self, **kwargs):
+    def plot_glmm1(self, **kwargs):
         """Produce GLMM visualisations for the variant effect of this prompt."""
         figs = plot_glmm(
-            self.variant_effect[0],
+            self.glmm1_results[0],
             'acc_diff',
             "Variant performance delta, pp",
             bar_colour=self.colour.value,
@@ -186,7 +180,7 @@ class PromptResult:
         return fig
 
     def get_significant_models(self, alpha: float, drop_only: bool = False):
-        df = self.variant_effect[0]
+        df = self.glmm1_results[0]
         if drop_only:
             df = df[df.acc_diff < 0]
         models = df[df.p_value < alpha].sort_values('estimate', ascending=True).index.tolist()
@@ -194,31 +188,31 @@ class PromptResult:
 
     def summary(self, alpha: float = 0.05):
 
-        variant_effect_df, variant_effect_diagnostics_df = self.variant_effect
+        glmm1_df, glmm1_diagnostics_df = self.glmm1_results
 
         d = {
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
             'main_acc': self.mres.variants['main'].get_accuracies_per_model(metric=self.metric),
-            'delta_symb_acc_diff': variant_effect_df['acc_diff'],
-            'delta_symb_log_or': variant_effect_df['estimate'],
-            'delta_symb_or': variant_effect_df['odds_ratio'],
-            'delta_symb_p_value': variant_effect_df['p_value'],
-            'delta_symb_significant': variant_effect_df['p_value'] < alpha,
-            'delta_symb_converged': ~variant_effect_diagnostics_df['convergence_messages'].astype(bool),
-            'delta_symb_singular': variant_effect_diagnostics_df['is_singular'],
+            'acc_diff': glmm1_df['acc_diff'],
+            'variant_effect_log_or': glmm1_df['estimate'],
+            'variant_effect_or': glmm1_df['odds_ratio'],
+            'variant_effect_p_value': glmm1_df['p_value'],
+            'variant_effect_significant': glmm1_df['p_value'] < alpha,
+            'variant_effect_converged': ~glmm1_diagnostics_df['convergence_messages'].astype(bool),
+            'variant_effect_singular': glmm1_diagnostics_df['is_singular'],
         }
 
-        number_effect_df, number_effect_diagnostics_df = self.number_effect
-        for (variable, variable_label) in (('sum_logs_c', 'number_effect'), ('is_variant', 'delta_symb_ne')):
-            df_ne = number_effect_df.xs(variable, level='variable')
+        glmm2_df, glmm2_diagnostics_df = self.glmm2_results
+        for (variable, variable_label) in (('gamma_c', 'number_effect'), ('is_variant', 'nec_variant_effect')):
+            df_ne = glmm2_df.xs(variable, level='variable')
 
             d |= {
                 f'{variable_label}_log_or': df_ne['estimate'],
                 f'{variable_label}_or': df_ne['odds_ratio'],
                 f'{variable_label}_p_value': df_ne['p_value'],
                 f'{variable_label}_significant': df_ne['p_value'] < alpha,
-                f'{variable_label}_converged': ~number_effect_diagnostics_df['convergence_messages'].astype(bool),
-                f'{variable_label}_singular': number_effect_diagnostics_df['is_singular'],
+                f'{variable_label}_converged': ~glmm2_diagnostics_df['convergence_messages'].astype(bool),
+                f'{variable_label}_singular': glmm2_diagnostics_df['is_singular'],
             }
 
         df = pd.DataFrame(d).transpose()
@@ -262,7 +256,7 @@ class MultiPromptResult:
         )
         return fig
 
-    def number_effect_to_latex(self, v="number_effect", models: list[str] | None = None, position='H'):
+    def glmm2_to_latex(self, v="number_effect", models: list[str] | None = None, position='H'):
         def get_q(name):
             return self.summary[models].xs(name, level='quantity').T
 
