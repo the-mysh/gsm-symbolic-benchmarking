@@ -28,9 +28,10 @@ def make_parser():
     return parser
 
 
-def make_names(n_boot: int, glmm_id: str, ext='.pkl'):
+def make_names(n_boot: int, glmm_id: str):
+    ext = "pkl"
     run_info = f"n_boot_{n_boot}__glmm{glmm_id}"
-    return run_info + '.pkl', f"{run_info}__checkpoints" + ext
+    return f"{run_info}.{ext}", f"{run_info}__wald.{ext}", f"{run_info}__checkpoints.{ext}"
 
 
 def main():
@@ -40,23 +41,21 @@ def main():
     output_folder = pargs.output_path or pargs.data_path.parent/"bootstrap"
     setup_log_file_handler(output_folder / 'logs')
 
-    output_filename_default, checkpoints_filename_default = make_names(pargs.n_boot, pargs.glmm_id)
+    output_filename_bootstrap, output_filename_wald, checkpoints_filename = make_names(pargs.n_boot, pargs.glmm_id)
 
     logger.info(f"Outputs will be saved to folder: {output_folder}")
-    output_filename = pargs.output_filename or output_filename_default
-    output_path = output_folder/output_filename
+    output_path_bootstrap = output_folder/output_filename_bootstrap
+    output_path_wald = output_folder/output_filename_wald
+    checkpoints_path = output_folder/checkpoints_filename
 
     logger.info(f"Loading data from {pargs.data_path}")
     mres = MultiVariantMultiModelResultsAnalyser(pargs.data_path)
     logger.debug("Data loaded")
 
     if pargs.save_checkpoints:
-        checkpoint_filename = pargs.checkpoint_filename or checkpoints_filename_default
-        checkpoint_path = output_folder / checkpoint_filename
-        logger.info(f"Checkpoint path is: {checkpoint_path}")
-
+        logger.info(f"Checkpoint path is: {checkpoints_path}")
     else:
-        checkpoint_path = None
+        checkpoints_path = None
 
     prep_func = getattr(mres, f"prep_glmm{pargs.glmm_id}")
     glmm, data_df = prep_func(variant=pargs.variant, metric=pargs.metric)
@@ -64,16 +63,19 @@ def main():
     bs_results = glmm.run_bootstrap(
         data_df,
         n_boot=pargs.n_boot,
-        checkpoint_path=checkpoint_path,
+        checkpoint_path=checkpoints_path,
         ignore_previous_checkpoints=pargs.ignore_previous_checkpoints
     )
 
+    summary_df = glmm.summarise_bootstrap_results(bs_results)
+    summary_df.to_pickle(output_path_bootstrap)
+    logger.info(f"Bootstrap summary saved to {output_path_bootstrap}")
+
     logger.info("Adding single GLMM estimates (non-bootstrapped) for comparison")
     original_results, original_info = glmm.run(data_df)
-
-    summary_df = glmm.summarise_bootstrap_results(bs_results, original_results, original_info)
-    summary_df.to_pickle(output_path)
-    logger.info(f"Bootstrap summary saved to {output_path}")
+    wald_summary_df = glmm.summarise_wald_results(original_results, original_info)
+    wald_summary_df.to_pickle(output_path_wald)
+    logger.info(f"Wald summary saved to {output_path_wald}")
 
     print("Bootstrap summary:")
     print(summary_df)

@@ -341,23 +341,23 @@ class GLMMRunner:
                 ci_lower = ci_upper = boot_se = boot_mean = boot_median = boot_p_value = np.nan
 
             stats[effect_label] = {
-                "boot_ci_upper_log": ci_upper,
-                "boot_ci_lower_log": ci_lower,
-                "boot_se_log": boot_se,
-                "boot_mean_log": boot_mean,
-                "boot_median_log": boot_median,
-                "boot_p_value": boot_p_value
+                "ci_upper_log": ci_upper,
+                "ci_lower_log": ci_lower,
+                "se_log": boot_se,
+                "mean_log": boot_mean,
+                "median_log": boot_median,
+                "p_value": boot_p_value
             }
 
         full_summary['stats'] = pd.DataFrame(stats)
 
         full_summary['info'] = {
-                'boot_n_requested': n_boot,
-                'boot_n_failed': model_result.n_failed,
-                'boot_n_nonconverged': model_result.n_nonconverged,
-                'boot_n_singular': model_result.n_singular,
-                'boot_n_clean': model_result.n_clean,
-                'boot_elapsed_seconds': elapsed,
+                'n_requested': n_boot,
+                'n_failed': model_result.n_failed,
+                'n_nonconverged': model_result.n_nonconverged,
+                'n_singular': model_result.n_singular,
+                'n_clean': model_result.n_clean,
+                'elapsed_seconds': elapsed,
             }
 
         logger.debug(
@@ -369,12 +369,9 @@ class GLMMRunner:
         return full_summary
 
     @staticmethod
-    def summarise_bootstrap_results(results: dict, single_estimates_df: pd.DataFrame | None = None,
-                                    single_info_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    def summarise_bootstrap_results(results: dict) -> pd.DataFrame:
         """
         Turn the results dict into a tidy summary DataFrame.
-
-        Optionally, compare against original (non-bootstrap) point estimates.
         """
 
         rows = {}
@@ -385,26 +382,27 @@ class GLMMRunner:
             rows[model_name] = stats.T.join(info_df.T)
 
         summary_df = pd.concat(rows)
+        return summary_df
 
-        if single_estimates_df is not None:
-            sest = single_estimates_df['estimate']
-            summary_df['single_estimate'] = sest
+    @staticmethod
+    def summarise_wald_results(estimates_df: pd.DataFrame, info_df: pd.DataFrame) -> pd.DataFrame:
 
-            z_crit = 1.959964
-            sse = single_estimates_df['std_err']
-            summary_df['single_ci_lower_log'] = sest - z_crit * sse
-            summary_df['single_ci_upper_log'] = sest + z_crit * sse
+        summary_df = estimates_df[['estimate', 'std_err', 'p_value']].copy()
 
-            summary_df['single_p_value'] = single_estimates_df['p_value']
+        sest = estimates_df['estimate']
+        sse = estimates_df['std_err']
+        z_crit = 1.959964
 
-            if single_info_df is not None:
-                glmm_variables = summary_df.index.get_level_values(1).unique()
-                single_info_df = pd.concat({k: single_info_df for k in glmm_variables}).swaplevel()
+        summary_df['ci_lower_log'] = sest - z_crit * sse
+        summary_df['ci_upper_log'] = sest + z_crit * sse
 
-                summary_df['single_singular'] = single_info_df['is_singular']
-                summary_df['single_nonconvergent'] = single_info_df['convergence_messages'].astype(bool)
-                summary_df['single_fit_failed'] = single_info_df['fit_failed']
-                summary_df['single_ranef_variance'] = single_info_df['ranef_variance']
-                summary_df['single_ranef_sd'] = single_info_df['ranef_sd']
+        glmm_variables = estimates_df.index.get_level_values(1).unique()
+        info_df = pd.concat({k: info_df for k in glmm_variables}).swaplevel()
+
+        summary_df['singular'] = info_df['is_singular']
+        summary_df['nonconvergent'] = info_df['convergence_messages'].astype(bool)
+        summary_df['fit_failed'] = info_df['fit_failed']
+        summary_df['ranef_variance'] = info_df['ranef_variance']
+        summary_df['ranef_sd'] = info_df['ranef_sd']
 
         return summary_df
