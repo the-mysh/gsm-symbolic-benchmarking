@@ -41,10 +41,10 @@ OUTPUTS_FOLDER = str(OUTPUTS) + "/"
 
 
 class _ResultsLoader:
-    def __init__(self, res_root, res_folders, metric, save_dest=None):
+    def __init__(self, res_root, res_folders, metric, save_dest=None, n_boot=None):
         self.results_root = res_root
         self.results_folders = res_folders
-        self.result_kwargs = dict(metric=metric, save_dest=save_dest)
+        self.result_kwargs = dict(metric=metric, save_dest=save_dest, n_boot=n_boot)
 
     @cached_property
     def gsm(self):
@@ -110,14 +110,15 @@ class _ResultsLoader:
         }
 
 
-results_loader = _ResultsLoader(RESULTS_ROOT, RESULTS_FOLDERS, METRIC, save_dest=OUTPUTS)
+def load_results(n_boot: int | None = None):
+    return _ResultsLoader(RESULTS_ROOT, RESULTS_FOLDERS, METRIC, save_dest=OUTPUTS, n_boot=n_boot)
 
 
 with open(RESOURCES/'mirzadeh-data.json') as f:
     original_results_df = pd.DataFrame(json.load(f))
     original_results_df = original_results_df.set_index('model')
 
-    models = results_loader.gsm.mres.models
+    models = load_results().gsm.mres.models
     original_results_df = original_results_df[original_results_df.index.isin(models)]
 
     original_model_order = original_results_df.index.tolist()

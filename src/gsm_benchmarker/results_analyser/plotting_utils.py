@@ -294,6 +294,8 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None,
                               sort_models: bool = False
                               ) -> tuple[pd.DataFrame, dict[str, SignificancePoint], list[str] | None]:
 
+    est_key = 'boot_median_log'
+
     p_thresholds = _define_significance_points(projected_alpha)
 
     if metric is not None:
@@ -303,7 +305,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None,
     def get_colour(row):
         default_colour = p_thresholds["not_significant"].colour
         p = row['boot_p_value']
-        is_drop = bool(row['boot_median'] < 0)
+        is_drop = bool(row[est_key] < 0)
 
         if np.isnan(p):
             return default_colour
@@ -318,7 +320,7 @@ def _prepare_odds_ratios_data(df: pd.DataFrame, metric: str | None = None,
 
     if model_order is None:
         if sort_models:
-            model_order = df_plot.sort_values(by='odds_ratio_plot', ascending=False).index.to_list()
+            model_order = df_plot.sort_values(by=est_key, ascending=False).index.to_list()
 
     df_plot = df_plot.reset_index()
 
@@ -338,6 +340,8 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     order of models used to generate the plot.
     """
 
+    est_key = 'boot_median_log'
+
     df_plot, p_thresholds, model_order = _prepare_odds_ratios_data(
         df, metric=metric, projected_alpha=projected_alpha,
         model_order=model_order, sort_models=sort_models
@@ -350,7 +354,7 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     for i, row in df_plot.iterrows():
         y = row['model']
 
-        if np.isnan(row['boot_median']):
+        if np.isnan(row[est_key]):
             ax.scatter(x=[1], y=[y], marker='x', color='k', lw=0.5, s=50)
             continue
 
@@ -359,7 +363,7 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
         ax.plot([row['boot_ci_lower_log'], row['boot_ci_upper_log']], [y, y], '|', c=ci_colour, ms=15)
 
         # draw the dot using the dynamically assigned colour (depending on significance)
-        ax.scatter(x=row['boot_median'], y=y, color=row['colour'], ec='black', s=80, zorder=2, ls='-', lw=0.5, marker='o')
+        ax.scatter(x=row[est_key], y=y, color=row['colour'], ec='black', s=80, zorder=2, ls='-', lw=0.5, marker='o')
 
     ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
 
@@ -373,7 +377,7 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
             mfc=point.colour, label=point.label.format(point.threshold)
         ) for point in p_thresholds.values() if point.colour in point_colours
     ]
-    if np.isnan(df_plot.odds_ratio).any():
+    if np.isnan(df_plot[est_key]).any():
         legend_elements.append(
             Line2D([0], [0], marker='x', c='k', mec='black', mew=0.5, ms=8, lw=0, label="Could not compute"))
 

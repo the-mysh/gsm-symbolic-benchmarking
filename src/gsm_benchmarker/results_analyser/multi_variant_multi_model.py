@@ -65,8 +65,28 @@ class MultiVariantMultiModelResultsAnalyser:
         else:
             self._summary_data = summary_data
             self._variants = variants
-        self._bootstrap_glmm1 = None
-        self._bootstrap_glmm2 = None
+            self._bootstrap_glmm1 = None
+            self._bootstrap_glmm2 = None
+
+    @property
+    def bootstrap_glmm1(self):
+        if self._bootstrap_glmm1:
+            df = self._bootstrap_glmm1.summary_df
+            df.index.names = ['model', 'metric']
+
+            acc = self.get_accuracy_summary(variant='main', metric='correct').groupby('model').mean()
+            acc['metric'] = 'is_variant'
+            acc = acc.reset_index().set_index(['model', 'metric'])
+            df = pd.concat([df, acc], axis=1, join='outer')
+
+            return df
+
+    @property
+    def bootstrap_glmm2(self):
+        if self._bootstrap_glmm2:
+            df = self._bootstrap_glmm2.summary_df
+            df.index.names = ['model', 'metric']
+            return df
 
     @property
     def summary_data(self):
@@ -122,13 +142,14 @@ class MultiVariantMultiModelResultsAnalyser:
         df_summary = concat(summary_data_dict)
 
         if n_boot is not None:
-            bootstrap_variant = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='1')
-            bootstrap_number = BootstrapResult(dir_path, n_boot=n_boot, glmm_id='2')
+            boot_path = dir_path.parent / 'bootstrap'
+            bootstrap_glmm1 = BootstrapResult(boot_path, n_boot=n_boot, glmm_id='1')
+            bootstrap_glmm2 = BootstrapResult(boot_path, n_boot=n_boot, glmm_id='2')
         else:
-            bootstrap_variant = None
-            bootstrap_number = None
+            bootstrap_glmm1 = None
+            bootstrap_glmm2 = None
 
-        return df_summary, variants, bootstrap_variant, bootstrap_number
+        return df_summary, variants, bootstrap_glmm1, bootstrap_glmm2
 
     def _check_variant(self, variant: str):
         if variant not in self._variants:
