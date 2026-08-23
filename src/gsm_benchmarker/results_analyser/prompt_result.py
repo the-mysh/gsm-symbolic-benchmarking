@@ -84,7 +84,7 @@ class PromptResult:
         df['boot_ci_lower'] = np.exp(df['boot_ci_lower_log'])
 
         if self.models is not None:
-            df = df[df.index.isin(self.models)]
+            df = df[df.index.isin(self.models, level='model')]
 
         if model_order is not None:
             df = df.sort_index(
@@ -128,7 +128,7 @@ class PromptResult:
                 lambda row: (
                         f"{row['wald_ranef_variance']:.2f} " + r"$\pm$" + f" {row['wald_ranef_sd']:.2f}"
                 ), axis=1),
-            'N estimates': df['boot_n_clean'],
+            'N estimates': df['boot_n_clean'].apply(fmt(0)),
         }, index=df.index)
         df2.index.name = 'Model'
 
@@ -185,14 +185,16 @@ class PromptResult:
 
     def get_significant_models(self, alpha: float, drop_only: bool = False):
         df = self.glmm1_results
+        if df is None:
+            return None
         if drop_only:
             df = df[df.acc_diff < 0]
-        models = df[df.boot_p_value < alpha].sort_values('boot_median_log', ascending=True).index.tolist()
+        models = df[df.boot_p_value < alpha].sort_values('boot_median_log', ascending=True).index.get_level_values('model').tolist()
         return models
 
     def summary(self, alpha: float = 0.05):
 
-        g1 = self.glmm1_results
+        g1 = self.glmm1_results.xs('is_variant', level='metric')
 
         d = {
             'GSM8K_acc': self.mres.variants['GSM8K'].get_accuracies_per_model(metric=self.metric),
@@ -206,13 +208,14 @@ class PromptResult:
 
         g2 = self.glmm2_results
         for (variable, variable_label) in (('gamma_c', 'number_effect'), ('is_variant', 'nec_variant_effect')):
-            df_ne = g2.xs(variable, level='variable')
+            df_ne = g2.xs(variable, level='metric')
 
             d |= {
                 f'{variable_label}_log_or': df_ne['boot_median_log'],
                 f'{variable_label}_or': np.exp(df_ne['boot_median_log']),
                 f'{variable_label}_p_value': df_ne['boot_p_value'],
                 f'{variable_label}_significant': df_ne['boot_p_value'] < alpha,
+                f'{variable_label}_agreement': df_ne['agreement'],
             }
 
         df = pd.DataFrame(d).transpose()
@@ -262,7 +265,7 @@ class MultiPromptResult:
 
         odds_ratios = get_q(f'{v}_or')
         p_values = get_q(f'{v}_p_value')
-        convergent = get_q(f'{v}_converged')
+        agreement = get_q(f'{v}_agreement')
 
         p_values_corrected = p_values.apply(
             lambda col: multipletests(col, alpha=0.05, method='holm')[1],
@@ -276,9 +279,9 @@ class MultiPromptResult:
         # Iterate and apply formatting
         for col in df_combined.columns:
             for idx in df_combined.index:
-                df_combined.at[idx, col] = self.format_cell(
+                df_combined.at[idx, col] = self.format_glmm2_cell(
                     odds_ratios.at[idx, col],
-                    convergent.at[idx, col],
+                    agreement.at[idx, col],
                     p_values.at[idx, col],
                     p_values_corrected.at[idx, col]
                 )
@@ -288,8 +291,8 @@ class MultiPromptResult:
 
         caption = ("Odds ratios and significance of the number effect across models and prompt formats. "
                    "Formatted as: Odds Ratio \\\\ Raw $p$ / Corrected $p$.")
-        if not convergent.all().all():
-            caption += " Cases of non-convergent fits marked with $\\dagger$."
+        if not agreement.all().all():
+            caption += r" The $\\ddagger$ symbol marks cases where Wald-derived statistical significance status does not match the bootstrap one."
 
         # Export to LaTeX. escape=False is crucial here so pandas doesn't break our LaTeX tags.
         latex_table = df_combined.to_latex(
@@ -324,16 +327,17 @@ class MultiPromptResult:
         return base_str
 
     @staticmethod
-    def format_cell(or_val, convergent, p_raw, p_corr):
+    def format_glmm2_cell(or_val, agreement, p_raw, p_corr):
         """Combine OR and p-values into a LaTeX makecell string.
 
         The returned string contains the odds ratio on the first line and the
         raw/corrected p-values on the second line.
         """
         or_str = f"{or_val:.2f}"
-        if not convergent:
-            or_str += " $\\dagger$"  # add a dagger symbol for non-convergent fits
         p_raw_str = MultiPromptResult.format_p_value(p_raw)
+        if not agreement:
+            p_raw_str += r" $\\ddagger$"  # add a dagger symbol for non-convergent fits
+
         p_corr_str = MultiPromptResult.format_p_value(p_corr)
 
         # \\\\ tells makecell to break the line inside the table cell
