@@ -15,8 +15,8 @@ class BootstrapResult:
         self.n_boot = n_boot
 
         bootstrap_filename, wald_filename, checkpoints_filename = make_bootstrap_names(n_boot, glmm_id)
-        self.boot_df = pd.read_pickle(self.data_path / bootstrap_filename)
-        self.wald_df = pd.read_pickle(self.data_path / wald_filename)
+        self.boot_df = pd.read_pickle(self.data_path / bootstrap_filename).sort_index()
+        self.wald_df = pd.read_pickle(self.data_path / wald_filename).sort_index()
 
         self.comparison_df = self._combine_results(alpha=alpha)
 
@@ -26,6 +26,9 @@ class BootstrapResult:
             logger.warning("Full results not available")
 
     def _combine_results(self, alpha=0.05):
+        # inconsistent data saving error patch
+        self.boot_df.index.names = self.wald_df.index.names
+
         self.wald_df['significant'] = self.wald_df['p_value'] < alpha
         self.boot_df['significant'] = self.boot_df['p_value'] < alpha
 
