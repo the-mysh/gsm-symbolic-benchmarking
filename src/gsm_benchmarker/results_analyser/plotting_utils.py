@@ -488,7 +488,8 @@ def plot_acc_change_distribution(df: pd.DataFrame, col_name: str = 'acc_diff', l
 @save_plot("prompts_variant_effect", "prompts_number_effect")
 def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str, str], models: list[str] | None = None,
                            add_bar_labels: bool = False, x_labels_rotation: float = 0,
-                           x_labels_ha='center', figsize=(10, 10), bottom=0.35, second_legend_offset=0.25):
+                           x_labels_ha='center', figsize=(10, 10), bottom=0.35,
+                           second_legend_offset=0.25, first_legend_offset=0.):
     """Plot two summary figures comparing prompt formats and effects.
 
     Returns two Figures: one showing accuracy and delta statistics, another
@@ -554,7 +555,7 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
         legend1 = ax_bottom.legend(
             handles=[Patch(facecolor=colours[prompt], edgecolor='white', label=prompt) for prompt in prompts],
             loc='upper center',
-            bbox_to_anchor=(0.5, -bottom),  # below bottom axis
+            bbox_to_anchor=(0.5, -bottom - first_legend_offset),  # below bottom axis
             ncol=5,
             title="Prompt formats",
             frameon=True
@@ -570,7 +571,6 @@ def plot_prompt_comparison(all_prompts_summary: pd.DataFrame, colours: dict[str,
             loc='upper center',
             bbox_to_anchor=(0.5, -bottom - second_legend_offset),  # below the first legend
             ncol=2,
-            title="Effect significance and GLMM diagnostics",
             frameon=True
         )
 
