@@ -33,6 +33,11 @@ RESULTS_FOLDERS = {
     'long_code': "noq_code_long__12_05/final"
 }
 
+EXTRA_RESULTS_FOLDERS = {
+    'short_code_fitlered': "noq_code_short__12_05__filtered/final",
+    'long_code_filtered': "noq_code_long__12_05__filtered/final"
+}
+
 RESOURCES = here/"resources"
 
 OUTPUTS = here/"outputs"
@@ -41,9 +46,10 @@ OUTPUTS_FOLDER = str(OUTPUTS) + "/"
 
 
 class _ResultsLoader:
-    def __init__(self, res_root, res_folders, metric, save_dest=None, n_boot=None):
+    def __init__(self, res_root, res_folders, extra_res_folders, metric, save_dest=None, n_boot=None):
         self.results_root = res_root
         self.results_folders = res_folders
+        self.extra_results_folders = extra_res_folders
         self.result_kwargs = dict(metric=metric, save_dest=save_dest, n_boot=n_boot)
 
     @cached_property
@@ -100,6 +106,28 @@ class _ResultsLoader:
         )
 
     @cached_property
+    def short_code_filtered(self):
+        return PromptResult(
+            self.results_root / self.extra_results_folders['short_code_fitlered'],
+            colour=self.short_code.colour.darken(0.5),
+            full_label="Simple code-output prompt (filtered)",
+            short_label="code-simple-filtered",
+            baseline=self.gsm.mres,
+            **self.result_kwargs
+        )
+
+    @cached_property
+    def long_code_filtered(self):
+        return PromptResult(
+            self.results_root / self.extra_results_folders['long_code_filtered'],
+            colour=self.long_code.colour.darken(0.5),
+            full_label="Structured code-output prompt (filtered)",
+            short_label="code-structured-filtered",
+            baseline=self.gsm.mres,
+            **self.result_kwargs
+        )
+
+    @cached_property
     def full_results(self):
         return {
             'GSM': self.gsm,
@@ -111,7 +139,7 @@ class _ResultsLoader:
 
 
 def load_results(n_boot: int | None = None):
-    return _ResultsLoader(RESULTS_ROOT, RESULTS_FOLDERS, METRIC, save_dest=OUTPUTS, n_boot=n_boot)
+    return _ResultsLoader(RESULTS_ROOT, RESULTS_FOLDERS, EXTRA_RESULTS_FOLDERS, METRIC, save_dest=OUTPUTS, n_boot=n_boot)
 
 
 with open(RESOURCES/'mirzadeh-data.json') as f:
