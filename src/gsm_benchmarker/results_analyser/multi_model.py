@@ -45,12 +45,6 @@ class MultiModelResultsAnalyser:
             self._summary_data = self._make_summary_df(summary_data_dict)
             self._full_data = self._make_full_df(full_data_dict) if full_data_dict else None
 
-    def get_clean_data_object(self) -> 'MultiModelResultsAnalyser':
-        return MultiModelResultsAnalyser(
-            dir_path=self._dir_path,
-            full_data_df=self.full_data[~np.isnan(self.full_data.predicted_numerical_result)]
-        )
-
     @cached_property
     def full_data(self) -> pd.DataFrame:
         if self._full_data is None:

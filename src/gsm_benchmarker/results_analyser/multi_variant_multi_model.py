@@ -1,9 +1,6 @@
 """Analysis helpers for collections of dataset variants across models.
 
-This module supports comparing a baseline dataset variant (GSM8K) with one or
-more GSM-Symbolic variants. It provides statistical tests (Wilcoxon,
-GLMM-based) and utilities for plotting transitions and number-counts that
-appear in questions.
+This module supports comparing a baseline dataset variant (GSM8K) with one or more GSM-Symbolic variants.
 """
 
 import os
@@ -436,11 +433,4 @@ class MultiVariantMultiModelResultsAnalyser:
     def plot_number_counts(self, model: str | None = None, bin_edges: list[int | float] | None = None, **kwargs):
         raw_counts_df, binned_counts_df = self.get_number_counts(model=model, bin_edges=bin_edges)
         return plot_number_counts(raw_counts_df, binned_counts_df, **kwargs)
-
-    def get_clean_data_object(self):
-        return MultiVariantMultiModelResultsAnalyser(
-            dir_path=self._dir_path,
-            summary_data=None,
-            variants={k: v.get_clean_data_object() for k, v in self._variants.items()}
-        )
 
