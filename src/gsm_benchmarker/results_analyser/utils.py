@@ -34,7 +34,7 @@ def do_for_metrics(func):
     return wrapper
 
 
-def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, **kwargs) -> str:
+def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, index: bool = True, **kwargs) -> str:
     """Return a LaTeX representation of a pandas DataFrame.
 
     Parameters
@@ -58,7 +58,10 @@ def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool =
     tab.index.name = None
 
     # Generate the LaTeX string
-    latex_code = tab.style.format(escape=None).to_latex(
+    ts = tab.style
+    if not index:
+        ts = ts.hide(axis='index')
+    latex_code = ts.format(escape=None).to_latex(
         column_format='l' + 'c' * len(tab.columns), # No vertical bars
         position=position,          # ACL prefers 't' (top of page) or 'ht'
         hrules=True,           # triggers the booktabs lines (\toprule, etc.)

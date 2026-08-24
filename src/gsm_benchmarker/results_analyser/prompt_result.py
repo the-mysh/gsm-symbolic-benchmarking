@@ -59,7 +59,7 @@ class PromptResult:
 
     @cached_property
     def glmm1_results(self) -> pd.DataFrame | None:
-        return self._filter_glmm_result_df(self.mres.bootstrap_glmm1)
+        return self._filter_glmm_result_df(self.mres.bootstrap_summary_glmm1)
 
     def glmm1_results_to_latex(self, alpha=0.05, projected_alpha: float | None = None,
                                model_order: list[str] | None = None, position: str = "H"):
@@ -140,7 +140,7 @@ class PromptResult:
 
     @cached_property
     def glmm2_results(self) -> pd.DataFrame:
-        return self._filter_glmm_result_df(self.mres.bootstrap_glmm2)
+        return self._filter_glmm_result_df(self.mres.bootstrap_summary_glmm2)
 
     def plot_glmm1(self, **kwargs):
         """Produce GLMM visualisations for the variant effect of this prompt."""

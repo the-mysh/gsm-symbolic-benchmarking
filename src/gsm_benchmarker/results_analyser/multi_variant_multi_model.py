@@ -66,7 +66,15 @@ class MultiVariantMultiModelResultsAnalyser:
             self._bootstrap_glmm2 = None
 
     @property
-    def bootstrap_glmm1(self):
+    def bootstrap_glmm1(self) -> BootstrapResult | None:
+        return self._bootstrap_glmm1
+
+    @property
+    def bootstrap_glmm2(self) -> BootstrapResult | None:
+        return self._bootstrap_glmm2
+
+    @property
+    def bootstrap_summary_glmm1(self):
         if self._bootstrap_glmm1:
             df = self._bootstrap_glmm1.summary_df
             df.index.names = ['model', 'metric']
@@ -79,7 +87,7 @@ class MultiVariantMultiModelResultsAnalyser:
             return df
 
     @property
-    def bootstrap_glmm2(self):
+    def bootstrap_summary_glmm2(self):
         if self._bootstrap_glmm2:
             df = self._bootstrap_glmm2.summary_df
             df.index.names = ['model', 'metric']
