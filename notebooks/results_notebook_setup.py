@@ -34,7 +34,7 @@ RESULTS_FOLDERS = {
 }
 
 EXTRA_RESULTS_FOLDERS = {
-    'short_code_fitlered': "noq_code_short__12_05__filtered/final",
+    'short_code_filtered': "noq_code_short__12_05__filtered/final",
     'long_code_filtered': "noq_code_long__12_05__filtered/final"
 }
 
@@ -108,7 +108,7 @@ class _ResultsLoader:
     @cached_property
     def short_code_filtered(self):
         return PromptResult(
-            self.results_root / self.extra_results_folders['short_code_fitlered'],
+            self.results_root / self.extra_results_folders['short_code_filtered'],
             colour=self.short_code.colour.darken(0.5),
             full_label="Simple code-output prompt (filtered)",
             short_label="code-simple-filtered",

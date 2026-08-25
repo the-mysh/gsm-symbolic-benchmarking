@@ -16,7 +16,7 @@ from gsm_benchmarker.results_analyser import MultiVariantMultiModelResultsAnalys
 from gsm_benchmarker.results_analyser.prompt_effect_analyser import PromptEffectAnalyser
 from gsm_benchmarker.results_analyser.plotting_utils import (plot_glmm, plot_acc_change_distribution, Colour,
                                                              plot_prompt_comparison, plot_prompt_acc_evolution)
-from gsm_benchmarker.results_analyser.utils import pandas_to_latex, correct_p_values
+from gsm_benchmarker.results_analyser.utils import pandas_to_latex, correct_p_values, format_p_value, format_float
 
 
 @dataclass
@@ -77,32 +77,12 @@ class PromptResult:
                 key=lambda c: c.map({model: index for index, model in enumerate(model_order)})
             )
 
-        def fmt(precision=3):
-            th = 10**(-precision)
-            def wrapper(v):
-                if not precision:
-                    return str(round(v))
-                if abs(v) < th:
-                    return f"< {th:.{precision}f}"
-                return f"{v:.{precision}f}"
-            return wrapper
-
-        def fmt_p_val(precision=3):
-            str_fmt = fmt(precision=precision)
-            a = projected_alpha if projected_alpha is not None else alpha
-            def wrapper(v):
-                v_formatted = str_fmt(v)
-                if v < a:
-                    return r"\textbf{" + v_formatted + "}"
-                return v_formatted
-            return wrapper
-
         df1 = pd.DataFrame({
-            'GSM-Base acc': df['GSM8K_acc'].apply(fmt(1)),
-            'GSM-Variants acc': df['main_acc'].apply(fmt(1)),
-            r'$\Delta$ Acc': df['acc_diff'].apply(fmt(2)),
-            'P value':  df.apply(lambda row: f"{fmt_p_val(3)(row['boot_p_value'])}{' $\\ddagger$' if not row['agreement'] else ''}", axis=1),
-            'Corrected P value': correct_p_values(df['boot_p_value']).apply(fmt_p_val(3))
+            'GSM-Base acc': df['GSM8K_acc'].apply(format_float(1)),
+            'GSM-Variants acc': df['main_acc'].apply(format_float(1)),
+            r'$\Delta$ Acc': df['acc_diff'].apply(format_float(2)),
+            'P value':  df.apply(lambda row: f"{format_p_value(3)(row['boot_p_value'])}{' $\\ddagger$' if not row['agreement'] else ''}", axis=1),
+            'Corrected P value': correct_p_values(df['boot_p_value']).apply(format_p_value(3))
         }, index=df.index)
         df1.index.name = 'Model'
 
@@ -114,7 +94,7 @@ class PromptResult:
                 lambda row: (
                         f"{row['wald_ranef_variance']:.2f} " + r"$\pm$" + f" {row['wald_ranef_sd']:.2f}"
                 ), axis=1),
-            'N estimates': df['boot_n_clean'].apply(fmt(0)),
+            'N estimates': df['boot_n_clean'].apply(format_float(0)),
         }, index=df.index)
         df2.index.name = 'Model'
 
@@ -139,7 +119,7 @@ class PromptResult:
         return self.pea
 
     @cached_property
-    def glmm2_results(self) -> pd.DataFrame:
+    def glmm2_results(self) -> pd.DataFrame | None:
         return self._filter_glmm_result_df(self.mres.bootstrap_summary_glmm2)
 
     def plot_glmm1(self, **kwargs):
@@ -295,39 +275,21 @@ class MultiPromptResult:
         print(latex_table)
 
     @staticmethod
-    def format_p_value(p):
-        """Format a single p-value for LaTeX output.
-
-        Values under 0.001 are shown as a delta symbol; values under 0.05 are
-        additionally made bold.
-        """
-        # Check if p-value is less than 0.001
-        if p < 0.001:
-            # Use math mode for the less-than sign in LaTeX
-            base_str = r"$< \delta$"
-        else:
-            # Format to 3 decimal places
-            base_str = f"{p:.3f}"
-
-        # Apply bold if under 0.05 threshold
-        if p < 0.05:
-            return f"\\textbf{{{base_str}}}"
-
-        return base_str
-
-    @staticmethod
     def format_glmm2_cell(or_val, agreement, p_raw, p_corr):
         """Combine OR and p-values into a LaTeX makecell string.
 
         The returned string contains the odds ratio on the first line and the
         raw/corrected p-values on the second line.
         """
+
+        pf = format_p_value(3, use_delta=True)
+
         or_str = f"{or_val:.2f}"
-        p_raw_str = MultiPromptResult.format_p_value(p_raw)
+        p_raw_str = pf(p_raw)
         if not agreement:
             p_raw_str += r" $\ddagger$"  # add a dagger symbol for non-convergent fits
 
-        p_corr_str = MultiPromptResult.format_p_value(p_corr)
+        p_corr_str = pf(p_corr)
 
         # \\\\ tells makecell to break the line inside the table cell
         return f"\\makecell{{{or_str} \\\\ {p_raw_str} / {p_corr_str}}}"

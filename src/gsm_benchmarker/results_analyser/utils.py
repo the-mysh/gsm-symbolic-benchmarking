@@ -34,7 +34,8 @@ def do_for_metrics(func):
     return wrapper
 
 
-def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, index: bool = True, **kwargs) -> str:
+def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool = True, index=True,
+                    column_format: str | None = None, **kwargs) -> str:
     """Return a LaTeX representation of a pandas DataFrame.
 
     Parameters
@@ -44,7 +45,9 @@ def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool =
     position:
         LaTeX float position argument (default: 't')
     clean_header:
-        If True, sanitize column and index labels by escaping underscores.
+        If True, sanitise column and index labels by escaping underscores.
+    column_format:
+        LaTeX column format string.
     Additional keyword arguments are forwarded to pandas styling .to_latex.
     """
     tab = tab.copy()
@@ -57,18 +60,48 @@ def pandas_to_latex(tab: pd.DataFrame, position: str = 't', clean_header: bool =
     tab.columns.name = tab.index.name
     tab.index.name = None
 
-    # Generate the LaTeX string
-    ts = tab.style
+    n_columns = len(tab.columns)
     if not index:
-        ts = ts.hide(axis='index')
-    latex_code = ts.format(escape=None).to_latex(
-        column_format='l' + 'c' * len(tab.columns), # No vertical bars
-        position=position,          # ACL prefers 't' (top of page) or 'ht'
-        hrules=True,           # triggers the booktabs lines (\toprule, etc.)
+        n_columns -= 1
+
+    # Generate the LaTeX string
+    latex_code = tab.to_latex(
+        column_format=column_format or ('l' + 'c' * n_columns),
+        position=position,
+        index=index,
         **kwargs
     )
 
     return latex_code
+
+
+def format_float(precision=3, use_delta: bool = False, use_abs: bool = False):
+    th = 10 ** (-precision)
+
+    def wrapper(v):
+        if not precision:
+            return str(round(v))
+        if abs(v) < th:
+            pref = r"$|\cdot|$ " if use_abs else ""
+            if use_delta:
+                return pref + r"< $\delta$"
+            return pref + f"< {th:.{precision}f}"
+        return f"{v:.{precision}f}"
+
+    return wrapper
+
+
+def format_p_value(precision=3, alpha=0.05, projected_alpha: float | None = None, use_delta: bool = False):
+    str_fmt = format_float(precision=precision, use_delta=use_delta)
+    a = projected_alpha if projected_alpha is not None else alpha
+
+    def wrapper(v):
+        v_formatted = str_fmt(v)
+        if v < a:
+            return r"\textbf{" + v_formatted + "}"
+        return v_formatted
+
+    return wrapper
 
 
 def correct_p_values(p_values):
