@@ -1,6 +1,10 @@
-# GSM-Symbolic Benchmarker
+# The Importance of Being Statistically Earnest
 
-Reproducing and extending GSM-Symbolic benchmark. 
+This repository contains code, prompt formats, and other metadata used in the paper: 
+[The Importance of Being Statistically Earnest: A Critical Re-evaluation of GSM-Symbolic](https://arxiv.org/abs/2605.28700),
+presented at [EMNLP 2026](https://2026.emnlp.org/) (main conference; track: _Resources and Evaluation_).
+
+---
 
 See [notebooks](./notebooks), in particular [this one](./notebooks/full_results.ipynb), for analysis of results.
 
