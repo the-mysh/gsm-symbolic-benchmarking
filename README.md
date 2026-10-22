@@ -4,7 +4,16 @@ This repository contains code, prompt formats, and other metadata used in the pa
 [The Importance of Being Statistically Earnest: A Critical Re-evaluation of GSM-Symbolic](https://arxiv.org/abs/2605.28700),
 presented at [EMNLP 2026](https://2026.emnlp.org/) (main conference; track: _Resources and Evaluation_).
 
+TL;DR: Scientist from Apple [showed](https://proceedings.iclr.cc/paper_files/paper/2025/hash/ec2e7a896f8250986b3907f57621ce94-Abstract-Conference.html)
+that LLMs cannot solve grade school math problems if the openly known questions are modified (by changing names or values), pointing to data contamination.
+They took this result to mean that _LLMs cannot genuinely reason_.
+We show that:
+1) 60\% of their results are not statistically significant,
+2) if number load (using higher numerical values) is accounted for, that proportion rises to 80\%,
+3) models display varied failure modes when alternative prompt formats are used, so blanket statements about LLM reasoning capabilities should be avoided.
+
 ---
+
 
 See [notebooks](./notebooks), in particular [this one](./notebooks/full_results.ipynb), for analysis of results.
 
@@ -16,7 +25,7 @@ Prompt formats usage examples shown [in this notebook](./notebooks/prompting_exp
 
 
 ## Installation and related notes
-This project's set up to run with a [uv environment](https://docs.astral.sh/uv/).
+This project's set up to run with a [uv environment](https://docs.astral.sh/uv/) (see also the [cheat sheet](#uv-cheat-sheet) below)..
 
 Project dependencies are included in [pyproject.toml](./pyproject.toml).
 
@@ -36,8 +45,10 @@ $ Rscript setup.R
 **Important:** Whenever the installer prompts you to choose whether to update installed packages - ignore the updates 
 (enter empty line).
 
-**Note:** things might be much easier to set up if you use conda instead of uv (if you have the option). 
+_Note: I do not plan on maintaining the pymer4 dependency and I do not expect to be able to debug issues with it;
+if time allows, I will swap the GLMM backend to [statsmodels](https://www.statsmodels.org/stable/mixed_glm.html)._
 
+### `uv` cheat sheet
 
 To install the current package in the environment:
 
