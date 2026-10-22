@@ -1,6 +1,5 @@
 import logging
 from functools import cached_property
-import matplotlib.pyplot as plt
 import os
 from pathlib import Path
 import pandas as pd
@@ -8,14 +7,12 @@ import json
 
 
 from gsm_benchmarker.results_analyser.prompt_result import PromptResult
-from gsm_benchmarker.results_analyser.plotting_utils import Colour
+from gsm_benchmarker.results_analyser.plotting_utils import Colour, setup_plotting_style
 
 logger = logging.getLogger('notebook')
 
 
-plt.style.use('default')
-plt.style.use('seaborn-v0_8-muted')
-plt.style.use('seaborn-v0_8-darkgrid')
+setup_plotting_style()
 
 
 METRIC = "correct"

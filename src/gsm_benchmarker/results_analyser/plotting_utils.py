@@ -16,6 +16,76 @@ import matplotlib.ticker as mtick
 from pathlib import Path
 from typing import NamedTuple
 import logging
+from dataclasses import dataclass
+
+
+@dataclass
+class _ColourPresets:
+    variant_gsm_base: str = 'mediumslateblue'
+    variant_gsm_variants: str = 'darksalmon'
+    sp_strong_drop: str = 'brown'
+    sp_significant_drop: str = 'sandybrown'
+    sp_potentially_significant_drop: str = 'khaki'
+    sp_strong_rise: str = 'darkgreen'
+    sp_significant_rise = "limegreen"
+    sp_potentially_significant_rise: str = "palegreen"
+    sp_not_significant: str = "darkgrey"
+    ci: str = "darkgrey"
+    no_effect: str = "k"
+
+
+    def load_preset(self, preset_name: str = "presentation"):
+        match preset_name:
+            case "presentation":
+                self.sp_significant_drop = 'orangered'
+                self.sp_strong_drop = 'orange'
+                self.sp_not_significant = "gainsboro"
+                self.ci = "k"
+                self.no_effect = "sienna"
+            case _:
+                raise ValueError(f"Unknown preset name: {preset_name}")
+
+
+@dataclass
+class _LinePresets:
+    no_effect_lw: float | int = 1
+    ci_lw: float | int = 2
+    ci_end_ms: int = 15
+    ci_dot_ms: int = 80
+
+    def load_preset(self, preset_name: str = "presentation"):
+        match preset_name:
+            case "presentation":
+                self.no_effect_lw = 1.75
+                self.ci_lw = 0.5
+                self.ci_end_ms = 6
+                self.ci_dot_ms = 100
+            case _:
+                raise ValueError(f"Unknown preset name: {preset_name}")
+
+
+
+COLOUR_PRESETS = _ColourPresets()
+LINE_PRESETS = _LinePresets()
+
+
+def setup_plotting_style(preset_name: str = "paper"):
+    global COLOUR_PRESETS, LINE_PRESETS
+    COLOUR_PRESETS = _ColourPresets()
+    LINE_PRESETS = _LinePresets()
+
+    plt.style.use('default')
+    plt.style.use('seaborn-v0_8-muted')
+
+    match preset_name:
+        case "paper":
+            plt.style.use('seaborn-v0_8-darkgrid')
+        case "presentation":
+            plt.style.use('seaborn-v0_8-whitegrid')
+            COLOUR_PRESETS.load_preset(preset_name)
+            LINE_PRESETS.load_preset(preset_name)
+        case _:
+            raise ValueError(f"Unknown preset name: {preset_name}")
 
 
 logger = logging.getLogger(__name__)
@@ -128,6 +198,7 @@ class SignificancePoint(NamedTuple):
 
 
 def _sort_by_model(df, model_order: list[str]):
+    df = df[df.model.isin(model_order)]
     return df.sort_values(
         by='model',
         key=lambda col: col.map({model: index for index, model in enumerate(model_order)})
@@ -273,16 +344,17 @@ def plot_stats(cs: pd.DataFrame, n_models: int = 20, titles: dict | None = None,
 
 def _define_significance_points(projected_alpha: float | None):
     pp = " (p < {})"
+    cp = COLOUR_PRESETS
     p_thresholds = {
-        'strong_drop': SignificancePoint(0.01, True, 'brown', f'Strong drop' + pp),
-        'significant_drop': SignificancePoint(0.05, True, 'sandybrown', 'Significant drop' + pp),
+        'strong_drop': SignificancePoint(0.01, True, cp.sp_strong_drop, f'Strong drop' + pp),
+        'significant_drop': SignificancePoint(0.05, True, cp.sp_significant_drop, 'Significant drop' + pp),
         'potentially_significant_drop': SignificancePoint(
-            projected_alpha, True, 'khaki', 'Potentially significant drop' + pp),
-        'strong_rise': SignificancePoint(0.01, False, 'darkgreen', 'Strong rise' + pp),
-        'significant_rise': SignificancePoint(0.05, False, 'limegreen', 'Significant rise' + pp),
+            projected_alpha, True, cp.sp_potentially_significant_drop, 'Potentially significant drop' + pp),
+        'strong_rise': SignificancePoint(0.01, False, cp.sp_strong_rise, 'Strong rise' + pp),
+        'significant_rise': SignificancePoint(0.05, False, cp.sp_significant_rise, 'Significant rise' + pp),
         'potentially_significant_rise': SignificancePoint(
-            projected_alpha, False, 'palegreen', 'Potentially significant rise' + pp),
-        'not_significant': SignificancePoint(1, None, 'darkgray', f'Not significant')
+            projected_alpha, False, cp.sp_potentially_significant_rise, 'Potentially significant rise' + pp),
+        'not_significant': SignificancePoint(1, None, cp.sp_not_significant, f'Not significant')
     }
 
     return p_thresholds
@@ -348,7 +420,9 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     )
 
     fig, ax = plt.subplots(figsize=_get_fig_size(len(df_plot)))
-    ci_colour = 'darkgrey'
+
+    lne = ax.axvline(x=0, color=COLOUR_PRESETS.no_effect,
+                     linestyle='--', linewidth=LINE_PRESETS.no_effect_lw, label="Line of no effect")
 
     # plot CIs and coloured dots
     for i, row in df_plot.iterrows():
@@ -359,13 +433,11 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
             continue
 
         # draw CIs
-        ax.hlines(y, xmin=row['boot_ci_lower_log'], xmax=row['boot_ci_upper_log'], color=ci_colour, lw=2)
-        ax.plot([row['boot_ci_lower_log'], row['boot_ci_upper_log']], [y, y], '|', c=ci_colour, ms=15)
+        ax.hlines(y, xmin=row['boot_ci_lower_log'], xmax=row['boot_ci_upper_log'], color=COLOUR_PRESETS.ci, lw=LINE_PRESETS.ci_lw)
+        ax.plot([row['boot_ci_lower_log'], row['boot_ci_upper_log']], [y, y], '|', c=COLOUR_PRESETS.ci, ms=LINE_PRESETS.ci_end_ms)
 
         # draw the dot using the dynamically assigned colour (depending on significance)
-        ax.scatter(x=row[est_key], y=y, color=row['colour'], ec='black', s=80, zorder=2, ls='-', lw=0.5, marker='o')
-
-    ax.axvline(x=0, color='black', linestyle='--', linewidth=1.2, zorder=0)  # line of no effect
+        ax.scatter(x=row[est_key], y=y, color=row['colour'], ec='black', s=LINE_PRESETS.ci_dot_ms, zorder=2, ls='-', lw=0.5, marker='o')
 
     ax.set_xlabel('Log Odds Ratio')
 
@@ -373,13 +445,14 @@ def plot_models_odds_ratios(df, metric: str | None = None, projected_alpha: floa
     point_colours = df_plot.colour.unique()
     legend_elements = [
         Line2D(
-            [0], [0], marker='o', c='darkgrey', mec='black', mew=0.5, ms=10,
+            [0], [0], marker='o', c=COLOUR_PRESETS.ci, mec='black', mew=0.5, ms=10, lw=LINE_PRESETS.ci_lw,
             mfc=point.colour, label=point.label.format(point.threshold)
         ) for point in p_thresholds.values() if point.colour in point_colours
     ]
     if np.isnan(df_plot[est_key]).any():
         legend_elements.append(
             Line2D([0], [0], marker='x', c='k', mec='black', mew=0.5, ms=8, lw=0, label="Could not compute"))
+    legend_elements.append(lne)
 
     ax.legend(handles=legend_elements, title="Significance", frameon=True, fontsize=8)
 
@@ -424,7 +497,7 @@ def plot_for_metrics(func):
 
 
 @plot_for_metrics
-def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | None = None,
+def plot_glmm(df: pd.DataFrame, bars_value_col: str | None = None, bars_value_ylabel: str | None = None,
               metric: str | None = None, bar_colour: str | None = None, title: str | None = None,
               save_prefix: str | Path | None = None, model_order: list[str] | None = None, **kwargs):
     """Compose GLMM plots: odds ratios and bar/p-value panels.
@@ -439,13 +512,19 @@ def plot_glmm(df: pd.DataFrame, bars_value_col: str, bars_value_ylabel: str | No
         title=f"{title} - odds ratios{metric_text}" if title else None,
     )
 
-    f2 = plot_bars_and_p_bars(
-        df, metric, value_col=bars_value_col, p_value_col='boot_p_value', bar_colour=bar_colour,
-        model_order=model_order, value_label=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
-        title=f"{title} - magnitude and significance{metric_text}" if title else None,
-    )
+    if bars_value_col:
 
-    return f1, f2
+        f2 = plot_bars_and_p_bars(
+            df, metric, value_col=bars_value_col, p_value_col='boot_p_value', bar_colour=bar_colour,
+            model_order=model_order, value_label=bars_value_ylabel, save_prefix=save_prefix, **kwargs,
+            title=f"{title} - magnitude and significance{metric_text}" if title else None,
+        )
+        figs = f1, f2
+
+    else:
+        figs = f1,
+
+    return figs
 
 
 @plot_for_metrics

@@ -135,6 +135,17 @@ class PromptResult:
 
         return figs
 
+    def plot_glmm2(self, metric: str = 'is_variant', **kwargs):
+        """Produce GLMM visualisations for the variant effect of this prompt."""
+        figs = plot_glmm(
+            self.glmm2_results.xs(metric, level='metric'),
+            None,
+            save_prefix=self.save_dest/self.short_label if self.save_dest is not None else None,
+            **kwargs
+        )
+
+        return figs
+
     def plot_acc_change_dist(self, **kwargs):
         acc_change_raw = self._check_pea().get_accuracy_change(variant='main', metric=self.metric)
 
